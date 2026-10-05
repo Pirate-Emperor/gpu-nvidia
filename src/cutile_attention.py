@@ -161,6 +161,15 @@ def _validate_cutile_config(
     head_dim = q.shape[-1]
     value_dim = v.shape[-1]
 
+    if head_dim not in (32, 64, 128):
+        raise AttentionValidationError(
+            f"head dimension D={head_dim} is unsupported; expected one of 32, 64, 128"
+        )
+    if value_dim != head_dim:
+        raise AttentionValidationError(
+            f"self-attention requires Dv == D; got D={head_dim}, Dv={value_dim}"
+        )
+
     for name, value in (
         ("query tile", tile_q),
         ("key tile", tile_k),
