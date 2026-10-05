@@ -7,6 +7,12 @@ on:
   push:
     paths:
       - ".github/workflows/a100-correctness.yml"
+      - "src/**"
+      - "tests/**"
+      - "scripts/**"
+      - "run_attention.py"
+      - "requirements-dev.txt"
+      - "pyproject.toml"
 
 concurrency:
   group: a100-correctness-${{ github.repository }}-${{ github.ref }}
