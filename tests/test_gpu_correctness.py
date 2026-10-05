@@ -11,10 +11,20 @@ from reference import (
     passes_mixed_tolerance,
 )
 
-cp = pytest.importorskip("cupy")
-ct = pytest.importorskip("cuda.tile")
+if os.environ.get("REQUIRE_A100") == "1":
+    try:
+        import cupy as cp
+    except ImportError as exc:
+        pytest.fail(f"CuPy is required for A100 tests: {exc}", pytrace=False)
+    try:
+        import cuda.tile as ct
+    except ImportError as exc:
+        pytest.fail(f"cuTile is required for A100 tests: {exc}", pytrace=False)
+else:
+    cp = pytest.importorskip("cupy")
+    ct = pytest.importorskip("cuda.tile")
 
-from cutile_attention import CuTileUnavailableError, forward
+from cutile_attention import forward
 
 
 def require_a100():
