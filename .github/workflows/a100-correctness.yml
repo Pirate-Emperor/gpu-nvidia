@@ -15,28 +15,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Locate compute-node core_config
+      - name: Verify compute-node Python environment
         shell: bash
         run: |
           set -euo pipefail
-          CORE_CONFIG_FILE="$(
-            find "$HOME/gpu/project" -maxdepth 6 -type f \(               -name "core_config.py" -o               -path "*/core_config/__init__.py"             \) -print -quit 2>/dev/null || true
-          )"
-          if [ -z "$CORE_CONFIG_FILE" ]; then
-            echo "ERROR: core_config module was not found under $HOME/gpu/project"
-            echo "Visible candidate paths:"
-            find "$HOME/gpu/project" -maxdepth 5 \( -name "core_config.py" -o -path "*/core_config" \) -print 2>/dev/null | head -50 || true
-            exit 1
+          if [ -f "$HOME/.bashrc" ]; then
+            # GitHub's runner shell is non-interactive and does not source .bashrc.
+            # The compute environment may rely on it for PYTHONPATH/module setup.
+            source "$HOME/.bashrc"
           fi
-          CORE_CONFIG_DIR="$(dirname "$CORE_CONFIG_FILE")"
-          echo "Found core_config at: $CORE_CONFIG_FILE"
-          echo "CORE_CONFIG_DIR=$CORE_CONFIG_DIR" >> "$GITHUB_ENV"
-          echo "PYTHONPATH=$CORE_CONFIG_DIR:${PYTHONPATH:-}" >> "$GITHUB_ENV"
+          python3 -c "import core_config, inspect, os; print('core_config:', inspect.getfile(core_config)); print('HTTP_PROXY configured:', bool(os.environ.get('HTTP_PROXY'))); print('HTTPS_PROXY configured:', bool(os.environ.get('HTTPS_PROXY')))"
 
       - name: Create isolated Python environment
         shell: bash
         run: |
           set -euo pipefail
+          if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi
           python3 -m venv .venv
           python3 scripts/with_core_config.py .venv/bin/python -m pip install --upgrade pip
           python3 scripts/with_core_config.py .venv/bin/python -m pip install -r requirements-dev.txt
@@ -46,8 +40,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi
           nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
-          .venv/bin/python -c "import core_config; print('core_config import: OK')"
+          .venv/bin/python -c "import core_config; print('core_config import in venv: OK')"
           .venv/bin/python -c "import cupy; print('CuPy:', cupy.__version__)"
           .venv/bin/python -c "import cuda.tile as ct; print('cuTile import: OK')"
           .venv/bin/python scripts/environment_check.py
@@ -58,4 +53,5 @@ jobs:
           REQUIRE_A100: "1"
         run: |
           set -euo pipefail
+          if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi
           .venv/bin/python -m pytest -q
