@@ -8,7 +8,27 @@ on:
     paths:
       - ".github/workflows/a100-correctness.yml"
 
+concurrency:
+  group: a100-correctness-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  cpu-tests:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run CPU reference and contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py python3 -m venv .venv-cpu
+          python3 scripts/with_core_config.py .venv-cpu/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py .venv-cpu/bin/python -m pip install -r requirements-dev.txt
+          .venv-cpu/bin/python -m pytest -q -m "not gpu"
+
   correctness:
     runs-on: [self-hosted, linux, x64, gpu, a100]
     timeout-minutes: 45
