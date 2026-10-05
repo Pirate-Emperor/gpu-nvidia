@@ -40,7 +40,7 @@ def _build_kernel(
     head_dim: int,
     value_dim: int,
 ):
-    _, ct = _import_runtime()
+    cp, ct = _import_runtime()
 
     @ct.kernel
     def kernel(
@@ -223,9 +223,9 @@ def launch_device(
                 f"{name} must be a power of two for cuTile"
             )
 
-    out_gpu = q_gpu.copy() if False else __import__("cupy").empty(
+    out_gpu = cp.empty(
         (batch, heads, seq_len, value_dim),
-        dtype=__import__("cupy").float16,
+        dtype=cp.float16,
     )
 
     kernel = _build_kernel(tile.query, tile.key, head_dim, value_dim)
@@ -248,7 +248,6 @@ def launch_device(
         float(scale),
     )
 
-    cp = __import__("cupy")
     ct_stream = cp.cuda.get_current_stream()
     ct.launch(ct_stream, grid, kernel, kernel_args)
     return out_gpu
