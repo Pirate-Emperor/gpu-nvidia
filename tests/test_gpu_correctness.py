@@ -26,6 +26,8 @@ else:
 
 from cutile_attention import forward
 
+pytestmark = pytest.mark.gpu
+
 
 def require_a100():
     names = cp.cuda.runtime.getDeviceProperties(0)
@@ -70,12 +72,27 @@ def make_inputs(case, mode="normal"):
     return q, k, v
 
 
-@pytest.mark.parametrize("case", MANDATORY_CASES, ids=lambda c: c.name)
-def test_cutile_matches_independent_reference(case):
+TILE_CONFIGS = ((64, 64), (128, 128))
+GPU_CORRECTNESS_CONFIGS = tuple(
+    (case, tile_q, tile_k)
+    for case in MANDATORY_CASES
+    for tile_q, tile_k in TILE_CONFIGS
+    if case.N % tile_q == 0 and case.N % tile_k == 0
+)
+
+
+@pytest.mark.parametrize(
+    "case,tile_q,tile_k",
+    GPU_CORRECTNESS_CONFIGS,
+    ids=lambda values: values.name
+    if hasattr(values, "name")
+    else str(values),
+)
+def test_cutile_matches_independent_reference(case, tile_q, tile_k):
     require_a100()
     q, k, v = make_inputs(case)
 
-    actual = forward(q, k, v, tile_q=64, tile_k=64)
+    actual = forward(q, k, v, tile_q=tile_q, tile_k=tile_k)
     expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
 
     assert actual.shape == expected.shape
