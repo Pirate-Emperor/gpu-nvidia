@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpu-nvidia-cutile-attention"
+version = "0.1.0"
+description = "CS-6023 fused causal attention with NVIDIA cuTile, targeted at A100/SM80"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "numpy>=2.0,<3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
