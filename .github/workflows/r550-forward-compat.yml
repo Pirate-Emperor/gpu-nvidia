@@ -76,6 +76,14 @@ jobs:
           export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           python3 scripts/with_core_config.py bash -lc 'cd compat-experiment && if command -v apt-get >/dev/null 2>&1; then apt-get download cuda-compat-13-4; else echo "apt-get unavailable"; fi'
           find compat-experiment -maxdepth 1 -type f -printf "%f\n" | head -20
+          shopt -s nullglob
+          debs=(compat-experiment/cuda-compat-13-4*.deb)
+          if [ "${#debs[@]}" -gt 0 ]; then
+            mkdir -p compat-experiment/root
+            dpkg-deb -x "${debs[-1]}" compat-experiment/root
+            echo "=== Extracted compatibility libraries ==="
+            find compat-experiment/root/usr/local/cuda-13.4/compat -maxdepth 1 -type f -printf "%f\n" | sort
+          fi
 
       - name: Test cuTile with locally extracted compatibility package
         shell: bash
@@ -98,5 +106,5 @@ jobs:
           echo "Using compatibility directory: $COMPAT_DIR"
           export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
           export PYTHONPATH="$PWD/src:$PWD/tests:$HOME:${PYTHONPATH:-}"
-          .venv-r550/bin/python scripts/with_core_config.py -c 'import cupy as cp; print("CUDA runtime:",cp.cuda.runtime.runtimeGetVersion()); print("device:",cp.cuda.runtime.getDeviceProperties(0)["name"])'
-          .venv-r550/bin/python scripts/with_core_config.py -c 'import numpy as np; from cutile_attention import forward; q=np.zeros((1,1,64,32),dtype=np.float16); k=np.zeros((1,1,64,32),dtype=np.float16); v=np.ones((1,1,64,32),dtype=np.float16); o=forward(q,k,v,tile_q=64,tile_k=64); print("COMPAT cuTile SUCCESS",o.shape,o.dtype,float(o[0,0,0,0]))'
+          .venv-r550/bin/python -c 'import cupy as cp; print("CUDA runtime:",cp.cuda.runtime.runtimeGetVersion()); print("device:",cp.cuda.runtime.getDeviceProperties(0)["name"])'
+          .venv-r550/bin/python -c 'import numpy as np; from cutile_attention import forward; q=np.zeros((1,1,64,32),dtype=np.float16); k=np.zeros((1,1,64,32),dtype=np.float16); v=np.ones((1,1,64,32),dtype=np.float16); o=forward(q,k,v,tile_q=64,tile_k=64); print("COMPAT cuTile SUCCESS",o.shape,o.dtype,float(o[0,0,0,0]))'
