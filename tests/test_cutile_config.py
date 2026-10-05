@@ -26,6 +26,12 @@ def test_valid_cutile_configs(tile_q, tile_k):
     _validate_cutile_config(q, k, v, tile_q, tile_k)
 
 
+def test_all_required_head_dimensions_are_accepted():
+    for d in (32, 64, 128):
+        q, k, v = make_inputs(N=128, D=d, Dv=d)
+        _validate_cutile_config(q, k, v, 64, 64)
+
+
 @pytest.mark.parametrize(
     "tile_q,tile_k",
     [
@@ -42,15 +48,15 @@ def test_invalid_cutile_tile_shapes(tile_q, tile_k):
         _validate_cutile_config(q, k, v, tile_q, tile_k)
 
 
-def test_non_power_of_two_head_dimension_rejected_for_cutile():
-    q, k, v = make_inputs(D=96, Dv=96)
-    with pytest.raises(AttentionValidationError, match="head dimension"):
+def test_unsupported_head_dimension_rejected_for_cutile():
+    q, k, v = make_inputs(D=16, Dv=16)
+    with pytest.raises(AttentionValidationError, match="unsupported"):
         _validate_cutile_config(q, k, v, 64, 64)
 
 
-def test_non_power_of_two_value_dimension_rejected_for_cutile():
-    q, k, v = make_inputs(D=64, Dv=96)
-    with pytest.raises(AttentionValidationError, match="value dimension"):
+def test_value_dimension_mismatch_rejected_for_cutile():
+    q, k, v = make_inputs(D=64, Dv=32)
+    with pytest.raises(AttentionValidationError, match="Dv == D"):
         _validate_cutile_config(q, k, v, 64, 64)
 
 
