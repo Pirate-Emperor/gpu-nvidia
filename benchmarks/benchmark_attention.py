@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib.metadata
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -80,6 +82,9 @@ def parse_tile(value: str) -> tuple[int, int]:
 
 def run_case(case, cp, tiles, warmup, iterations):
     q, k, v = make_inputs(case, cp)
+    q32 = q.astype(cp.float32)
+    k32 = k.astype(cp.float32)
+    v32 = v.astype(cp.float32)
     output_bytes = case.B * case.H * case.N * case.Dv * np.dtype(np.float16).itemsize
     rows = []
 
@@ -90,11 +95,7 @@ def run_case(case, cp, tiles, warmup, iterations):
         fused_call = lambda: cutile_launch_device(
             q, k, v, tile_q=tile_q, tile_k=tile_k
         )
-        baseline_call = lambda: baseline_launch_device(
-            q.astype(cp.float32),
-            k.astype(cp.float32),
-            v.astype(cp.float32),
-        )
+        baseline_call = lambda: baseline_launch_device(q32, k32, v32)
 
         jit_ms = cold_start_ms(fused_call, cp)
         fused_ms, fused_p90 = timed_gpu(
@@ -127,9 +128,34 @@ def run_case(case, cp, tiles, warmup, iterations):
             }
         )
 
-    del q, k, v
+    del q, k, v, q32, k32, v32
     cp.get_default_memory_pool().free_all_blocks()
     return rows
+
+
+def environment_metadata(cp, gpu_name):
+    metadata = {
+        "gpu": gpu_name,
+        "cupy": cp.__version__,
+        "cuda_runtime_version": int(cp.cuda.runtime.runtimeGetVersion()),
+        "cutile": importlib.metadata.version("cuda-tile"),
+        "compilation_mode": "JIT excluded from steady-state timing; cold-start reported separately",
+    }
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,driver_version,clocks.current.sm,power.limit,power.draw",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        metadata["nvidia_smi"] = result.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        metadata["nvidia_smi"] = None
+    return metadata
 
 
 def main() -> int:
@@ -188,7 +214,7 @@ def main() -> int:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "gpu": gpu_name,
+        "environment": environment_metadata(cp, gpu_name),
         "warmup": args.warmup,
         "iterations": args.iterations,
         "tiles": [{"tile_q": q, "tile_k": k} for q, k in args.tiles],
