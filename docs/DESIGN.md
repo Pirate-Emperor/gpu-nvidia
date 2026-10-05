@@ -20,7 +20,9 @@ Inputs:
 
 Required workload:
 - Causal self-attention only.
-- Nq == Nk for the required path.
+- Nq == Nk == N for the required path.
+- D must be one of {32, 64, 128}.
+- For the required self-attention path, Dv == D.
 - Supported sequence lengths must be divisible by the selected query/key tile sizes.
 - Reject unsupported shapes/dtypes before kernel launch with a clear nonzero exit.
 
