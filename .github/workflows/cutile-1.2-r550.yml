@@ -1,0 +1,72 @@
+name: cuTile 1.2 R550 experiment
+
+on:
+  push:
+    paths:
+      - ".github/workflows/cutile-1.2-r550.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: cutile-1.2-r550-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  experiment:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v python3.12 || true
+          python3.12 --version 2>/dev/null || python3 --version
+
+      - name: Create isolated cuTile 1.2 environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          PYTHON_BIN=python3
+          if command -v python3.12 >/dev/null 2>&1; then PYTHON_BIN=python3.12; fi
+          "$PYTHON_BIN" -m venv .venv-cutile12
+          python3 scripts/with_core_config.py .venv-cutile12/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py .venv-cutile12/bin/python -m pip install -r requirements-dev.txt
+          python3 scripts/with_core_config.py .venv-cutile12/bin/python -m pip install "cupy-cuda13x" "cuda-tile[tileiras]==1.2.0"
+
+      - name: Download and extract CUDA 13.2 compatibility package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p compat
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py bash -lc 'cd compat && apt-get download cuda-compat-13-2'
+          deb="$(ls -1 compat/cuda-compat-13-2*.deb | tail -1)"
+          mkdir -p compat/root
+          dpkg-deb -x "$deb" compat/root
+          find compat/root/usr/local/cuda-13.2/compat -maxdepth 1 -type f -printf "%f\n" | sort
+
+      - name: Run cuTile 1.2 actual A100 kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$PWD/compat/root/usr/local/cuda-13.2/compat:${LD_LIBRARY_PATH:-}"
+          export PYTHONPATH="$PWD/src:$PWD/tests:$HOME:${PYTHONPATH:-}"
+          .venv-cutile12/bin/python -c '
+import importlib.metadata
+import numpy as np
+import cupy as cp
+import cuda.tile
+print("CuPy:", cp.__version__)
+print("cuTile:", importlib.metadata.version("cuda-tile"))
+print("CUDA runtime:", cp.cuda.runtime.runtimeGetVersion())
+print("device:", cp.cuda.runtime.getDeviceProperties(0)["name"])
+from cutile_attention import forward
+q=np.zeros((1,1,64,32),dtype=np.float16)
+k=np.zeros((1,1,64,32),dtype=np.float16)
+v=np.ones((1,1,64,32),dtype=np.float16)
+out=forward(q,k,v,tile_q=64,tile_k=64)
+print("CUTILE_1_2_SUCCESS", out.shape, out.dtype, np.isfinite(out).all(), float(out[0,0,0,0]))
+'
