@@ -31,6 +31,7 @@ def test_reference_shape_and_finiteness():
 @pytest.mark.parametrize(
     "kwargs",
     [
+        {"B": 1, "H": 1, "N": 1, "D": 32},
         {"B": 1, "H": 1, "N": 1, "D": 64},
         {"B": 2, "H": 1, "N": 64, "D": 64},
         {"B": 1, "H": 4, "N": 128, "D": 128},
