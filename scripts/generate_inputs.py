@@ -5,17 +5,16 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
 
 import numpy as np
-
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from io import make_npz
+from attention_io import make_npz
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,22 +48,22 @@ def generate(
 
     rng = np.random.default_rng(seed)
 
+    if mode == "constant":
+        q = np.ones((batch, heads, seq, head_dim), dtype=np.float16)
+        k = np.ones((batch, heads, seq, head_dim), dtype=np.float16)
+        # Keep V constant across the sequence so the expected output is easy
+        # to reason about even though the score path is exercised.
+        v = np.ones((batch, heads, seq, value_dim), dtype=np.float16)
+        return q, k, v
+
     if mode == "normal":
         scale = 1.0
     elif mode == "small":
         scale = 1e-3
-    elif mode == "large_logits":
+    else:
         # 64 is finite in FP16 and creates deliberately large finite
         # FP32 logits after the dot product and scale operation.
         scale = 64.0
-    else:
-        q = np.ones((batch, heads, seq, head_dim), dtype=np.float16)
-        k = np.ones((batch, heads, seq, head_dim), dtype=np.float16)
-        v = np.arange(
-            batch * heads * seq * value_dim, dtype=np.float32
-        ).reshape(batch, heads, seq, value_dim).astype(np.float16)
-        make_npz(args_output_placeholder, q, k, v)
-        return q, k, v
 
     q = (
         rng.standard_normal((batch, heads, seq, head_dim), dtype=np.float32) * scale
@@ -78,14 +77,9 @@ def generate(
     return q, k, v
 
 
-args_output_placeholder: Path | None = None
-
-
 def main() -> int:
-    global args_output_placeholder
     args = parse_args()
     value_dim = args.head_dim if args.value_dim is None else args.value_dim
-    args_output_placeholder = args.output
 
     q, k, v = generate(
         args.batch,
