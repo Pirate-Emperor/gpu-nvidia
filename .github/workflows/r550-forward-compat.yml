@@ -1,0 +1,125 @@
+name: R550 forward compatibility experiment
+
+on:
+  push:
+    paths:
+      - ".github/workflows/r550-forward-compat.yml"
+      - "src/**"
+      - "tests/**"
+      - "scripts/**"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe node and existing compatibility libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py bash -lc '
+            set -euo pipefail
+            echo "=== OS ==="
+            cat /etc/os-release || true
+            echo "=== GPU ==="
+            nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
+            echo "=== CUDA tools ==="
+            command -v nvcc || true
+            nvcc --version 2>/dev/null || true
+            echo "=== CUDA modules ==="
+            module -t avail cuda 2>&1 | head -100 || true
+            echo "=== Existing compat directories ==="
+            for d in /usr/local/cuda*/compat /opt/cuda*/compat "$HOME"/cuda*/compat "$HOME"/.local/cuda*/compat; do
+              if [ -d "$d" ]; then
+                echo "FOUND $d"
+                ls -l "$d" | head -50
+              fi
+            done
+            echo "=== Driver libraries ==="
+            find /usr/local /opt "$HOME" -path "*/compat/libcuda.so*" -type f 2>/dev/null | head -50 || true
+          '
+
+      - name: Create isolated environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py python3 -m venv .venv
+          python3 scripts/with_core_config.py .venv/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py .venv/bin/python -m pip install -r requirements-dev.txt
+          python3 scripts/with_core_config.py .venv/bin/python -m pip install "cupy-cuda13x" "cuda-tile[tileiras]"
+
+      - name: Test native R550 runtime (expected failure unless compat is preconfigured)
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          .venv/bin/python -c "import cupy as cp; print('CuPy:', cp.__version__); print(cp.cuda.runtime.getDeviceProperties(0))"
+
+      - name: Attempt no-root compat package extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          mkdir -p compat-experiment
+          python3 scripts/with_core_config.py bash -lc '
+            set -euo pipefail
+            if [ -d /usr/local/cuda-13.4/compat ]; then
+              echo "/usr/local/cuda-13.4/compat already exists"
+              exit 0
+            fi
+            if command -v apt-get >/dev/null 2>&1; then
+              cd compat-experiment
+              apt-get download cuda-compat-13-4
+            else
+              echo "apt-get not available; no package-manager download attempted"
+            fi
+          '
+          shopt -s nullglob
+          debs=(compat-experiment/cuda-compat-13-4*.deb)
+          if [ "${#debs[@]}" -gt 0 ]; then
+            mkdir -p compat-experiment/root
+            dpkg-deb -x "${debs[-1]}" compat-experiment/root
+            find compat-experiment/root -path "*/compat/libcuda.so*" -type f -print
+          fi
+
+      - name: Attempt actual cuTile launch
+        shell: bash
+        env:
+          REQUIRE_A100: "0"
+        run: |
+          set -euo pipefail
+          COMPAT_DIR=""
+          if [ -d /usr/local/cuda-13.4/compat ]; then
+            COMPAT_DIR="/usr/local/cuda-13.4/compat"
+          else
+            for d in compat-experiment/root/usr/local/cuda-*/compat; do
+              if [ -d "$d" ]; then
+                COMPAT_DIR="$d"
+                break
+              fi
+            done
+          fi
+
+          if [ -n "$COMPAT_DIR" ]; then
+            echo "Using CUDA compatibility libraries: $COMPAT_DIR"
+            export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
+          else
+            echo "No CUDA compatibility libraries found; testing native R550 path."
+          fi
+
+          export PYTHONPATH="$PWD/src:$PWD/tests:$HOME:${PYTHONPATH:-}"
+          .venv/bin/python scripts/with_core_config.py -c 'import cupy as cp; print("CUDA runtime:", cp.cuda.runtime.runtimeGetVersion()); print("device:", cp.cuda.runtime.getDeviceProperties(0)["name"])' 2>&1 || true
+          .venv/bin/python scripts/with_core_config.py -c '
+import numpy as np
+from cutile_attention import forward
+q = np.zeros((1,1,64,32), dtype=np.float16)
+k = np.zeros((1,1,64,32), dtype=np.float16)
+v = np.ones((1,1,64,32), dtype=np.float16)
+out = forward(q, k, v, tile_q=64, tile_k=64)
+print("cuTile launch SUCCESS", out.shape, out.dtype, np.isfinite(out).all(), float(out[0,0,0,0]))
+' 
