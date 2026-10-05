@@ -175,6 +175,12 @@ def main() -> int:
         default=[(64, 64), (128, 128)],
         metavar="QxK",
     )
+    parser.add_argument(
+        "--case",
+        action="append",
+        choices=[case.name for case in MANDATORY_CASES],
+        help="benchmark only the selected case; repeat the option for multiple cases",
+    )
     args = parser.parse_args()
 
     if args.warmup < 1 or args.iterations < 30:
@@ -196,8 +202,13 @@ def main() -> int:
     raw_name = device.get("name", b"")
     gpu_name = raw_name.decode() if isinstance(raw_name, bytes) else str(raw_name)
 
+    selected_cases = MANDATORY_CASES
+    if args.case:
+        selected_names = set(args.case)
+        selected_cases = tuple(case for case in MANDATORY_CASES if case.name in selected_names)
+
     all_rows = []
-    for case in MANDATORY_CASES:
+    for case in selected_cases:
         all_rows.extend(
             run_case(
                 case,
