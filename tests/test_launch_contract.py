@@ -5,10 +5,10 @@ from contract import TileConfig, validate_launch_contract
 from reference import AttentionValidationError
 
 
-def make_inputs(N=64):
-    q = np.zeros((1, 2, N, 64), dtype=np.float16)
-    k = np.zeros((1, 2, N, 64), dtype=np.float16)
-    v = np.zeros((1, 2, N, 64), dtype=np.float16)
+def make_inputs(N=64, D=64, Dv=64):
+    q = np.zeros((1, 2, N, D), dtype=np.float16)
+    k = np.zeros((1, 2, N, D), dtype=np.float16)
+    v = np.zeros((1, 2, N, Dv), dtype=np.float16)
     return q, k, v
 
 
@@ -41,6 +41,24 @@ def test_non_divisible_sequence_rejected(n, tq, tk, match):
     q, k, v = make_inputs(n)
     with pytest.raises(AttentionValidationError, match=match):
         validate_launch_contract(q, k, v, TileConfig(query=tq, key=tk))
+
+
+def test_required_head_dimensions_are_accepted():
+    for d in (32, 64, 128):
+        q, k, v = make_inputs(N=128, D=d, Dv=d)
+        validate_launch_contract(q, k, v, TileConfig(query=64, key=64))
+
+
+def test_unsupported_head_dimension_rejected():
+    q, k, v = make_inputs(N=64, D=16, Dv=16)
+    with pytest.raises(AttentionValidationError, match="unsupported"):
+        validate_launch_contract(q, k, v, TileConfig(query=64, key=64))
+
+
+def test_value_dimension_must_equal_head_dimension():
+    q, k, v = make_inputs(N=64, D=64, Dv=32)
+    with pytest.raises(AttentionValidationError, match="Dv == D"):
+        validate_launch_contract(q, k, v, TileConfig(query=64, key=64))
 
 
 @pytest.mark.parametrize(
