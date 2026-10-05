@@ -42,3 +42,14 @@ def validate_launch_contract(
         raise AttentionValidationError(
             f"key sequence length {nk} is not divisible by key tile {tile.key}"
         )
+
+    head_dim = q.shape[-1]
+    value_dim = v.shape[-1]
+    if head_dim not in (32, 64, 128):
+        raise AttentionValidationError(
+            f"head dimension D={head_dim} is unsupported; expected one of 32, 64, 128"
+        )
+    if value_dim != head_dim:
+        raise AttentionValidationError(
+            f"self-attention requires Dv == D; got D={head_dim}, Dv={value_dim}"
+        )
