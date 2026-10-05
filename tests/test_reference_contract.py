@@ -148,7 +148,7 @@ def test_non_contiguous_rejected():
 def test_mismatched_batch_heads_rejected():
     q, k, v = make_inputs()
     with pytest.raises(AttentionValidationError):
-        validate_attention_inputs(q, k[:1], v)
+        validate_attention_inputs(q, k[:, :1], v)
 
 
 def test_mismatched_sequence_rejected():
