@@ -14,7 +14,7 @@ def test_two_token_scalar_causal_attention_has_exact_structure():
 
     out = causal_attention_fp32(q, k, v)
 
-    np.testing.assert_array_equal(out[..., 0, 0], np.array([10.0], dtype=np.float32))
+    np.testing.assert_array_equal(out[..., 0, 0], np.array([[10.0]], dtype=np.float32))
     np.testing.assert_allclose(
         out[..., 1, 0],
         np.array([15.0], dtype=np.float32),
