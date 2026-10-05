@@ -184,28 +184,48 @@ def _validate_cutile_config(
     return tile
 
 
-def launch(
-    q: np.ndarray,
-    k: np.ndarray,
-    v: np.ndarray,
+def launch_device(
+    q_gpu,
+    k_gpu,
+    v_gpu,
     *,
     tile_q: int = 64,
     tile_k: int = 64,
 ):
-    """Launch fused causal attention and return a CuPy output array."""
-    cp, _ = _import_runtime()
+    """Launch fused causal attention on already resident GPU arrays."""
+    _, ct = _import_runtime()
 
-    tile = _validate_cutile_config(q, k, v, tile_q, tile_k)
+    batch, heads, seq_len, head_dim = q_gpu.shape
+    value_dim = v_gpu.shape[-1]
+    if head_dim not in (32, 64, 128):
+        raise AttentionValidationError(
+            f"head dimension D={head_dim} is unsupported; expected one of 32, 64, 128"
+        )
+    if value_dim != head_dim:
+        raise AttentionValidationError(
+            f"self-attention requires Dv == D; got D={head_dim}, Dv={value_dim}"
+        )
 
-    batch, heads, seq_len, head_dim = q.shape
-    value_dim = v.shape[-1]
+    tile = TileConfig(query=tile_q, key=tile_k)
+    if seq_len % tile.query != 0 or seq_len % tile.key != 0:
+        raise AttentionValidationError(
+            f"sequence length {seq_len} must be divisible by query/key tiles "
+            f"{tile.query}/{tile.key}"
+        )
+    for name, value in (
+        ("query tile", tile_q),
+        ("key tile", tile_k),
+        ("head dimension", head_dim),
+        ("value dimension", value_dim),
+    ):
+        if not _is_power_of_two(value):
+            raise AttentionValidationError(
+                f"{name} must be a power of two for cuTile"
+            )
 
-    q_gpu = cp.asarray(q)
-    k_gpu = cp.asarray(k)
-    v_gpu = cp.asarray(v)
-    out_gpu = cp.empty(
+    out_gpu = q_gpu.copy() if False else __import__("cupy").empty(
         (batch, heads, seq_len, value_dim),
-        dtype=cp.float16,
+        dtype=__import__("cupy").float16,
     )
 
     kernel = _build_kernel(tile.query, tile.key, head_dim, value_dim)
@@ -228,11 +248,34 @@ def launch(
         float(scale),
     )
 
+    cp = __import__("cupy")
     ct_stream = cp.cuda.get_current_stream()
-    _, ct = _import_runtime()
     ct.launch(ct_stream, grid, kernel, kernel_args)
     return out_gpu
 
+
+def launch(
+    q: np.ndarray,
+    k: np.ndarray,
+    v: np.ndarray,
+    *,
+    tile_q: int = 64,
+    tile_k: int = 64,
+):
+    """Copy inputs to the GPU and launch fused causal attention."""
+    cp, _ = _import_runtime()
+
+    tile = _validate_cutile_config(q, k, v, tile_q, tile_k)
+    q_gpu = cp.asarray(q)
+    k_gpu = cp.asarray(k)
+    v_gpu = cp.asarray(v)
+    return launch_device(
+        q_gpu,
+        k_gpu,
+        v_gpu,
+        tile_q=tile.query,
+        tile_k=tile.key,
+    )
 
 def forward(
     q: np.ndarray,
