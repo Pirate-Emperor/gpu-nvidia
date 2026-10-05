@@ -1,0 +1,36 @@
+name: A100 correctness
+
+on:
+  workflow_dispatch:
+
+jobs:
+  correctness:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create isolated test environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run CPU/reference tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .venv/bin/activate
+          python -m pytest -q
+
+      - name: Run environment audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .venv/bin/activate
+          python scripts/environment_check.py
+
+      # The cuTile kernel tests will be added here as soon as the backend exists.
