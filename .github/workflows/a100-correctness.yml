@@ -22,6 +22,19 @@ jobs:
           export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           python3 -c "import core_config, inspect, os; print('core_config:', inspect.getfile(core_config)); print('HTTP_PROXY configured:', bool(os.environ.get('HTTP_PROXY'))); print('HTTPS_PROXY configured:', bool(os.environ.get('HTTPS_PROXY')))"
 
+      - name: Check cuTile driver prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          DRIVER_VERSION="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | xargs)"
+          DRIVER_MAJOR="${DRIVER_VERSION%%.*}"
+          echo "NVIDIA driver: ${DRIVER_VERSION}"
+          if [ "$DRIVER_MAJOR" -lt 580 ]; then
+            echo "ERROR: cuTile requires NVIDIA driver R580 or later; this node has ${DRIVER_VERSION}."
+            echo "Use an A100 node with R580+ (preferred), or have the cluster administrator provide a supported CUDA forward-compatibility configuration."
+            exit 1
+          fi
+
       - name: Create isolated Python environment
         shell: bash
         run: |
