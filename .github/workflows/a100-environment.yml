@@ -1,0 +1,33 @@
+name: A100 environment audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify A100 identity and CUDA stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
+          python3 --version
+          nvcc --version
+          ncu --version
+
+      - name: Import core_config and inspect network environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -c "import core_config; print('core_config import: OK')"
+          python3 -c "import core_config, os; print('HTTP_PROXY configured:', bool(os.environ.get('HTTP_PROXY'))); print('HTTPS_PROXY configured:', bool(os.environ.get('HTTPS_PROXY')))"
+
+      - name: Run read-only project audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/environment_check.py
