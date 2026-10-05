@@ -81,12 +81,15 @@ GPU_CORRECTNESS_CONFIGS = tuple(
 )
 
 
+def gpu_config_id(config):
+    case, tile_q, tile_k = config
+    return f"{case.name}-tile{tile_q}x{tile_k}"
+
+
 @pytest.mark.parametrize(
     "case,tile_q,tile_k",
     GPU_CORRECTNESS_CONFIGS,
-    ids=lambda values: values.name
-    if hasattr(values, "name")
-    else str(values),
+    ids=gpu_config_id,
 )
 def test_cutile_matches_independent_reference(case, tile_q, tile_k):
     require_a100()
