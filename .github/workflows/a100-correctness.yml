@@ -19,18 +19,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f "$HOME/.bashrc" ]; then
-            # GitHub's runner shell is non-interactive and does not source .bashrc.
-            # The compute environment may rely on it for PYTHONPATH/module setup.
-            source "$HOME/.bashrc"
-          fi
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           python3 -c "import core_config, inspect, os; print('core_config:', inspect.getfile(core_config)); print('HTTP_PROXY configured:', bool(os.environ.get('HTTP_PROXY'))); print('HTTPS_PROXY configured:', bool(os.environ.get('HTTPS_PROXY')))"
 
       - name: Create isolated Python environment
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           python3 -m venv .venv
           python3 scripts/with_core_config.py .venv/bin/python -m pip install --upgrade pip
           python3 scripts/with_core_config.py .venv/bin/python -m pip install -r requirements-dev.txt
@@ -40,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
           .venv/bin/python -c "import core_config; print('core_config import in venv: OK')"
           .venv/bin/python -c "import cupy; print('CuPy:', cupy.__version__)"
@@ -53,5 +49,5 @@ jobs:
           REQUIRE_A100: "1"
         run: |
           set -euo pipefail
-          if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           .venv/bin/python -m pytest -q
