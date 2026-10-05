@@ -22,7 +22,7 @@ The optimized cuTile kernel is never used to generate expected outputs.
 ## Test categories
 
 ### 1. Structural contract
-Tests validate rank, dtype, contiguity, batch/head agreement, sequence agreement, and Q/K head-dimension agreement.
+Tests validate rank, dtype, contiguity, batch/head agreement, sequence agreement, Q/K head-dimension agreement, D in {32,64,128}, and Dv == D.
 
 ### 2. Exact causal invariants
 These are deterministic tests. They prove:
