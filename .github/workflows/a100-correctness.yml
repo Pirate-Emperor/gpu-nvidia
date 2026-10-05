@@ -2,6 +2,11 @@ name: A100 correctness
 
 on:
   workflow_dispatch:
+  # One-shot automatic trigger so the self-hosted GPU runner is exercised
+  # from this repository without depending on a manual UI dispatch.
+  push:
+    paths:
+      - ".github/workflows/a100-correctness.yml"
 
 jobs:
   correctness:
@@ -15,9 +20,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m venv .venv
-          python3 scripts/with_core_config.py             .venv/bin/python -m pip install --upgrade pip
-          python3 scripts/with_core_config.py             .venv/bin/python -m pip install -r requirements-dev.txt
-          python3 scripts/with_core_config.py             .venv/bin/python -m pip install "cupy-cuda13x" "cuda-tile[tileiras]"
+          python3 scripts/with_core_config.py .venv/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py .venv/bin/python -m pip install -r requirements-dev.txt
+          python3 scripts/with_core_config.py .venv/bin/python -m pip install "cupy-cuda13x" "cuda-tile[tileiras]"
 
       - name: Verify A100/cuTile stack
         shell: bash
