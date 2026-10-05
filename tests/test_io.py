@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from io import load_attention_npz, make_npz, save_attention_npy
+from attention_io import load_attention_npz, make_npz, save_attention_npy
 from reference import AttentionValidationError
 
 
@@ -28,8 +28,9 @@ def test_npz_round_trip(tmp_path):
 
 
 def test_npz_requires_exact_keys(tmp_path):
+    q, k, _ = make_inputs()
     path = tmp_path / "bad.npz"
-    np.savez(path, Q=make_inputs()[0], K=make_inputs()[1])
+    np.savez(path, Q=q, K=k)
 
     with pytest.raises(AttentionValidationError):
         load_attention_npz(path)
