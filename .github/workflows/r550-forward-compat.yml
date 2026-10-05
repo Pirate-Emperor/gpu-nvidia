@@ -8,6 +8,10 @@ on:
       - "scripts/**"
   workflow_dispatch:
 
+concurrency:
+  group: r550-forward-compat-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   probe:
     runs-on: [self-hosted, linux, x64, gpu, a100]
@@ -27,15 +31,15 @@ jobs:
             echo "=== CUDA ==="
             command -v nvcc || true
             nvcc --version 2>/dev/null || true
-            echo "=== Existing compatibility directories ==="
-            for d in /usr/local/cuda*/compat /opt/cuda*/compat "$HOME"/cuda*/compat "$HOME"/.local/cuda*/compat; do
+            echo "=== CUDA module command ==="
+            command -v module || true
+            echo "=== Known compatibility directories ==="
+            for d in /usr/local/cuda-13.4/compat /usr/local/cuda-13.3/compat /usr/local/cuda-13.2/compat /opt/cuda-13.4/compat /opt/cuda-13.3/compat /opt/cuda-13.2/compat "$HOME"/cuda-13.4/compat "$HOME"/cuda-13.3/compat "$HOME"/cuda-13.2/compat; do
               if [ -d "$d" ]; then
                 echo "FOUND: $d"
-                find "$d" -maxdepth 1 -type f -printf "%f\n" | sort | head -50
+                ls -1 "$d" | head -50
               fi
             done
-            echo "=== Existing compat libcuda ==="
-            find /usr/local /opt "$HOME" -path "*/compat/libcuda.so*" -type f 2>/dev/null | head -50 || true
           '
 
       - name: Create isolated environment
