@@ -6,31 +6,32 @@ on:
 jobs:
   correctness:
     runs-on: [self-hosted, linux, x64, gpu, a100]
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create isolated test environment
+      - name: Create isolated Python environment
         shell: bash
         run: |
           set -euo pipefail
           python3 -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.txt
+          python3 scripts/with_core_config.py             .venv/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py             .venv/bin/python -m pip install -r requirements-dev.txt
+          python3 scripts/with_core_config.py             .venv/bin/python -m pip install "cupy-cuda13x" "cuda-tile[tileiras]"
 
-      - name: Run CPU/reference tests
+      - name: Verify A100/cuTile stack
         shell: bash
         run: |
           set -euo pipefail
-          . .venv/bin/activate
-          python -m pytest -q
+          nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
+          .venv/bin/python -c "import cupy; print('CuPy:', cupy.__version__)"
+          .venv/bin/python -c "import cuda.tile as ct; print('cuTile import: OK')"
+          .venv/bin/python scripts/environment_check.py
 
-      - name: Run environment audit
+      - name: Run complete correctness suite
         shell: bash
+        env:
+          REQUIRE_A100: "1"
         run: |
           set -euo pipefail
-          . .venv/bin/activate
-          python scripts/environment_check.py
-
-      # The cuTile kernel tests will be added here as soon as the backend exists.
+          .venv/bin/python -m pytest -q
