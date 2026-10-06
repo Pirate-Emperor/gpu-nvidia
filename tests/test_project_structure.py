@@ -11,6 +11,7 @@ REQUIRED_FILES = (
     "docs/PROGRESS.md",
     "docs/TEST_MATRIX.md",
     "docs/CUDA_VARIANTS.md",
+    "docs/ADMIN_CHECKLIST.md",
     "results/README.md",
     "src/reference.py",
     "src/online_reference.py",
