@@ -17,7 +17,7 @@ on:
       - "pyproject.toml"
 
 concurrency:
-  group: a100-native-cuda-\${{ github.repository }}-\${{ github.ref }}
+  group: a100-native-cuda-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
