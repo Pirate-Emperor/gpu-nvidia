@@ -43,6 +43,7 @@ jobs:
           python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install --upgrade pip
           python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install -r requirements-dev.txt
           python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install "cupy-cuda12x"
+          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install "nvidia-cuda-runtime-cu12==12.4.*"
 
       - name: Verify native CUDA without cuTile
         shell: bash
