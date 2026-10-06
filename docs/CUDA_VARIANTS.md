@@ -56,3 +56,23 @@ Only after these pass does a cuTile result become a useful comparison point.
 ## Relation to the course target
 
 These are not substitutes for the required cuTile kernel. They are the low-level CUDA control implementations that let us debug the fused algorithm, precision, causal masking, synchronization, and indexing before the cuTile environment becomes available.
+
+## Variant C: shared-memory tiled CUDA
+
+File: src/shared_tile_cuda_attention.py
+
+This variant stages K and V into explicit shared-memory tiles of 32 or 64 keys.
+The query row is staged once in shared memory, and the same stable two-pass
+online-softmax recurrence is evaluated tile by tile.
+
+Properties:
+- Explicit K/V shared-memory tiling.
+- Tile sizes 32 and 64.
+- FP16 storage with FP32 accumulation.
+- No global score or probability matrix.
+- Sequence length must be divisible by tile_k.
+- Provides the closest ordinary-CUDA structural analogue to a tile DSL kernel.
+
+Its purpose is especially important for the later cuTile work: if this version
+and the online NumPy recurrence agree, most remaining debugging can be isolated
+to cuTile syntax, indexing, launch/grid semantics, or compiler behavior.
