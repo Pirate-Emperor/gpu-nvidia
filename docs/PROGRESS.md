@@ -27,6 +27,14 @@ This file is the durable experiment log for the project. Record what was tested,
 - Added additional current-query locality checks.
 - Added GPU-only tests for asymmetric legal tile configurations, tile-to-tile agreement, causal future-K/V invariance, constant-V behavior, zero-logit prefix means, nonfinite input rejection, non-contiguous rejection, and unsupported/mismatched dimensions.
 
+### Independent native CUDA work
+- Added a custom block-row fused CUDA kernel that uses ordinary CUDA C++ and cooperative reductions.
+- Added a second warp-row fused CUDA kernel using warp-shuffle reductions.
+- Added independent correctness suites against the FP32 oracle and tiled online-softmax reference.
+- Added cross-implementation tests between the two custom fused CUDA variants.
+- Added a native-CUDA GitHub Actions workflow that deliberately does not require cuTile or R580+, so the R550 node can validate these implementations independently.
+- Added a baseline benchmark path comparing unfused CuPy, scalar CUDA, block-row fused CUDA, and warp-row fused CUDA.
+
 ### CPU validation
 - The self-hosted A100 runner successfully executed the CPU/reference suite.
 - The corrected suite reached 75 passing tests before this latest edge-case expansion.
@@ -82,3 +90,21 @@ For each material kernel change:
 3. record successful and unsuccessful outcomes;
 4. re-run correctness before claiming a performance improvement;
 5. preserve benchmark/profiler artifacts instead of replacing prior runs.
+
+
+## 2026-10-06 — Current development direction
+
+### Driver-independent engineering
+The project is no longer blocked on cuTile for algorithmic validation. The custom
+CUDA variants are intended to exercise the same fused mathematical path:
+scaled QK scores -> causal restriction -> stable max-shifted softmax -> V
+accumulation, with FP16 inputs and FP32 accumulation.
+
+The native CUDA workflow is intentionally separate from the cuTile workflow.
+A successful native-CUDA run would validate the ordinary CUDA implementations
+on the existing A100/R550 node without implying that cuTile is supported.
+
+### Local execution note
+The development sandbox cannot resolve github.com, so the latest repository
+state was not executed locally from this environment. CI remains the source of
+truth for execution results. No unexecuted test or benchmark is marked PASS.
