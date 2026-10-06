@@ -59,6 +59,8 @@ The A100 GPU suite is intentionally broader than the minimum course matrix.
 | Custom block-row CUDA | D=32/64/128 + causal/edge/stability cases | NEW; pending GPU CI |
 | Custom warp-row CUDA | D=32/64/128 + causal/edge/stability cases | NEW; pending GPU CI |
 | Cross-implementation agreement | block-row vs warp-row | NEW; pending GPU CI |
+| Shared-memory tiled CUDA | tile_k=32/64, D=32/64/128 | NEW; pending GPU CI |
+| Three-way fused agreement | block-row vs warp-row vs shared-tile | NEW; pending GPU CI |
 
 ## 3. GPU baseline ladder
 
