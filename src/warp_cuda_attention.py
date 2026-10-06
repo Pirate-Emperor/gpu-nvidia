@@ -142,7 +142,8 @@ def _kernel():
     return cp.RawKernel(
         source,
         "causal_attention_warp",
-        options=("--std=c++14",),
+        options=("--std=c++14", "-arch=sm_80"),
+        backend="nvcc",
     )
 
 
