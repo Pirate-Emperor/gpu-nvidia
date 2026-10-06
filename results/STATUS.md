@@ -15,8 +15,11 @@ Last known validated state of main:
 | Host driver upgrade from runner | NOT available: non-root; sudo requires credentials |
 | Native current cuTile runtime | BLOCKED by driver prerequisite |
 | cuda-compat-13-4 user-space experiment | Reached CUDA error 803 |
-| Scalar CUDA baseline | Implemented; GPU execution pending supported runtime |
-| Unfused CuPy baseline | Implemented; GPU execution pending supported runtime |
+| Scalar CUDA baseline | Implemented; native CUDA execution workflow added |
+| Custom block-row fused CUDA | Implemented; native CUDA execution workflow added |
+| Custom warp-row fused CUDA | Implemented; native CUDA execution workflow added |
+| Custom shared-memory tiled CUDA | Implemented; native CUDA execution workflow added |
+| Unfused CuPy baseline | Implemented; native CUDA execution workflow added |
 | PyTorch SDPA reference | Implemented; optional |
 | Benchmark harness | Implemented |
 | Nsight target | Implemented |
@@ -26,6 +29,6 @@ Last known validated state of main:
 
 ## Interpretation
 
-The project now has broader CPU/reference and GPU correctness coverage, but GPU results remain unvalidated because the current A100 node is on R550. The repository must not report the cuTile kernel as correct or performant until it executes on a supported A100/cuTile environment.
+The project now has broader CPU/reference coverage and a driver-independent native-CUDA validation path. The native CUDA variants are implemented but their latest CI execution result is not yet available here. cuTile results remain unvalidated because the current A100 node is on R550. The repository must not report the cuTile kernel as correct or performant until it executes on a supported A100/cuTile environment.
 
 Prior test and experiment logs remain in docs/PROGRESS.md.
