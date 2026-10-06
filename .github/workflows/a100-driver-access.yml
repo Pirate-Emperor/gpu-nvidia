@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/a100-driver-access.yml"
       - "scripts/driver_access_check.py"
+      - "scripts/exhaustive_gpu_audit.py"
 
 jobs:
   audit:
@@ -19,3 +20,4 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
           python3 scripts/with_core_config.py python3 scripts/driver_access_check.py
+          python3 scripts/with_core_config.py python3 scripts/exhaustive_gpu_audit.py
