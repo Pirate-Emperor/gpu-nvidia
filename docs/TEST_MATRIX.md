@@ -99,3 +99,19 @@ No GPU performance number is marked valid until the kernel executes successfully
 Current runner: NVIDIA A100-SXM4-40GB, SM80, driver R550.90.07.
 
 Current NVIDIA cuTile Python documentation requires R580+; the current user-space forward-compatibility experiment on this node produced CUDA error 803. Therefore GPU execution remains an environment gate rather than an untested result.
+## 6. Dual-device hardware validation
+
+The actual runner exposes two full A100-SXM4-40GB GPUs through `CUDA_VISIBLE_DEVICES=0,1`.
+The native-CUDA suite therefore includes:
+- one CUDA arithmetic smoke test on device 0 and device 1;
+- one fused-attention execution on device 0 and device 1;
+- a cross-device output agreement test using identical inputs.
+
+This is hardware validation, not a cuTile result. The cuTile workflow remains a
+separate R580-gated execution path.
+
+## 7. Compilation backends
+
+The ordinary CUDA implementations are compiled through CuPy's `nvcc` backend
+with `-arch=sm_80`, using the host's CUDA 12.4 compiler. This intentionally
+avoids the current NVRTC header-discovery failure on the R550 node.
