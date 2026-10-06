@@ -8,7 +8,7 @@ Use this checklist before declaring the A100/cuTile environment ready.
 2. NVIDIA Data Center Driver R580 or later.
 3. For detailed cuTile Nsight Compute statistics, use R580.126.09 or later. NVIDIA's current documented R580 release is 580.178.04.
 4. Python 3.10-3.14 available; the project CI uses Python 3.12.
-5. A CUDA 13.1+ compiler/toolchain path for cuTile: either a system CUDA Toolkit 13.1+ installation or the project virtual environment can provide TileIR compiler components through `cuda-tile[tileiras]`.
+5. A supported cuTile compiler/toolchain path: preferably system CUDA Toolkit 13.1+, but this is not necessarily a host-wide requirement because the project virtual environment can provide the required TileIR compiler components through `cuda-tile[tileiras]`.
 6. Current Nsight Compute CLI (`ncu`) installed on the target node for the required profiling runs.
 
 ## Required on HGX/NVSwitch systems
