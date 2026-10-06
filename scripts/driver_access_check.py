@@ -25,9 +25,15 @@ def main() -> int:
 
     sudo_available = shutil.which("sudo") is not None
     sudo_passwordless = False
+    sudo_policy = ""
     if sudo_available:
         code, _ = run(["sudo", "-n", "true"])
         sudo_passwordless = code == 0
+        policy_code, policy_output = run(["sudo", "-n", "-l"])
+        if policy_code == 0:
+            sudo_policy = policy_output
+        else:
+            sudo_policy = "sudo -n -l requires credentials or is not permitted"
 
     package_manager = next(
         (name for name in ("apt-get", "dnf", "yum", "zypper") if shutil.which(name)),
@@ -41,6 +47,7 @@ def main() -> int:
         "driver_query": driver,
         "sudo_available": sudo_available,
         "sudo_passwordless": sudo_passwordless,
+        "sudo_policy": sudo_policy,
         "package_manager": package_manager,
         "nvcc": shutil.which("nvcc"),
         "nvidia_smi": shutil.which("nvidia-smi"),
