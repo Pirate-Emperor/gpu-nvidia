@@ -36,6 +36,9 @@ src/custom_cuda_attention.py
 src/warp_cuda_attention.py
   Independent fused CUDA implementation using warp-shuffle reductions; no cuTile dependency.
 
+src/shared_tile_cuda_attention.py
+  Independent shared-memory tiled fused CUDA implementation; no cuTile dependency.
+
 docs/CUDA_VARIANTS.md
   Design notes and invariants for the independent CUDA fused implementations.
 
@@ -122,8 +125,9 @@ Coverage includes:
 4. Simple scalar CUDA baseline.
 5. Custom block-row fused CUDA.
 6. Custom warp-row fused CUDA.
-7. Optional PyTorch SDPA reference.
-8. Fused cuTile target.
+7. Custom shared-memory tiled CUDA.
+8. Optional PyTorch SDPA reference.
+9. Fused cuTile target.
 
 This lets us distinguish mathematical correctness from GPU-kernel optimization.
 
