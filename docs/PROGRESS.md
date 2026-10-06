@@ -122,3 +122,17 @@ added CPU/reference tests, not GPU execution:
 
 These test specifications were corrected on main. The GPU audit run remains a
 separate self-hosted A100 job and must not be inferred from this hosted CPU run.
+
+## 2026-10-06 — Driver maintenance is deferred; development continues
+
+The cluster administrator has confirmed that an R580+ driver upgrade is possible during the next scheduled maintenance cycle, but the cycle may be delayed and no other available node currently provides R580+.
+
+Therefore the project intentionally continues without cuTile execution rather than waiting:
+1. validate independent CUDA implementations on the existing A100/R550 host;
+2. benchmark unfused and fused ordinary-CUDA variants;
+3. validate both A100 devices exposed to the runner;
+4. harden correctness, edge-case, I/O, and reproducibility tests;
+5. collect native CUDA/Nsight evidence where the current software stack permits;
+6. after the driver upgrade, install/validate cuTile and run the same frozen correctness/performance matrix.
+
+Important: native CUDA results are development/control results. They are not presented as cuTile results and do not replace the required cuTile implementation.
