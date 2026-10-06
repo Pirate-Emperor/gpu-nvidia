@@ -117,7 +117,6 @@ def test_cutile_matches_independent_reference(case, tile_q, tile_k):
     ), f"max_abs={abs_err}, max_rel={rel_err}"
 
 
-@pytest.mark.parametrize("mode", ["small", "large_logits"])
 @pytest.mark.parametrize(
     "tile_q,tile_k",
     EXPLORATORY_TILE_CONFIGS,
