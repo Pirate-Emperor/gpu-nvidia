@@ -3,6 +3,7 @@ import pytest
 
 from reference import causal_attention_fp32, max_abs_error, max_rel_error
 
+
 @pytest.mark.parametrize(
     "B,H,N,D,seed",
     [
@@ -18,21 +19,19 @@ def test_reference_randomized_required_shapes_are_finite(B, H, N, D, seed):
     rng = np.random.default_rng(seed)
     q = rng.standard_normal((B, H, N, D), dtype=np.float32).astype(np.float16)
     k = rng.standard_normal((B, H, N, D), dtype=np.float32).astype(np.float16)
-    v = rng.standard_normal((B, H, N), dtype=np.float32).astype(np.float16).reshape(B,H,N,1)
-    v = np.repeat(v, D, axis=-1)
+    v = rng.standard_normal((B, H, N, D), dtype=np.float32).astype(np.float16)
 
     out = causal_attention_fp32(q, k, v)
-
     assert out.shape == (B, H, N, D)
     assert out.dtype == np.float32
     assert np.isfinite(out).all()
+
 
 @pytest.mark.parametrize("D", [32, 64, 128])
 def test_zero_logits_reduce_to_prefix_means(D):
     N = 64
     q = np.zeros((1, 1, N, D), dtype=np.float16)
     k = np.zeros_like(q)
-
     token_values = np.arange(N * D, dtype=np.float32).reshape(1, 1, N, D)
     v = token_values.astype(np.float16)
 
@@ -41,6 +40,7 @@ def test_zero_logits_reduce_to_prefix_means(D):
     for row in [0, 1, 7, 31, 63]:
         expected = np.mean(v[..., : row + 1, :].astype(np.float32), axis=-2)
         np.testing.assert_allclose(out[..., row, :], expected, rtol=1e-6, atol=1e-6)
+
 
 @pytest.mark.parametrize("D", [32, 64, 128])
 def test_constant_value_tensor_is_preserved(D):
@@ -51,16 +51,21 @@ def test_constant_value_tensor_is_preserved(D):
     v = np.full((1, 1, N, D), np.float16(3.25), dtype=np.float16)
 
     out = causal_attention_fp32(q, k, v)
-
     np.testing.assert_array_equal(out, np.full_like(out, 3.25, dtype=np.float32))
+
 
 def test_extreme_finite_logits_remain_stable():
     D = 64
     N = 64
     q = np.zeros((1, 1, N, D), dtype=np.float16)
     k = np.zeros_like(q)
-    q[..., :, 0] = np.float16(64.0)
-    k[..., :, 0] = np.float16(64.0)
+
+    # Unique basis direction per token: diagonal score is 4096 and
+    # off-diagonal scores are 0, stressing stable max-shift softmax.
+    for i in range(N):
+        q[..., i, i] = np.float16(64.0)
+        k[..., i, i] = np.float16(64.0)
+
     v = np.zeros((1, 1, N, D), dtype=np.float16)
     v[..., :, 0] = np.arange(N, dtype=np.float16)
 
@@ -71,6 +76,7 @@ def test_extreme_finite_logits_remain_stable():
     assert np.isfinite(max_rel_error(out, out))
     np.testing.assert_allclose(out[..., :, 0], np.arange(N, dtype=np.float32), atol=1e-5)
 
+
 def test_output_stays_inside_prefix_value_convex_hull():
     rng = np.random.default_rng(300)
     q = rng.standard_normal((1, 2, 32, 32), dtype=np.float32).astype(np.float16)
@@ -78,14 +84,15 @@ def test_output_stays_inside_prefix_value_convex_hull():
     v = rng.standard_normal((1, 2, 32, 32), dtype=np.float32).astype(np.float16)
 
     out = causal_attention_fp32(q, k, v)
-
     v32 = v.astype(np.float32)
+
     for row in [0, 1, 7, 15, 31]:
         prefix = v32[..., : row + 1, :]
         lower = prefix.min(axis=-2)
         upper = prefix.max(axis=-2)
         assert np.all(out[..., row, :] >= lower - 1e-5)
         assert np.all(out[..., row, :] <= upper + 1e-5)
+
 
 def test_large_head_count_and_batch_count_match_repeated_single_head_semantics():
     rng = np.random.default_rng(301)
@@ -104,11 +111,12 @@ def test_large_head_count_and_batch_count_match_repeated_single_head_semantics()
             )
             np.testing.assert_array_equal(batched[b : b + 1, h : h + 1], single)
 
+
 def test_output_changes_when_only_current_query_changes():
     rng = np.random.default_rng(302)
     q = rng.standard_normal((1, 1, 16, 32), dtype=np.float32).astype(np.float16)
     k = rng.standard_normal((1, 1, 16, 32), dtype=np.float32).astype(np.float16)
-    v = rng.standard_normal((1, 1, 16, 32), dtype=np.float32).astype(np.float16)
+    v = rng.standard_normal((1, 1, 16, 32), dtype=np.float16)
 
     before = causal_attention_fp32(q, k, v)
     q2 = q.copy()
