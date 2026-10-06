@@ -1,0 +1,21 @@
+name: A100 driver access audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/a100-driver-access.yml"
+      - "scripts/driver_access_check.py"
+
+jobs:
+  audit:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read-only host audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py python3 scripts/driver_access_check.py
