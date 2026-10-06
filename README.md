@@ -30,6 +30,12 @@ src/baseline.py
 src/naive_cuda_attention.py
   Simple scalar CUDA baseline. It is intentionally inefficient and exists to establish a basic CUDA performance floor.
 
+src/custom_cuda_attention.py
+  Independent fused CUDA implementation using ordinary CUDA C++ and cooperative block reductions; no cuTile dependency.
+
+src/warp_cuda_attention.py
+  Independent fused CUDA implementation using warp-shuffle reductions; no cuTile dependency.
+
 src/torch_reference.py
   Optional PyTorch SDPA reference/performance backend.
 
@@ -99,8 +105,10 @@ Coverage includes:
 2. NumPy tiled online-softmax reference.
 3. Unfused CuPy GPU baseline.
 4. Simple scalar CUDA baseline.
-5. Optional PyTorch SDPA reference.
-6. Fused cuTile target.
+5. Custom block-row fused CUDA.
+6. Custom warp-row fused CUDA.
+7. Optional PyTorch SDPA reference.
+8. Fused cuTile target.
 
 This lets us distinguish mathematical correctness from GPU-kernel optimization.
 
