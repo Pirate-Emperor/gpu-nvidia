@@ -42,6 +42,9 @@ src/shared_tile_cuda_attention.py
 docs/CUDA_VARIANTS.md
   Design notes and invariants for the independent CUDA fused implementations.
 
+docs/ADMIN_CHECKLIST.md
+  Cluster-side hardware/software/profiling prerequisites before cuTile execution.
+
 src/torch_reference.py
   Optional PyTorch SDPA reference/performance backend.
 
