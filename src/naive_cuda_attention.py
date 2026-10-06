@@ -95,7 +95,7 @@ def _kernel():
         O[linear] = __float2half(accum / norm);
     }
     """
-    return cp.RawKernel(source, "causal_attention_naive", options=("--std=c++14",))
+    return cp.RawKernel(source, "causal_attention_naive", options=("--std=c++14", "-arch=sm_80"), backend="nvcc")
 
 
 def launch_device(q_gpu, k_gpu, v_gpu, *, threads: int = 256):
