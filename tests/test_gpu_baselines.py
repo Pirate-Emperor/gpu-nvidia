@@ -27,36 +27,45 @@ def require_a100(cp):
     return name
 
 
-def make_case():
-    rng = np.random.default_rng(7001)
-    q = rng.standard_normal((1, 1, 64, 32), dtype=np.float32).astype(np.float16)
-    k = rng.standard_normal((1, 1, 64, 32), dtype=np.float32).astype(np.float16)
-    v = rng.standard_normal((1, 1, 64, 32), dtype=np.float32).astype(np.float16)
+@pytest.fixture
+def baseline_runtime():
+    cp = require_cupy()
+    require_a100(cp)
+    return cp
+
+
+def make_case(D=32, seed=7001):
+    rng = np.random.default_rng(seed)
+    q = rng.standard_normal((1, 1, 64, D), dtype=np.float32).astype(np.float16)
+    k = rng.standard_normal((1, 1, 64, D), dtype=np.float32).astype(np.float16)
+    v = rng.standard_normal((1, 1, 64, D), dtype=np.float32).astype(np.float16)
     return q, k, v
 
 
-def test_simple_cuda_baseline_matches_reference():
-    cp = require_cupy()
+@pytest.mark.parametrize("D", [32, 64, 128])
+def test_simple_cuda_baseline_matches_reference(baseline_runtime, D):
     from naive_cuda_attention import forward
 
-    require_a100(cp)
-    q, k, v = make_case()
+    q, k, v = make_case(D=D, seed=7001 + D)
     actual = forward(q, k, v)
     expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
 
+    assert actual.shape == expected.shape
+    assert actual.dtype == np.float16
     assert np.isfinite(actual).all()
     assert passes_mixed_tolerance(actual, expected, abs_scale=2e-2, rel_scale=2e-2)
 
 
-def test_unfused_cupy_baseline_matches_reference():
-    cp = require_cupy()
+@pytest.mark.parametrize("D", [32, 64, 128])
+def test_unfused_cupy_baseline_matches_reference(baseline_runtime, D):
     from baseline import forward
 
-    require_a100(cp)
-    q, k, v = make_case()
+    q, k, v = make_case(D=D, seed=7101 + D)
     actual = forward(q, k, v)
     expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
 
+    assert actual.shape == expected.shape
+    assert actual.dtype == np.float16
     assert np.isfinite(actual).all()
     assert passes_mixed_tolerance(actual, expected, abs_scale=2e-2, rel_scale=2e-2)
 
