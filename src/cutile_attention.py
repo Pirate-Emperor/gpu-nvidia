@@ -193,7 +193,7 @@ def launch_device(
     tile_k: int = 64,
 ):
     """Launch fused causal attention on already resident GPU arrays."""
-    _, ct = _import_runtime()
+    cp, ct = _import_runtime()
 
     batch, heads, seq_len, head_dim = q_gpu.shape
     value_dim = v_gpu.shape[-1]
