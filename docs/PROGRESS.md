@@ -8,15 +8,29 @@ This file is the durable experiment log for the project. Record what was tested,
 - Added an independent FP32 NumPy mathematical reference.
 - Added a tiled online-softmax NumPy reference.
 - Added a deliberately unfused CuPy GPU baseline.
+- Added a scalar CUDA baseline.
+- Added an optional PyTorch SDPA reference.
 - Added the first cuTile fused causal-attention kernel.
 - Added required launch-contract validation.
 - Added deterministic input generation and exact NPZ/NPY I/O.
 - Added correctness/contract/I/O/generator/online-reference tests.
 - Added a frozen representative benchmark matrix.
+- Added a persistent human-readable test/validation ledger at docs/TEST_MATRIX.md.
+
+### Expanded test coverage
+- Added randomized finite-output coverage across B/H/N and D=32/64/128.
+- Added exact prefix-mean checks for zero logits.
+- Added constant-V invariance checks across all required head dimensions.
+- Added extreme finite-logit stability checks.
+- Added convex-hull invariants for attention outputs.
+- Added explicit batch/head isolation checks.
+- Added additional current-query locality checks.
+- Added GPU-only tests for asymmetric legal tile configurations, tile-to-tile agreement, causal future-K/V invariance, constant-V behavior, zero-logit prefix means, nonfinite input rejection, non-contiguous rejection, and unsupported/mismatched dimensions.
 
 ### CPU validation
 - The self-hosted A100 runner successfully executed the CPU/reference suite.
-- The corrected suite reached 75 passing tests.
+- The corrected suite reached 75 passing tests before this latest edge-case expansion.
+- The newly added CPU tests are preserved and will run automatically through the repository test workflow.
 - One initial test failure was a test-shape assertion, not an attention implementation failure; it was fixed and re-run successfully.
 
 ### A100 environment
@@ -39,37 +53,29 @@ This file is the durable experiment log for the project. Record what was tested,
 - The currently reachable Python package index does not expose cuda-tile 1.2.0, so that branch did not reach GPU execution.
 
 ## Engineering infrastructure added
-- Added a simple scalar CUDA baseline.
-- Added an optional PyTorch SDPA reference.
-- Added baseline correctness tests.
 - Added a project-structure test that freezes required deliverables.
 - Added a read-only driver-access audit workflow.
 - Added benchmark and Nsight workflows that are ready for a supported A100/cuTile runtime.
 - Added result-storage conventions and a persistent status snapshot.
 
-## Baseline ladder added
-
-The repository now contains:
+## Baseline ladder
 1. NumPy FP32 full attention.
 2. NumPy tiled online-softmax.
 3. Unfused CuPy attention.
 4. Simple scalar CUDA attention.
 5. Optional PyTorch SDPA reference.
-6. cuTile fused attention.
+6. Fused cuTile attention.
 
-Each GPU backend has a correctness-test path. Exploratory baselines are not confused with the required cuTile deliverable.
+Each executable GPU backend has an independent correctness-test path against the mathematical oracle.
 
 ## Next execution gate
-
-1. Determine whether another existing A100 node has R580+.
-2. Check whether the cluster permits a system driver upgrade or provides a supported compatibility environment.
-3. Once a supported runtime is available, execute the full cuTile correctness matrix.
-4. Capture at least two Nsight Compute profiles.
-5. Run >=30-iteration benchmark sessions and preserve raw JSON/CSV.
-6. Optimize only after correctness and profiling evidence exist.
+1. Ask the cluster administrator for an R580+ driver path or another supported A100 node.
+2. Run the expanded GPU correctness matrix.
+3. Capture at least two Nsight Compute profiles.
+4. Run >=30-iteration benchmark sessions and preserve raw JSON/CSV.
+5. Optimize only after correctness and profiling evidence exist.
 
 ## Experiment policy
-
 For each material kernel change:
 1. preserve/update the relevant tests;
 2. record the exact environment and configuration;
