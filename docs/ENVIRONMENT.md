@@ -48,3 +48,24 @@ scripts/driver_access_check.py reports:
 - nvidia-smi/nvcc discovery.
 
 It performs no installation, upgrade, driver unload, or reboot operation.
+
+
+## Preflight checklist
+
+Before a cuTile execution or profiling run, the project records:
+
+- GPU model, compute capability, memory size, MIG state, compute mode, and persistence mode.
+- NVIDIA driver version. Runtime requires R580+; detailed cuTile profiling requires R580.126.09+.
+- System CUDA Toolkit version if present. NVIDIA's current cuTile quickstart supports a system CUDA Toolkit 13.1+ path; otherwise the project can install the required TileIR compiler components in the Python environment.
+- Python version (project uses Python 3.12 in CI).
+- Nsight Compute path/version.
+- Fabric Manager presence/status on NVSwitch/HGX systems.
+- Linux kernel, glibc, and host compiler information.
+- Relevant CUDA environment variables.
+- The profiling permission situation for the unprivileged GitHub Actions runner.
+
+Run:
+
+    python3 scripts/cutile_sanity_check.py
+
+The script is read-only.
