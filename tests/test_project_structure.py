@@ -15,6 +15,8 @@ REQUIRED_FILES = (
     "src/online_reference.py",
     "src/baseline.py",
     "src/naive_cuda_attention.py",
+    "src/custom_cuda_attention.py",
+    "src/warp_cuda_attention.py",
     "src/torch_reference.py",
     "src/cutile_attention.py",
     "benchmarks/benchmark_attention.py",
@@ -29,6 +31,7 @@ REQUIRED_FILES = (
     "tests/test_gpu_edge_cases.py",
     "tests/test_gpu_baselines.py",
     "tests/test_cases.py",
+    ".github/workflows/a100-native-cuda.yml",
 )
 
 def test_required_project_files_exist():
