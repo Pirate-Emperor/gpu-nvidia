@@ -246,7 +246,7 @@ def test_all_three_custom_fused_variants_agree():
 @pytest.mark.parametrize("tile_k", [32, 64])
 def test_shared_tile_rejects_nondivisible_sequences(tile_k):
     require_a100()
-    q, k, v = make_inputs(B=1, H=1, N=96, D=64, seed=13500 + tile_k)
+    q, k, v = make_inputs(B=1, H=1, N=100, D=64, seed=13500 + tile_k)
 
     with pytest.raises(ValueError, match="divisible"):
         shared_tile_forward(q, k, v, tile_k=tile_k)
