@@ -68,8 +68,16 @@ def main():
 
     print("gpu topology:")
     print(run(["nvidia-smi", "-L"]))
+    print("topology matrix:")
+    print(run(["nvidia-smi", "topo", "-m"]))
     print("mig config:")
     print(run(["nvidia-smi", "-q", "-d", "MIG"]))
+    print("gpu health:")
+    print(run([
+        "nvidia-smi",
+        "--query-gpu=temperature.gpu,power.draw,power.limit,clocks.sm,clocks.mem,ecc.errors.uncorrected.volatile.total",
+        "--format=csv",
+    ]))
 
     print("\n=== CUDA toolchain ===")
     nvcc = run(["nvcc", "--version"])
@@ -105,6 +113,8 @@ def main():
     print("Preferred toolchain path: system CUDA 13.1+ OR matching tileiras/nvcc/nvvm packages in the venv")
     print("Profiling note: non-admin GPU performance-counter access must be permitted for an unprivileged runner")
     print("Profiling note: concurrent DCGM/performance-counter users may need coordination")
+    print("Benchmark note: prefer an exclusive GPU allocation and stable clock/power policy")
+    print("Benchmark note: full A100 40GB is preferred; record whether MIG is enabled")
     return 0
 
 
