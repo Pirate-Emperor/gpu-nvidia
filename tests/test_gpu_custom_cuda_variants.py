@@ -17,6 +17,7 @@ else:
     cp = pytest.importorskip("cupy")
 
 from custom_cuda_attention import forward as rowwise_forward
+from shared_tile_cuda_attention import forward as shared_tile_forward
 from warp_cuda_attention import forward as warp_forward
 
 
@@ -195,3 +196,57 @@ def test_common_key_shift_is_softmax_invariant(backend):
     shifted = BACKENDS[backend](q, k + shift, v)
 
     np.testing.assert_allclose(shifted, baseline, rtol=2e-2, atol=2e-2)
+
+
+@pytest.mark.parametrize("tile_k", [32, 64])
+@pytest.mark.parametrize(
+    "B,H,N,D",
+    [
+        (1, 1, 64, 32),
+        (1, 1, 64, 64),
+        (1, 1, 128, 128),
+        (2, 2, 128, 64),
+    ],
+)
+def test_shared_tile_cuda_matches_reference(B, H, N, D, tile_k):
+    require_a100()
+    q, k, v = make_inputs(B=B, H=H, N=N, D=D, seed=13200 + D + tile_k)
+
+    actual = shared_tile_forward(q, k, v, tile_k=tile_k)
+    assert_reference_match(actual, q, k, v)
+
+
+@pytest.mark.parametrize("tile_k", [32, 64])
+def test_shared_tile_cuda_matches_online_recurrence(tile_k):
+    require_a100()
+    q, k, v = make_inputs(B=1, H=2, N=128, D=128, seed=13300 + tile_k)
+
+    actual = shared_tile_forward(q, k, v, tile_k=tile_k)
+    expected = causal_attention_online_fp32(
+        q, k, v, tile_q=32, tile_k=tile_k
+    )
+
+    np.testing.assert_allclose(
+        actual, expected.astype(np.float16), rtol=2e-2, atol=2e-2
+    )
+
+
+def test_all_three_custom_fused_variants_agree():
+    require_a100()
+    q, k, v = make_inputs(B=1, H=4, N=128, D=64, seed=13400)
+
+    block = rowwise_forward(q, k, v)
+    warp = warp_forward(q, k, v)
+    tiled = shared_tile_forward(q, k, v, tile_k=64)
+
+    np.testing.assert_allclose(block, warp, rtol=2e-2, atol=2e-2)
+    np.testing.assert_allclose(block, tiled, rtol=2e-2, atol=2e-2)
+
+
+@pytest.mark.parametrize("tile_k", [32, 64])
+def test_shared_tile_rejects_nondivisible_sequences(tile_k):
+    require_a100()
+    q, k, v = make_inputs(B=1, H=1, N=96, D=64, seed=13500 + tile_k)
+
+    with pytest.raises(ValueError, match="divisible"):
+        shared_tile_forward(q, k, v, tile_k=tile_k)
