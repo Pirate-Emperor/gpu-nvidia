@@ -11,6 +11,7 @@ Last known validated state of main:
 | Self-hosted A100 runner routing | PASS |
 | A100 detected | A100-SXM4-40GB, SM80 |
 | Current node driver | R550.90.07 |
+| Host driver upgrade from runner | NOT available: non-root; sudo requires credentials |
 | Native current cuTile runtime | BLOCKED by driver prerequisite |
 | cuda-compat-13-4 user-space experiment | Reached CUDA error 803 |
 | Simple CUDA baseline | Implemented; GPU execution pending supported runtime |
@@ -18,6 +19,7 @@ Last known validated state of main:
 | Benchmark harness | Implemented |
 | Nsight target | Implemented |
 | Raw benchmark artifacts | Pending first supported GPU execution |
+| Driver-access audit | PASS: read-only diagnostics complete |
 
 ## Interpretation
 
