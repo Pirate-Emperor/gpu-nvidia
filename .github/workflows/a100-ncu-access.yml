@@ -1,0 +1,52 @@
+name: A100 Nsight access smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/ncu_smoke.cu"
+      - ".github/workflows/a100-ncu-access.yml"
+
+concurrency:
+  group: a100-ncu-access-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ncu-access:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify runner and GPU visibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi --query-gpu=index,name,driver_version,memory.total,compute_cap --format=csv
+          echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-<unset>}"
+
+      - name: Compile CUDA smoke binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvcc -O2 -arch=sm_80 scripts/ncu_smoke.cu -o /tmp/ncu_smoke
+          /tmp/ncu_smoke
+
+      - name: Run Nsight Compute smoke profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          ncu --version
+          mkdir -p results/ncu-access
+          ncu --set basic \
+            --target-processes all \
+            --force-overwrite \
+            --export results/ncu-access/ncu_smoke \
+            /tmp/ncu_smoke
+
+      - name: Upload Nsight smoke result
+        uses: actions/upload-artifact@v4
+        with:
+          name: a100-ncu-access-${{ github.run_id }}
+          path: results/ncu-access/
+          if-no-files-found: error
