@@ -2,17 +2,6 @@ name: A100 correctness
 
 on:
   workflow_dispatch:
-  # One-shot automatic trigger so the self-hosted GPU runner is exercised
-  # from this repository without depending on a manual UI dispatch.
-  push:
-    paths:
-      - ".github/workflows/a100-correctness.yml"
-      - "src/**"
-      - "tests/**"
-      - "scripts/**"
-      - "run_attention.py"
-      - "requirements-dev.txt"
-      - "pyproject.toml"
 
 concurrency:
   group: a100-correctness-${{ github.repository }}-${{ github.ref }}
