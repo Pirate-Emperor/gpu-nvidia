@@ -8,6 +8,16 @@ from reference import causal_attention_fp32, passes_mixed_tolerance
 pytestmark = pytest.mark.gpu
 
 
+def require_cupy():
+    if os.environ.get("REQUIRE_A100") == "1":
+        try:
+            import cupy as cp
+        except ImportError as exc:
+            pytest.fail(f"CuPy is required for A100 baseline tests: {exc}", pytrace=False)
+        return cp
+    return pytest.importorskip("cupy")
+
+
 def require_a100(cp):
     props = cp.cuda.runtime.getDeviceProperties(0)
     raw_name = props.get("name", b"")
@@ -26,7 +36,7 @@ def make_case():
 
 
 def test_simple_cuda_baseline_matches_reference():
-    cp = pytest.importorskip("cupy")
+    cp = require_cupy()
     from naive_cuda_attention import forward
 
     require_a100(cp)
@@ -39,7 +49,7 @@ def test_simple_cuda_baseline_matches_reference():
 
 
 def test_unfused_cupy_baseline_matches_reference():
-    cp = pytest.importorskip("cupy")
+    cp = require_cupy()
     from baseline import forward
 
     require_a100(cp)
