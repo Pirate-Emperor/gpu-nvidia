@@ -72,7 +72,11 @@ def make_inputs(case, mode="normal"):
     return q, k, v
 
 
-TILE_CONFIGS = ((64, 64), (128, 128))
+# These two are the mandatory course comparison points.
+# 128x128 remains an exploratory/resource-stress configuration below.
+TILE_CONFIGS = ((64, 64), (32, 64))
+EXPLORATORY_TILE_CONFIGS = ((64, 32), (128, 128))
+
 GPU_CORRECTNESS_CONFIGS = tuple(
     (case, tile_q, tile_k)
     for case in MANDATORY_CASES
@@ -111,6 +115,25 @@ def test_cutile_matches_independent_reference(case, tile_q, tile_k):
         abs_scale=2e-2,
         rel_scale=2e-2,
     ), f"max_abs={abs_err}, max_rel={rel_err}"
+
+
+@pytest.mark.parametrize("mode", ["small", "large_logits"])
+@pytest.mark.parametrize(
+    "tile_q,tile_k",
+    EXPLORATORY_TILE_CONFIGS,
+    ids=lambda x: f"tile{x[0]}x{x[1]}",
+)
+def test_cutile_exploratory_tile_configuration(tile_q, tile_k):
+    require_a100()
+    case = MANDATORY_CASES[2]
+    if case.N % tile_q or case.N % tile_k:
+        pytest.skip("sequence length is not divisible by exploratory tile")
+    q, k, v = make_inputs(case)
+    actual = forward(q, k, v, tile_q=tile_q, tile_k=tile_k)
+    expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
+    assert passes_mixed_tolerance(
+        actual, expected, abs_scale=2e-2, rel_scale=2e-2
+    )
 
 
 @pytest.mark.parametrize("mode", ["small", "large_logits"])
