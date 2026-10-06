@@ -1,0 +1,67 @@
+name: A100 native CUDA baselines
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/custom_cuda_attention.py"
+      - "src/naive_cuda_attention.py"
+      - "src/baseline.py"
+      - "tests/test_gpu_custom_cuda.py"
+      - "tests/test_gpu_baselines.py"
+      - ".github/workflows/a100-native-cuda.yml"
+      - "requirements-dev.txt"
+      - "pyproject.toml"
+
+concurrency:
+  group: a100-native-cuda-\${{ github.repository }}-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-cuda:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify A100 and host CUDA stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
+          nvcc --version
+
+      - name: Create isolated environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py python3 -m venv .venv-native-cuda
+          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install -r requirements-dev.txt
+          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install "cupy-cuda12x"
+
+      - name: Verify native CUDA without cuTile
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          .venv-native-cuda/bin/python - <<'PY'
+          import cupy as cp
+          print("CuPy:", cp.__version__)
+          print("GPU:", cp.cuda.runtime.getDeviceProperties(0)["name"])
+          x = cp.arange(16, dtype=cp.float32)
+          assert float((x * x).sum().get()) == 1240.0
+          print("Basic CUDA execution: OK")
+          PY
+
+      - name: Run native CUDA correctness suite
+        shell: bash
+        env:
+          REQUIRE_A100: "1"
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          .venv-native-cuda/bin/python -m pytest -q \
+            tests/test_gpu_custom_cuda.py \
+            tests/test_gpu_baselines.py
