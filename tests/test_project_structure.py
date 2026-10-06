@@ -18,6 +18,7 @@ REQUIRED_FILES = (
     "src/naive_cuda_attention.py",
     "src/custom_cuda_attention.py",
     "src/warp_cuda_attention.py",
+    "src/shared_tile_cuda_attention.py",
     "src/torch_reference.py",
     "src/cutile_attention.py",
     "benchmarks/benchmark_attention.py",
