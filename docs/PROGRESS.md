@@ -24,6 +24,8 @@ This file is the durable experiment log for the project. Record what was tested,
 - The node reports 40 GiB and compute capability 8.0.
 - Current driver is R550.90.07.
 - Current NVIDIA cuTile Python releases require a newer driver, so the production cuTile workflow stops at an explicit environment gate.
+- A read-only access audit reports UID/EUID 55012, not root; sudo exists but passwordless sudo is unavailable and noninteractive sudo policy inspection requires credentials.
+- Conclusion: a host-driver upgrade cannot be performed by the GitHub runner account itself. It requires an administrator/privileged maintenance path, unless the cluster provides a separately authorized upgrade mechanism.
 
 ### Forward-compatibility experiment
 - NVIDIA cuda-compat-13-4 was downloaded from the NVIDIA repository without root.
@@ -35,6 +37,15 @@ This file is the durable experiment log for the project. Record what was tested,
 ### cuTile 1.2 experiment
 - A branch attempted to test an early cuTile release associated with Ampere/SM80 support.
 - The currently reachable Python package index does not expose cuda-tile 1.2.0, so that branch did not reach GPU execution.
+
+## Engineering infrastructure added
+- Added a simple scalar CUDA baseline.
+- Added an optional PyTorch SDPA reference.
+- Added baseline correctness tests.
+- Added a project-structure test that freezes required deliverables.
+- Added a read-only driver-access audit workflow.
+- Added benchmark and Nsight workflows that are ready for a supported A100/cuTile runtime.
+- Added result-storage conventions and a persistent status snapshot.
 
 ## Baseline ladder added
 
