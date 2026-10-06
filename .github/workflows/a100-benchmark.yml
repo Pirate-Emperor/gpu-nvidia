@@ -15,7 +15,7 @@ jobs:
         run: |
           set -euo pipefail
           DRIVER_VERSION="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | xargs)"
-          DRIVER_MAJOR="\${DRIVER_VERSION%%.*}"
+          DRIVER_MAJOR="${DRIVER_VERSION%%.*}"
           echo "Driver: $DRIVER_VERSION"
           if [ "$DRIVER_MAJOR" -lt 580 ]; then
             echo "ERROR: current cuTile benchmark requires R580+."
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           python3 scripts/with_core_config.py python3 -m venv .venv-bench
           python3 scripts/with_core_config.py .venv-bench/bin/python -m pip install --upgrade pip
           python3 scripts/with_core_config.py .venv-bench/bin/python -m pip install -r requirements-dev.txt
@@ -37,16 +37,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p results/runs
-          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
           .venv-bench/bin/python benchmarks/benchmark_attention.py \
             --iterations 50 \
             --warmup 10 \
-            --output "results/runs/\${stamp}_A100_cutile_benchmark.json"
+            --output "results/runs/${stamp}_A100_cutile_benchmark.json"
 
       - name: Upload raw benchmark artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: a100-benchmark-\${{ github.run_id }}
+          name: a100-benchmark-${{ github.run_id }}
           path: results/runs/
           if-no-files-found: error
