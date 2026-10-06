@@ -30,4 +30,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           python3 scripts/environment_check.py
+          python3 scripts/cutile_sanity_check.py
