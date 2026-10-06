@@ -116,7 +116,7 @@ def test_output_changes_when_only_current_query_changes():
     rng = np.random.default_rng(302)
     q = rng.standard_normal((1, 1, 16, 32), dtype=np.float32).astype(np.float16)
     k = rng.standard_normal((1, 1, 16, 32), dtype=np.float32).astype(np.float16)
-    v = rng.standard_normal((1, 1, 16, 32), dtype=np.float16)
+    v = rng.standard_normal((1, 1, 16, 32), dtype=np.float32).astype(np.float16)
 
     before = causal_attention_fp32(q, k, v)
     q2 = q.copy()
