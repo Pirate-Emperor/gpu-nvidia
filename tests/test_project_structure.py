@@ -39,6 +39,7 @@ REQUIRED_FILES = (
     ".github/workflows/a100-native-cuda.yml",
     ".github/workflows/a100-ncu-access.yml",
     "scripts/ncu_smoke.cu",
+    "tests/test_gpu_device_matrix.py",
 )
 
 def test_required_project_files_exist():
