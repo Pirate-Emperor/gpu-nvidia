@@ -56,6 +56,9 @@ The A100 GPU suite is intentionally broader than the minimum course matrix.
 | Zero-logit prefix means | D=64 | BLOCKED |
 | Tile-to-tile numerical agreement | 64x64 vs 128x128 | BLOCKED |
 | Multiple B/H | B=2 and multi-head cases | BLOCKED |
+| Custom block-row CUDA | D=32/64/128 + causal/edge/stability cases | NEW; pending GPU CI |
+| Custom warp-row CUDA | D=32/64/128 + causal/edge/stability cases | NEW; pending GPU CI |
+| Cross-implementation agreement | block-row vs warp-row | NEW; pending GPU CI |
 
 ## 3. GPU baseline ladder
 
@@ -65,10 +68,15 @@ Every executable GPU implementation has a separate correctness path:
 2. Tiled NumPy online-softmax oracle.
 3. Unfused CuPy score/probability materialization baseline.
 4. Scalar CUDA baseline.
-5. Optional PyTorch SDPA reference.
-6. Fused cuTile kernel.
+5. Custom block-row fused CUDA.
+6. Custom warp-row fused CUDA.
+7. Optional PyTorch SDPA reference.
+8. Fused cuTile kernel.
 
-The baseline tests verify each implementation against the independent FP32 oracle rather than against another optimized implementation.
+The two custom CUDA variants are deliberately independent implementations of
+the fused algorithm. They are cross-checked against the mathematical oracle,
+the online recurrence, and each other before they are used as a reference for
+cuTile.
 
 ## 4. Performance runs
 
