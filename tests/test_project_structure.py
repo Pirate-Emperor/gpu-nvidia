@@ -25,6 +25,7 @@ REQUIRED_FILES = (
     "tests/test_reference_contract.py",
     "tests/test_reference_causal.py",
     "tests/test_reference_edge_cases.py",
+    "tests/test_reference_metamorphic.py",
     "tests/test_online_reference.py",
     "tests/test_launch_contract.py",
     "tests/test_cutile_config.py",
