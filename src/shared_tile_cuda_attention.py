@@ -192,7 +192,8 @@ def _kernel(tile_k: int):
     return cp.RawKernel(
         source,
         "causal_attention_shared_tile",
-        options=("--std=c++14",),
+        options=("--std=c++14", "-arch=sm_80"),
+        backend="nvcc",
     )
 
 
