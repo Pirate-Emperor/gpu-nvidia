@@ -30,10 +30,11 @@ This file is the durable experiment log for the project. Record what was tested,
 ### Independent native CUDA work
 - Added a custom block-row fused CUDA kernel that uses ordinary CUDA C++ and cooperative reductions.
 - Added a second warp-row fused CUDA kernel using warp-shuffle reductions.
+- Added a third shared-memory tiled fused CUDA kernel with configurable 32/64 key tiles.
 - Added independent correctness suites against the FP32 oracle and tiled online-softmax reference.
 - Added cross-implementation tests between the two custom fused CUDA variants.
 - Added a native-CUDA GitHub Actions workflow that deliberately does not require cuTile or R580+, so the R550 node can validate these implementations independently.
-- Added a baseline benchmark path comparing unfused CuPy, scalar CUDA, block-row fused CUDA, and warp-row fused CUDA.
+- Added a baseline benchmark path comparing unfused CuPy, scalar CUDA, block-row fused CUDA, warp-row fused CUDA, and shared-memory tiled CUDA.
 
 ### CPU validation
 - The self-hosted A100 runner successfully executed the CPU/reference suite.
