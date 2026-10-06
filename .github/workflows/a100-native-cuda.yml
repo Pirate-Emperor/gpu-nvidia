@@ -50,7 +50,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          export CUPY_CACHE_DIR="/tmp/cupy-cache-${GITHUB_RUN_ID}"
+          mkdir -p "$CUPY_CACHE_DIR"
           .venv-native-cuda/bin/python - <<'PY'
           import cupy as cp
           print("CuPy:", cp.__version__)
@@ -66,7 +68,9 @@ jobs:
           REQUIRE_A100: "1"
         run: |
           set -euo pipefail
-          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          export CUPY_CACHE_DIR="/tmp/cupy-cache-${GITHUB_RUN_ID}"
+          mkdir -p "$CUPY_CACHE_DIR"
           .venv-native-cuda/bin/python -m pytest -q \
             tests/test_gpu_custom_cuda.py \
             tests/test_gpu_custom_cuda_variants.py \
