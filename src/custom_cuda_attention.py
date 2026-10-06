@@ -117,38 +117,40 @@ def _kernel():
         float value_acc = 0.0f;
 
         // Pass 2: streaming normalization and one output dimension per thread.
-        if (tid < D) {
-            const long long out_index =
-                head_base + (long long)qpos * D + tid;
+        const bool active_output = (tid < D);
+        const long long out_index =
+            head_base + (long long)qpos * D + tid;
 
-            for (int j = 0; j <= qpos; ++j) {
-                const long long k_base = head_base + (long long)j * D;
-                float local_dot = 0.0f;
+        for (int j = 0; j <= qpos; ++j) {
+            const long long k_base = head_base + (long long)j * D;
+            float local_dot = 0.0f;
 
-                for (int d = tid; d < D; d += blockDim.x) {
-                    local_dot +=
-                        __half2float(Q[q_base + d]) *
-                        __half2float(K[k_base + d]);
-                }
+            for (int d = tid; d < D; d += blockDim.x) {
+                local_dot +=
+                    __half2float(Q[q_base + d]) *
+                    __half2float(K[k_base + d]);
+            }
 
-                reduce_buf[tid] = local_dot;
-                reduce_sum_128(reduce_buf);
+            reduce_buf[tid] = local_dot;
+            reduce_sum_128(reduce_buf);
 
-                if (tid == 0) {
-                    shared_score = reduce_buf[0] * scale;
-                }
-                __syncthreads();
+            if (tid == 0) {
+                shared_score = reduce_buf[0] * scale;
+            }
+            __syncthreads();
 
-                const float weight = expf(shared_score - shared_max);
+            const float weight = expf(shared_score - shared_max);
+            if (active_output) {
                 norm += weight;
-
                 const long long v_index =
                     head_base + (long long)j * D + tid;
                 value_acc += weight * __half2float(V[v_index]);
-
-                __syncthreads();
             }
 
+            __syncthreads();
+        }
+
+        if (active_output) {
             O[out_index] = __float2half(value_acc / norm);
         }
     }
