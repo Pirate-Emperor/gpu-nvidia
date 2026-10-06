@@ -109,3 +109,16 @@ on the existing A100/R550 node without implying that cuTile is supported.
 The development sandbox cannot resolve github.com, so the latest repository
 state was not executed locally from this environment. CI remains the source of
 truth for execution results. No unexecuted test or benchmark is marked PASS.
+
+## 2026-10-06 — CI sanity finding and correction
+
+The first CI execution after the expanded test additions completed 94 tests and
+reported 5 failures plus 11 GPU/package skips. The failures were all in newly
+added CPU/reference tests, not GPU execution:
+- constant-value exact-equality assertions were too strict for FP32 reduction;
+- one extreme-logit expected array had a missing leading B/H dimension;
+- the common-key-shift metamorphic property used an overly strict tolerance
+  despite FP16 input rounding.
+
+These test specifications were corrected on main. The GPU audit run remains a
+separate self-hosted A100 job and must not be inferred from this hosted CPU run.
