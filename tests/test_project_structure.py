@@ -10,6 +10,7 @@ REQUIRED_FILES = (
     "docs/BASELINE_LADDER.md",
     "docs/PROGRESS.md",
     "docs/TEST_MATRIX.md",
+    "docs/CUDA_VARIANTS.md",
     "results/README.md",
     "src/reference.py",
     "src/online_reference.py",
