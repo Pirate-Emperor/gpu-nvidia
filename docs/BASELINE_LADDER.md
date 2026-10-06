@@ -12,8 +12,9 @@ be evaluated independently.
 | 3 | Simple scalar CUDA | One-thread-per-output programming floor | Extension |
 | 4 | Custom block-row CUDA fused | Ordinary CUDA fused implementation with cooperative dot-product reduction | Diagnostic/bridge |
 | 5 | Custom warp-row CUDA fused | Warp-shuffle fused implementation | Diagnostic/bridge |
-| 6 | PyTorch SDPA | Framework/vendor performance reference | Recommended |
-| 7 | cuTile fused | Main project fused implementation | Required target |
+| 6 | Custom shared-memory tiled CUDA fused | Explicit K/V tile staging and online softmax | Diagnostic/bridge |
+| 7 | PyTorch SDPA | Framework/vendor performance reference | Recommended |
+| 8 | cuTile fused | Main project fused implementation | Required target |
 
 ## Diagnostic value
 
