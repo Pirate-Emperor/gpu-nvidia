@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Exhaustive read-only GPU/node inventory for the project's self-hosted A100 runner."""
+"""Exhaustive read-only GPU/node inventory for the project's self-hosted A100 runner.
+
+Second PR execution revision: collect actual runner state before any admin change."""
 from __future__ import annotations
 
 import os
