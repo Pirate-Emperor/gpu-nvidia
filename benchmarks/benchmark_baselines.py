@@ -19,6 +19,7 @@ from baseline import launch_device as unfused_launch
 from cases import MANDATORY_CASES
 from custom_cuda_attention import launch_device as custom_block_launch
 from naive_cuda_attention import launch_device as naive_launch
+from shared_tile_cuda_attention import launch_device as shared_tile_launch
 from warp_cuda_attention import launch_device as custom_warp_launch
 
 
@@ -104,6 +105,12 @@ def main():
     warp_ms, warp_p90 = timed(
         lambda: custom_warp_launch(q, k, v), cp, args.warmup, args.iterations
     )
+    tiled_ms, tiled_p90 = timed(
+        lambda: shared_tile_launch(q, k, v, tile_k=64),
+        cp,
+        args.warmup,
+        args.iterations,
+    )
     unfused_ms, unfused_p90 = timed(
         lambda: unfused_launch(q32, k32, v32), cp, args.warmup, args.iterations
     )
@@ -114,11 +121,16 @@ def main():
             "custom_block_p90_ms": block_p90,
             "custom_warp_median_ms": warp_ms,
             "custom_warp_p90_ms": warp_p90,
+            "shared_tile64_median_ms": tiled_ms,
+            "shared_tile64_p90_ms": tiled_p90,
             "unfused_cupy_median_ms": unfused_ms,
             "unfused_cupy_p90_ms": unfused_p90,
             "custom_block_over_unfused_speedup": unfused_ms / block_ms,
             "custom_warp_over_unfused_speedup": unfused_ms / warp_ms,
+            "shared_tile64_over_unfused_speedup": unfused_ms / tiled_ms,
             "custom_warp_over_custom_block_speedup": block_ms / warp_ms,
+            "shared_tile64_over_custom_block_speedup": block_ms / tiled_ms,
+
         }
     )
 
