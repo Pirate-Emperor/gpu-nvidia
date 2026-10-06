@@ -55,3 +55,20 @@ Then verify the cuTile environment with:
     systemctl is-active nvidia-fabricmanager   # on systems using Fabric Manager
 
 Do not treat a successful `nvidia-smi` check alone as sufficient; the driver, compiler, profiler, profiling permissions, and GPU allocation policy all matter.
+
+## Confirmed current node findings
+
+The self-hosted runner is on an 8-GPU HGX/NVSwitch system:
+- 8 physical A100-SXM4-40GB GPUs are visible to DCGM.
+- 6 NVSwitches are present.
+- The runner exposes GPUs 0 and 1 through CUDA_VISIBLE_DEVICES=0,1.
+- The selected GPUs are full GPUs, not MIG instances; MIG is disabled.
+- Both selected GPUs were idle at the audit snapshot, with 40960 MiB installed and only 1 MiB used.
+- Both selected GPUs reported PCIe Gen4 x16.
+- NVLink status showed 12 links at 25 GB/s on each selected A100.
+- Fabric Manager is installed and active.
+- System CUDA Toolkit is 12.4.131.
+- System GCC is 11.4.0 and glibc is 2.35.
+- Nsight Compute 2024.1.1.0 and Nsight Systems 2023.4.4.54 are installed.
+- Basic CUDA execution succeeds on the runner.
+- CuPy RawKernel JIT currently fails because NVRTC cannot find standard headers such as float.h and math.h. This is being fixed with the matching CUDA 12.4 runtime-header package in the project environment rather than requiring a host-wide CUDA upgrade.
