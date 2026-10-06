@@ -170,3 +170,28 @@ def test_noncontiguous_inputs_rejected(backend):
 
     with pytest.raises(ValueError, match="C-contiguous"):
         BACKENDS[backend](q_bad, k, v)
+
+
+@pytest.mark.parametrize("backend", BACKENDS, ids=BACKENDS.keys())
+def test_identical_keys_reduce_to_prefix_means(backend):
+    require_a100()
+    q, _, v = make_inputs(B=1, H=2, N=64, D=64, seed=13105)
+    k = np.empty_like(q)
+    k[...] = np.float16(0.75)
+
+    actual = BACKENDS[backend](q, k, v)
+    expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
+
+    np.testing.assert_allclose(actual, expected, rtol=2e-2, atol=2e-2)
+
+
+@pytest.mark.parametrize("backend", BACKENDS, ids=BACKENDS.keys())
+def test_common_key_shift_is_softmax_invariant(backend):
+    require_a100()
+    q, k, v = make_inputs(B=1, H=2, N=64, D=64, seed=13106)
+    shift = np.linspace(-2.0, 2.0, 64, dtype=np.float32).astype(np.float16)
+
+    baseline = BACKENDS[backend](q, k, v)
+    shifted = BACKENDS[backend](q, k + shift, v)
+
+    np.testing.assert_allclose(shifted, baseline, rtol=2e-2, atol=2e-2)
