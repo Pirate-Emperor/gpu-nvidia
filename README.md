@@ -36,6 +36,9 @@ src/custom_cuda_attention.py
 src/warp_cuda_attention.py
   Independent fused CUDA implementation using warp-shuffle reductions; no cuTile dependency.
 
+docs/CUDA_VARIANTS.md
+  Design notes and invariants for the independent CUDA fused implementations.
+
 src/torch_reference.py
   Optional PyTorch SDPA reference/performance backend.
 
@@ -71,6 +74,18 @@ CPU/reference tests need only NumPy and pytest:
     pytest -q -m "not gpu"
 
 The CPU suite does not validate CUDA execution.
+
+## Native CUDA validation
+
+A separate self-hosted A100 workflow runs the ordinary CUDA baselines without
+importing or requiring cuTile. This is intentional: the current R550 node can
+still be used to validate the fused CUDA algorithm while the cuTile environment
+is blocked.
+
+The native CUDA ladder includes the scalar CUDA baseline, a block-row fused
+kernel, a warp-row fused kernel, and the unfused CuPy baseline. Every fused
+variant is checked against the independent NumPy oracle and the tiled
+online-softmax reference.
 
 ## GPU environment
 
