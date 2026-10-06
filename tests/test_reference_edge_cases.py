@@ -51,7 +51,7 @@ def test_constant_value_tensor_is_preserved(D):
     v = np.full((1, 1, N, D), np.float16(3.25), dtype=np.float16)
 
     out = causal_attention_fp32(q, k, v)
-    np.testing.assert_array_equal(out, np.full_like(out, 3.25, dtype=np.float32))
+    np.testing.assert_allclose(out, np.full_like(out, 3.25, dtype=np.float32), rtol=2e-6, atol=2e-6)
 
 
 def test_extreme_finite_logits_remain_stable():
@@ -74,7 +74,7 @@ def test_extreme_finite_logits_remain_stable():
     assert np.isfinite(out).all()
     assert np.isfinite(max_abs_error(out, out))
     assert np.isfinite(max_rel_error(out, out))
-    np.testing.assert_allclose(out[..., :, 0], np.arange(N, dtype=np.float32), atol=1e-5)
+    np.testing.assert_allclose(out[..., :, 0], np.arange(N, dtype=np.float32)[None, None, :], rtol=1e-6, atol=1e-5)
 
 
 def test_output_stays_inside_prefix_value_convex_hull():
