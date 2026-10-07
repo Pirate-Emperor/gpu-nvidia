@@ -29,6 +29,11 @@ jobs:
         run: |
           set -euo pipefail
           export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
+          export PYTHONPATH="$CORE_HOME:${PYTHONPATH:-}"
+          echo "HOME=$HOME"
+          echo "CORE_HOME=$CORE_HOME"
+          python3 -c "import os,sys; print(\"PYTHONPATH=\"+os.environ.get(\"PYTHONPATH\",\"\")); print(\"sys.path[0:5]=\",sys.path[0:5])"
+          find "$CORE_HOME" -maxdepth 3 -name "core_config.py" -print -quit
           mkdir -p "$CORE_HOME/cuda-compat-13-0-exp"
           cd "$CORE_HOME/cuda-compat-13-0-exp"
           url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-compat-13-0_580.178.04-1ubuntu1_amd64.deb"
