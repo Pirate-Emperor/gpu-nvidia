@@ -30,13 +30,13 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           mkdir -p "$HOME/cuda-compat-13-0-exp"
-          cd "$HOME/cuda-compat-13-0-exp"
+          cd "$CORE_HOME/cuda-compat-13-0-exp"
           url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-compat-13-0_580.178.04-1ubuntu1_amd64.deb"
           python3 "$GITHUB_WORKSPACE/scripts/with_core_config.py" curl -fL --retry 3 -o compat.deb "$url"
           rm -rf compat
           dpkg-deb -x compat.deb compat
           test -f compat/usr/local/cuda-13.0/compat/libcuda.so.580.178.04
-          echo "COMPAT_DIR=$HOME/cuda-compat-13-0-exp/compat/usr/local/cuda-13.0/compat" >> "$GITHUB_ENV"
+          echo "COMPAT_DIR=$CORE_HOME/cuda-compat-13-0-exp/compat/usr/local/cuda-13.0/compat" >> "$GITHUB_ENV"
 
       - name: CUDA 13.0 runtime smoke test
         shell: bash
