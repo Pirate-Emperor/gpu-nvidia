@@ -39,17 +39,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
-          export PYTHONPATH="$CORE_HOME:${PYTHONPATH:-}"
-          echo "HOME=$HOME"
-          echo "CORE_HOME=$CORE_HOME"
-          python3 -c "import os,sys; print(\"PYTHONPATH=\"+os.environ.get(\"PYTHONPATH\",\"\")); print(\"sys.path[0:5]=\",sys.path[0:5])"
-          find "$CORE_HOME" -maxdepth 3 -name "core_config.py" -print -quit
-          python3 scripts/with_core_config.py python3 -m venv .venv-native-cuda
-          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install --upgrade pip
-          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install -r requirements-dev.txt
-          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install "cupy-cuda12x"
-          python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install "nvidia-cuda-runtime-cu12==12.4.*"
+          python3 -m venv .venv-native-cuda
+          .venv-native-cuda/bin/python -m pip install --upgrade pip
+          .venv-native-cuda/bin/python -m pip install -r requirements-dev.txt
+          .venv-native-cuda/bin/python -m pip install "cupy-cuda12x"
+          .venv-native-cuda/bin/python -m pip install "nvidia-cuda-runtime-cu12==12.4.*"
 
       - name: Verify native CUDA without cuTile
         shell: bash
