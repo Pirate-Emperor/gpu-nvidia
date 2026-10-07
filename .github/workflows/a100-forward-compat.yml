@@ -28,8 +28,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
-          mkdir -p "$HOME/cuda-compat-13-0-exp"
+          export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
+          export PYTHONPATH="$CORE_HOME:${PYTHONPATH:-}"
+          echo "CORE_HOME=$CORE_HOME"
+          python3 -c "import core_config; print(\"core_config import: PASS\")"
+          mkdir -p "$CORE_HOME/cuda-compat-13-0-exp"
           cd "$CORE_HOME/cuda-compat-13-0-exp"
           url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-compat-13-0_580.178.04-1ubuntu1_amd64.deb"
           python3 "$GITHUB_WORKSPACE/scripts/with_core_config.py" curl -fL --retry 3 -o compat.deb "$url"
@@ -43,7 +46,9 @@ jobs:
         run: |
           set -euo pipefail
           export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
-          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
+          export PYTHONPATH="$CORE_HOME:${PYTHONPATH:-}"
+          export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
           python3 scripts/with_core_config.py python3 -m venv .venv-compat13
           python3 scripts/with_core_config.py .venv-compat13/bin/python -m pip install --upgrade pip
           python3 scripts/with_core_config.py .venv-compat13/bin/python -m pip install "nvidia-cuda-runtime-cu13==13.0.*" "cupy-cuda13x"
@@ -68,7 +73,8 @@ jobs:
         run: |
           set -euo pipefail
           export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
-          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
+          export PYTHONPATH="$CORE_HOME:${PYTHONPATH:-}"
           export CUPY_CACHE_DIR="/tmp/cupy-compat13-${GITHUB_RUN_ID}"
           mkdir -p "$CUPY_CACHE_DIR"
           .venv-compat13/bin/python - <<'PY'
