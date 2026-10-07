@@ -55,7 +55,7 @@ jobs:
                   print("GPU", i, p["name"], "cc", p["major"], p["minor"])
           x = cp.arange(4096, dtype=cp.float32)
           y = (x * x).sum().get()
-          assert float(y) == 22857344.0
+          assert float(y) == 22898104320.0
           print("CUDA 13.0 forward-compat runtime execution: PASS")
           PY
 
