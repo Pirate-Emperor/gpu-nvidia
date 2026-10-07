@@ -1,4 +1,5 @@
 name: A100 native CUDA baselines
+# execution probe: fixed test-shape assertions
 
 on:
   workflow_dispatch:
