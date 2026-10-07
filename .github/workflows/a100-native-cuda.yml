@@ -39,7 +39,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PYTHONPATH="$HOME:\${PYTHONPATH:-}"
+          export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
+          export PYTHONPATH="$CORE_HOME:${PYTHONPATH:-}"
           python3 scripts/with_core_config.py python3 -m venv .venv-native-cuda
           python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install --upgrade pip
           python3 scripts/with_core_config.py .venv-native-cuda/bin/python -m pip install -r requirements-dev.txt
