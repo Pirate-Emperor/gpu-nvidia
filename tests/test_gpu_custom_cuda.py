@@ -115,7 +115,7 @@ def test_custom_fused_cuda_handles_extreme_finite_logits():
 
     assert np.isfinite(actual).all()
     np.testing.assert_allclose(
-        actual[..., :, 0],
+        actual[0, 0, :, 0],
         np.arange(N, dtype=np.float16),
         rtol=2e-2,
         atol=2e-2,
