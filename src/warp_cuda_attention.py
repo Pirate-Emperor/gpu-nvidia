@@ -41,6 +41,7 @@ def _kernel():
     #include <float.h>
 
     #define FULL_MASK 0xffffffffu
+    #define WARP_SIZE 32
 
     __device__ __forceinline__ float warp_sum(float x) {
         for (int offset = 16; offset > 0; offset >>= 1) {
