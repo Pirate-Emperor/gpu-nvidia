@@ -1,0 +1,85 @@
+name: A100 CUDA 13.0 forward compatibility experiment
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/a100-forward-compat.yml"
+
+jobs:
+  compat:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify host
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi --query-gpu=index,name,driver_version,compute_cap,memory.total --format=csv
+          nvcc --version
+
+      - name: Install CUDA 13.0 forward-compatibility libraries in workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          mkdir -p "$HOME/cuda-compat-13-0-exp"
+          cd "$HOME/cuda-compat-13-0-exp"
+          url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-compat-13-0_580.178.04-1ubuntu1_amd64.deb"
+          python3 "$GITHUB_WORKSPACE/scripts/with_core_config.py" curl -fL --retry 3 -o compat.deb "$url"
+          rm -rf compat
+          dpkg-deb -x compat.deb compat
+          test -f compat/usr/local/cuda-13.0/compat/libcuda.so.580.178.04
+          echo "COMPAT_DIR=$HOME/cuda-compat-13-0-exp/compat/usr/local/cuda-13.0/compat" >> "$GITHUB_ENV"
+
+      - name: CUDA 13.0 runtime smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py python3 -m venv .venv-compat13
+          python3 scripts/with_core_config.py .venv-compat13/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py .venv-compat13/bin/python -m pip install "nvidia-cuda-runtime-cu13==13.0.*" "cupy-cuda13x"
+          .venv-compat13/bin/python - <<'PY'
+          import cupy as cp
+          print("CuPy:", cp.__version__)
+          print("Runtime:", cp.cuda.runtime.runtimeGetVersion())
+          print("Driver:", cp.cuda.runtime.driverGetVersion())
+          print("Device count:", cp.cuda.runtime.getDeviceCount())
+          for i in range(cp.cuda.runtime.getDeviceCount()):
+              with cp.cuda.Device(i):
+                  p = cp.cuda.runtime.getDeviceProperties(i)
+                  print("GPU", i, p["name"], "cc", p["major"], p["minor"])
+          x = cp.arange(4096, dtype=cp.float32)
+          y = (x * x).sum().get()
+          assert float(y) == 22857344.0
+          print("CUDA 13.0 forward-compat runtime execution: PASS")
+          PY
+
+      - name: PTX JIT smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          export CUPY_CACHE_DIR="/tmp/cupy-compat13-${GITHUB_RUN_ID}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          .venv-compat13/bin/python - <<'PY'
+          import cupy as cp
+          src = r'''
+          extern "C" __global__ void add1(const float* x, float* y) {
+              int i = blockDim.x * blockIdx.x + threadIdx.x;
+              y[i] = x[i] + 1.0f;
+          }
+          '''
+          k = cp.RawKernel(src, "add1", backend="nvrtc")
+          x = cp.arange(256, dtype=cp.float32)
+          y = cp.empty_like(x)
+          k((1,), (256,), (x, y))
+          cp.cuda.runtime.deviceSynchronize()
+          cp.testing.assert_array_equal(y, x + 1)
+          print("CUDA 13.0 PTX/NVRTC execution: PASS")
+          PY
