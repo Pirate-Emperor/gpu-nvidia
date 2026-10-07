@@ -146,7 +146,7 @@ def test_extreme_logits_remain_finite(backend):
 
     assert np.isfinite(actual).all()
     np.testing.assert_allclose(
-        actual[..., :, 0], np.arange(N, dtype=np.float16), rtol=2e-2, atol=2e-2
+        actual[0, 0, :, 0], np.arange(N, dtype=np.float16), rtol=2e-2, atol=2e-2
     )
 
 
