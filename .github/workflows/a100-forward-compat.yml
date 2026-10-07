@@ -48,6 +48,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
           export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
           cd "$CORE_HOME/cuda-compat-13-0-exp"
           cudart_url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-cudart-13-0_13.0.96-1_amd64.deb"
@@ -81,8 +82,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
           export CORE_HOME="/nlsasfs/home/lmedge/rahkus"
+          export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
           export PYTHONPATH="$CORE_HOME:${PYTHONPATH:-}"
           export CUPY_CACHE_DIR="/tmp/cupy-compat13-${GITHUB_RUN_ID}"
           mkdir -p "$CUPY_CACHE_DIR"
