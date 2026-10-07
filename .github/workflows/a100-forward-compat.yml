@@ -49,10 +49,18 @@ jobs:
         run: |
           set -euo pipefail
           export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
-          export LD_LIBRARY_PATH="$COMPAT_DIR:${LD_LIBRARY_PATH:-}"
+          cd "$CORE_HOME/cuda-compat-13-0-exp"
+          cudart_url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-cudart-13-0_13.0.96-1_amd64.deb"
+          curl -fL --retry 3 -o cudart.deb "$cudart_url"
+          rm -rf cudart
+          dpkg-deb -x cudart.deb cudart
+          export CUDART_DIR="$CORE_HOME/cuda-compat-13-0-exp/cudart/usr/local/cuda-13.0/targets/x86_64-linux/lib"
+          echo "CUDART_DIR=$CUDART_DIR" >> "$GITHUB_ENV"
+          export LD_LIBRARY_PATH="$COMPAT_DIR:$CUDART_DIR:${LD_LIBRARY_PATH:-}"
+          cd "$GITHUB_WORKSPACE"
           python3 -m venv .venv-compat13
           .venv-compat13/bin/python -m pip install --upgrade pip
-          .venv-compat13/bin/python -m pip install "nvidia-cuda-runtime-cu13==13.0.*" "cupy-cuda13x"
+          .venv-compat13/bin/python -m pip install "cupy-cuda13x"
           .venv-compat13/bin/python - <<'PY'
           import cupy as cp
           print("CuPy:", cp.__version__)
