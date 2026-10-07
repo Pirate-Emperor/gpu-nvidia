@@ -6,6 +6,10 @@ on:
     paths:
       - ".github/workflows/a100-forward-compat.yml"
 
+concurrency:
+  group: a100-forward-compat-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   compat:
     runs-on: [self-hosted, linux, x64, gpu, a100]
