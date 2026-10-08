@@ -1,0 +1,33 @@
+name: A100 tile PTXAS resource report
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/shared_tile_cuda_attention.py"
+      - "src/variants/shared_tile_v1.py"
+      - "src/variants/shared_tile_v2.py"
+      - "src/variants/shared_tile_v3.py"
+      - "scripts/ptxas_tile_report.py"
+      - ".github/workflows/a100-ptxas-report.yml"
+
+concurrency:
+  group: a100-ptxas-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare native CUDA environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/setup_native_env.sh
+      - name: Compile resource report
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${NATIVE_VENV}/bin/python" scripts/ptxas_tile_report.py
