@@ -40,7 +40,7 @@ def test_v3_matches_v2_and_reference(B,H,N,D,tile_k):
     assert passes_mixed_tolerance(v3,ref,abs_scale=2e-2,rel_scale=2e-2)
     np.testing.assert_allclose(v3,v2,rtol=2e-2,atol=2e-2)
 
-@pytest.mark.parametrize("tile_k",[32,64])
+@pytest.mark.parametrize("tile_k",[16,32,64])
 def test_v3_adversarial(tile_k):
     N=D=128
     q=np.zeros((1,1,N,D),dtype=np.float16)
