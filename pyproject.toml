@@ -16,5 +16,5 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
 markers = [
-  "gpu: tests that require a CUDA GPU and cuTile",
+  "gpu: tests that require a CUDA GPU",
 ]
