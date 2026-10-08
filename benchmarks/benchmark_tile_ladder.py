@@ -99,10 +99,12 @@ def main():
 
     # Compile every version/tile once in a fresh CuPy cache and record that
     # cold compile separately from steady-state execution.
+    # The kernel source is identical across tile_k; tile_k is a runtime
+    # argument. Only the first compile per version is a true cold JIT
+    # measurement in the fresh CuPy cache.
     cold_ms = {}
     for version, (kernel_fn, _, cases) in versions.items():
-        for tile_k in TILES:
-            cold_ms[(version, tile_k)] = cold_compile(kernel_fn, tile_k, cp)
+        cold_ms[version] = cold_compile(kernel_fn, TILES[0], cp)
 
     for name in ALL_CASES:
         case = next(c for c in MANDATORY_CASES if c.name == name)
@@ -128,7 +130,7 @@ def main():
                     "version": version,
                     "warmup": args.warmup,
                     "iterations": args.iterations,
-                    "cold_compile_ms": cold_ms[(version, tile_k)],
+                    "cold_compile_ms": cold_ms[version] if tile_k == TILES[0] else None,
                     "median_ms": med,
                     "p90_ms": p90,
                     "throughput_tflops": throughput_tflops(case, med),
@@ -153,6 +155,7 @@ def main():
         "warmup": args.warmup,
         "iterations": args.iterations,
         "tiles": list(TILES),
+        "cold_compile_tile_k": TILES[0],
         "v1_cases": list(V1_CASES),
         "cases": list(ALL_CASES),
         "results": rows,
@@ -163,6 +166,10 @@ def main():
         w = csv.DictWriter(f, fieldnames=rows[0].keys())
         w.writeheader()
         w.writerows(rows)
+
+    print("COLD_JIT")
+    for version in versions:
+        print(f"  {version} tk={TILES[0]} compile={cold_ms[version]:.3f}ms")
 
     for name in ALL_CASES:
         print(f"CASE {name}")
