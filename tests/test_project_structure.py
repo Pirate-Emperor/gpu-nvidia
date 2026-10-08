@@ -31,6 +31,7 @@ REQUIRED_FILES = (
     "tests/test_reference_metamorphic.py",
     "tests/test_reference_exhaustive.py",
     "docs/KERNEL_VERSIONS.md",
+    "docs/EXHAUSTIVE_TEST_PLAN.md",
     "src/variants/shared_tile_v1.py",
     "src/variants/__init__.py",
     "src/variants/shared_tile_v2.py",
