@@ -1,0 +1,73 @@
+name: A100 full non-cuTile suite
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/reference.py"
+      - "src/online_reference.py"
+      - "src/contract.py"
+      - "src/baseline.py"
+      - "src/naive_cuda_attention.py"
+      - "src/custom_cuda_attention.py"
+      - "src/warp_cuda_attention.py"
+      - "src/shared_tile_cuda_attention.py"
+      - "src/variants/**"
+      - "tests/**"
+      - ".github/workflows/a100-native-full.yml"
+      - "requirements-dev.txt"
+      - "pyproject.toml"
+
+concurrency:
+  group: a100-native-full-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  non-cutile:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify A100 and CUDA
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi --query-gpu=index,name,driver_version,compute_cap,memory.total --format=csv
+          nvcc --version
+
+      - name: Create isolated environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv-native-full
+          .venv-native-full/bin/python -m pip install --upgrade pip
+          .venv-native-full/bin/python -m pip install -r requirements-dev.txt
+          .venv-native-full/bin/python -m pip install "cupy-cuda12x"
+          .venv-native-full/bin/python -m pip install "nvidia-cuda-runtime-cu12==12.4.*"
+
+      - name: Run all tests that do not require cuTile
+        shell: bash
+        env:
+          REQUIRE_A100: "1"
+        run: |
+          set -euo pipefail
+          export CUPY_CACHE_DIR="/tmp/cupy-cache-full-${GITHUB_RUN_ID}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          .venv-native-full/bin/python -m pytest -q \
+            tests/test_cases.py \
+            tests/test_generator.py \
+            tests/test_io.py \
+            tests/test_launch_contract.py \
+            tests/test_online_reference.py \
+            tests/test_project_structure.py \
+            tests/test_reference_contract.py \
+            tests/test_reference_causal.py \
+            tests/test_reference_edge_cases.py \
+            tests/test_reference_exhaustive.py \
+            tests/test_reference_metamorphic.py \
+            tests/test_gpu_baselines.py \
+            tests/test_gpu_custom_cuda.py \
+            tests/test_gpu_custom_cuda_variants.py \
+            tests/test_gpu_device_matrix.py \
+            tests/test_gpu_shared_tile_exhaustive.py
