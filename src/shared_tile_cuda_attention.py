@@ -1,9 +1,10 @@
 """Shared-memory tiled fused CUDA attention (promoted v3).
 
 This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns a small query tile; four QK scores are computed per loop iteration., each warp owns one query row, K/V are staged
-in shared-memory tiles, and a fused online-softmax recurrence is performed
-without materializing scores or probabilities in global memory.
+one block owns a small query tile; each warp owns one query row, four QK
+scores are computed per inner iteration, K/V are staged in shared-memory
+tiles, and a fused online-softmax recurrence is performed without
+materializing scores or probabilities in global memory.
 
 It is intentionally independent of cuTile.
 """
@@ -127,13 +128,26 @@ def _kernel(tile_k: int):
 
             for (int jj = 0; jj < TILE_K; jj += 4) {
                 float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
-                for (int d = lane; d < D; d += WARP_SIZE) {
-                    const float qd =
-                        __half2float(q_shared[(qpos - qbase) * D + d]);
-                    s0 += qd * __half2float(k_shared[(jj + 0) * D + d]);
-                    s1 += qd * __half2float(k_shared[(jj + 1) * D + d]);
-                    s2 += qd * __half2float(k_shared[(jj + 2) * D + d]);
-                    s3 += qd * __half2float(k_shared[(jj + 3) * D + d]);
+                float qv[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+                #pragma unroll
+                for (int m = 0; m < 4; ++m) {
+                    const int d = lane + m * WARP_SIZE;
+                    if (d < D) {
+                        qv[m] = __half2float(
+                            q_shared[(qpos - qbase) * D + d]
+                        );
+                    }
+                }
+
+                #pragma unroll
+                for (int m = 0; m < 4; ++m) {
+                    const int d = lane + m * WARP_SIZE;
+                    if (d < D) {
+                        s0 += qv[m] * __half2float(k_shared[(jj + 0) * D + d]);
+                        s1 += qv[m] * __half2float(k_shared[(jj + 1) * D + d]);
+                        s2 += qv[m] * __half2float(k_shared[(jj + 2) * D + d]);
+                        s3 += qv[m] * __half2float(k_shared[(jj + 3) * D + d]);
+                    }
                 }
 
                 float sc0 = warp_broadcast(warp_sum(s0) * scale);
@@ -194,7 +208,7 @@ def _validate_device_inputs(q_gpu, k_gpu, v_gpu, tile_k: int):
     cp = _import_cupy()
 
     if tile_k not in (16, 32, 64):
-        raise AttentionValidationError("shared-tile key tile must be 32 or 64")
+        raise AttentionValidationError("shared-tile key tile must be one of 16, 32, 64")
     for name, x in (("Q", q_gpu), ("K", k_gpu), ("V", v_gpu)):
         if x.dtype != cp.float16:
             raise AttentionValidationError(f"{name} must have dtype float16")
@@ -222,7 +236,7 @@ def _validate_device_inputs(q_gpu, k_gpu, v_gpu, tile_k: int):
         )
 
 
-def launch_device(q_gpu, k_gpu, v_gpu, *, tile_k: int = 16):
+def launch_device(q_gpu, k_gpu, v_gpu, *, tile_k: int = 64):
     cp = _import_cupy()
     _validate_device_inputs(q_gpu, k_gpu, v_gpu, tile_k)
 
