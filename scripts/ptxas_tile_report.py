@@ -15,6 +15,7 @@ KERNEL_FILES = {
     "v2": ROOT / "src" / "variants" / "shared_tile_v2.py",
     "v3": ROOT / "src" / "variants" / "shared_tile_v3.py",
     "current": ROOT / "src" / "shared_tile_cuda_attention.py",
+    "v4": ROOT / "src" / "variants" / "shared_tile_v4.py",
 }
 
 
