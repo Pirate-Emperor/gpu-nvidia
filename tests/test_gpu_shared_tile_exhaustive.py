@@ -182,24 +182,20 @@ def test_shared_tile_long_usage_smoke():
 
 def test_shared_tile_affine_value_transform():
     require_a100()
-    q = np.zeros((1, 1, 4, 32), dtype=np.float16)
+    q = np.zeros((1, 1, 32, 32), dtype=np.float16)
     k = np.zeros_like(q)
     v = np.zeros_like(q)
-    q[..., 0, 0] = 1
-    q[..., 1, 1] = 1
-    q[..., 2, 2] = 1
-    v[..., 0, 0] = 1
-    v[..., 0, 1] = 2
-    v[..., 1, 0] = 2
-    v[..., 1, 1] = 4
-    v[..., 2, 0] = 3
-    v[..., 2, 1] = 6
-    v[..., 3, 0] = 4
-    v[..., 3, 1] = 8
+    for i in range(4):
+        q[0, 0, i, i] = 1
+        k[0, 0, i, i] = 1
+    v[0, 0, 0, :2] = [1, 2]
+    v[0, 0, 1, :2] = [2, 4]
+    v[0, 0, 2, :2] = [3, 6]
+    v[0, 0, 3, :2] = [4, 8]
 
-    base = forward(q, k, v, tile_k=2)
+    base = forward(q, k, v, tile_k=16)
     transformed_v = (2 * v.astype(np.float32) - 3).astype(np.float16)
-    transformed = forward(q, k, transformed_v, tile_k=2)
+    transformed = forward(q, k, transformed_v, tile_k=16)
 
     np.testing.assert_allclose(
         transformed,
