@@ -70,8 +70,35 @@ def causal_attention_online_fp32(
                     tile_max = np.max(scores, axis=1, keepdims=True)
                     new_max = np.maximum(running_max, tile_max)
 
-                    rescale = np.exp(running_max - new_max, dtype=np.float32)
-                    weights = np.exp(scores - new_max, dtype=np.float32)
+                    # A whole K-tile can be future for an entire Q-tile.
+                    # In that case both maxima are -inf; evaluating
+                    # exp(-inf - (-inf)) would create NaNs. Such a tile must
+                    # leave the running state unchanged.
+                    tile_valid = np.isfinite(tile_max)
+                    old_valid = np.isfinite(running_max)
+
+                    rescale_arg = np.where(
+                        old_valid,
+                        running_max - new_max,
+                        np.float32(-np.inf),
+                    )
+                    rescale = np.where(
+                        tile_valid,
+                        np.exp(rescale_arg, dtype=np.float32),
+                        np.float32(1.0),
+                    )
+
+                    finite_scores = np.isfinite(scores)
+                    weight_arg = np.where(
+                        finite_scores,
+                        scores - new_max,
+                        np.float32(0.0),
+                    )
+                    weights = np.where(
+                        finite_scores,
+                        np.exp(weight_arg, dtype=np.float32),
+                        np.float32(0.0),
+                    )
 
                     running_norm = (
                         rescale * running_norm
