@@ -17,8 +17,8 @@ else:
 from custom_cuda_attention import forward
 
 
-def gpu_name():
-    raw = cp.cuda.runtime.getDeviceProperties(0)["name"]
+def gpu_name(device_id):
+    raw = cp.cuda.runtime.getDeviceProperties(device_id)["name"]
     return raw.decode() if isinstance(raw, bytes) else str(raw)
 
 
@@ -28,7 +28,7 @@ def test_selected_a100_devices_execute_native_cuda(device_id):
     if device_id >= count:
         pytest.skip(f"device {device_id} is not exposed to this runner")
     with cp.cuda.Device(device_id):
-        name = gpu_name()
+        name = gpu_name(device_id)
         if os.environ.get("REQUIRE_A100") == "1":
             assert "A100" in name
         x = cp.arange(1024, dtype=cp.float32)
