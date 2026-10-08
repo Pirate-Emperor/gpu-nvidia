@@ -69,7 +69,7 @@ def test_both_exposed_devices_produce_consistent_results():
     outs = []
     for device_id in (0, 1):
         with cp.cuda.Device(device_id):
-            outs.append(forward(q, k, v))
+            outs.append(block_forward(q, k, v))
 
     np.testing.assert_allclose(outs[0], outs[1], rtol=2e-2, atol=2e-2)
 
@@ -92,3 +92,21 @@ def test_selected_a100_devices_run_shared_tile_v2(device_id, tile_k):
     assert out.shape == q.shape
     assert out.dtype == np.float16
     assert np.isfinite(out).all()
+
+
+def test_both_exposed_devices_produce_consistent_shared_tile_results():
+    count = cp.cuda.runtime.getDeviceCount()
+    if count < 2:
+        pytest.skip("runner exposes fewer than two CUDA devices")
+
+    rng = np.random.default_rng(17003)
+    q = rng.standard_normal((1, 2, 128, 64), dtype=np.float32).astype(np.float16)
+    k = rng.standard_normal((1, 2, 128, 64), dtype=np.float32).astype(np.float16)
+    v = rng.standard_normal((1, 2, 128, 64), dtype=np.float32).astype(np.float16)
+
+    outs = []
+    for device_id in (0, 1):
+        with cp.cuda.Device(device_id):
+            outs.append(tiled_forward(q, k, v, tile_k=64))
+
+    np.testing.assert_allclose(outs[0], outs[1], rtol=2e-2, atol=2e-2)
