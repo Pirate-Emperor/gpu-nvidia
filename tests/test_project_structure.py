@@ -46,6 +46,10 @@ REQUIRED_FILES = (
     "scripts/ncu_smoke.cu",
     "tests/test_gpu_device_matrix.py",
     "tests/test_gpu_shared_tile_exhaustive.py",
+    "tests/test_gpu_kernel_versions.py",
+    "docs/KERNEL_VERSIONS.md",
+    ".github/workflows/a100-kernel-version-benchmark.yml",
+    "benchmarks/benchmark_kernel_versions.py",
 )
 
 def test_required_project_files_exist():
