@@ -193,7 +193,7 @@ def _kernel(tile_k: int):
 def _validate_device_inputs(q_gpu, k_gpu, v_gpu, tile_k: int):
     cp = _import_cupy()
 
-    if tile_k not in (32, 64):
+    if tile_k not in (16, 32, 64):
         raise AttentionValidationError("shared-tile key tile must be 32 or 64")
     for name, x in (("Q", q_gpu), ("K", k_gpu), ("V", v_gpu)):
         if x.dtype != cp.float16:
