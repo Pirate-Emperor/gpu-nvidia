@@ -20,7 +20,7 @@ from shared_tile_v1 import launch_device as v1_launch
 from shared_tile_v2 import launch_device as v2_launch
 
 CASES = tuple(c.name for c in MANDATORY_CASES)
-TILES = (32, 64)
+TILES = (16, 32, 64)
 
 
 def make_inputs(case, cp):
