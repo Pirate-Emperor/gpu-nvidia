@@ -18,6 +18,9 @@ from reference import AttentionValidationError, validate_attention_inputs
 
 
 BLOCK_THREADS = 128
+WARPS_PER_BLOCK = 4
+WARP_SIZE = 32
+TILE_Q = WARPS_PER_BLOCK
 MAX_TILE_K = 64
 MAX_D = 128
 
@@ -214,7 +217,7 @@ def launch_device(q_gpu, k_gpu, v_gpu, *, tile_k: int = 64):
     out = cp.empty_like(q_gpu)
 
     _kernel(tile_k)(
-        (b, h, n),
+        (b, h, n // TILE_Q),
         (BLOCK_THREADS,),
         (
             q_gpu,
