@@ -49,7 +49,7 @@ def assert_match(actual, q, k, v):
     )
 
 
-@pytest.mark.parametrize("tile_k", (32, 64))
+@pytest.mark.parametrize("tile_k", (16, 32, 64))
 @pytest.mark.parametrize("D", (32, 64, 128))
 @pytest.mark.parametrize("N", (64, 128, 256))
 def test_shared_tile_matches_reference_across_required_dimensions(tile_k, D, N):
@@ -60,7 +60,7 @@ def test_shared_tile_matches_reference_across_required_dimensions(tile_k, D, N):
     assert_match(forward(q, k, v, tile_k=tile_k), q, k, v)
 
 
-@pytest.mark.parametrize("tile_k", (32, 64))
+@pytest.mark.parametrize("tile_k", (16, 32, 64))
 def test_shared_tile_matches_reference_with_batch_head_isolation(tile_k):
     require_a100()
     q, k, v = make_inputs(2, 4, 128, 64, 21100 + tile_k)
