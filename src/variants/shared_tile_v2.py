@@ -200,6 +200,10 @@ def _validate_device_inputs(q_gpu, k_gpu, v_gpu, tile_k: int):
         raise AttentionValidationError(
             f"sequence length {q_gpu.shape[-2]} must be divisible by tile_k {tile_k}"
         )
+    if q_gpu.shape[-2] % TILE_Q != 0:
+        raise AttentionValidationError(
+            f"sequence length {q_gpu.shape[-2]} must be divisible by query tile {TILE_Q}"
+        )
 
 
 def launch_device(q_gpu, k_gpu, v_gpu, *, tile_k: int = 64):
