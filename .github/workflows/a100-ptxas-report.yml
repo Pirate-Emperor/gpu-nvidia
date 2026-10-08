@@ -8,6 +8,7 @@ on:
       - "src/variants/shared_tile_v1.py"
       - "src/variants/shared_tile_v2.py"
       - "src/variants/shared_tile_v3.py"
+      - "src/variants/shared_tile_v4.py"
       - "scripts/ptxas_tile_report.py"
       - ".github/workflows/a100-ptxas-report.yml"
 
