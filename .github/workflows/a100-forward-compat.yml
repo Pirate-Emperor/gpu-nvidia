@@ -2,9 +2,6 @@ name: A100 CUDA 13.0 forward compatibility experiment
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/workflows/a100-forward-compat.yml"
 
 concurrency:
   group: a100-forward-compat-${{ github.repository }}-${{ github.ref }}
