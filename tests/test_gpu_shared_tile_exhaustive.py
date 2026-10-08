@@ -145,3 +145,10 @@ def test_shared_tile_rejects_nonfinite_without_launch():
     q.flat[0] = np.nan
     with pytest.raises(ValueError, match="NaN|infinity"):
         forward(q, k, v, tile_k=64)
+
+
+def test_shared_tile_rejects_partial_query_tile():
+    require_a100()
+    q, k, v = make_inputs(1, 1, 66, 64, 21600)
+    with pytest.raises(ValueError, match="query tile"):
+        forward(q, k, v, tile_k=32)
