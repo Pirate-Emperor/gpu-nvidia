@@ -47,6 +47,6 @@ def main():
     with out.with_suffix(".csv").open("w",newline="") as f: w=csv.DictWriter(f,fieldnames=rows[0]); w.writeheader(); w.writerows(rows)
     for name in CASES:
         for tk in TILES:
-            p=piv[(name,tk)]; print(f"{name:24s} tk={tk:2d} v2={p["v2"]:.3f} ms v3={p["v3"]:.3f} ms v2/v3={p["v2"]/p["v3"]:.2f}x")
+            p=piv[(name,tk)]; print(f"{name:24s} tk={tk:2d} v2={p['v2']:.3f} ms v3={p['v3']:.3f} ms v2/v3={p['v2']/p['v3']:.2f}x")
 
 if __name__=="__main__": raise SystemExit(main())
