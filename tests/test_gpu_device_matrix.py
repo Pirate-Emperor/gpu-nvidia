@@ -14,7 +14,8 @@ if os.environ.get("REQUIRE_A100") == "1":
 else:
     cp = pytest.importorskip("cupy")
 
-from custom_cuda_attention import forward
+from custom_cuda_attention import forward as block_forward
+from shared_tile_cuda_attention import forward as tiled_forward
 
 
 def gpu_name(device_id):
@@ -48,7 +49,7 @@ def test_selected_a100_devices_run_fused_attention(device_id):
     v = rng.standard_normal((1, 1, 64, 32), dtype=np.float32).astype(np.float16)
 
     with cp.cuda.Device(device_id):
-        out = forward(q, k, v)
+        out = block_forward(q, k, v)
 
     assert out.shape == q.shape
     assert out.dtype == np.float16
@@ -71,3 +72,23 @@ def test_both_exposed_devices_produce_consistent_results():
             outs.append(forward(q, k, v))
 
     np.testing.assert_allclose(outs[0], outs[1], rtol=2e-2, atol=2e-2)
+
+
+@pytest.mark.parametrize("device_id", [0, 1])
+@pytest.mark.parametrize("tile_k", [32, 64])
+def test_selected_a100_devices_run_shared_tile_v2(device_id, tile_k):
+    count = cp.cuda.runtime.getDeviceCount()
+    if device_id >= count:
+        pytest.skip(f"device {device_id} is not exposed to this runner")
+
+    rng = np.random.default_rng(17100 + device_id + tile_k)
+    q = rng.standard_normal((1, 2, 128, 64), dtype=np.float32).astype(np.float16)
+    k = rng.standard_normal((1, 2, 128, 64), dtype=np.float32).astype(np.float16)
+    v = rng.standard_normal((1, 2, 128, 64), dtype=np.float32).astype(np.float16)
+
+    with cp.cuda.Device(device_id):
+        out = tiled_forward(q, k, v, tile_k=tile_k)
+
+    assert out.shape == q.shape
+    assert out.dtype == np.float16
+    assert np.isfinite(out).all()
