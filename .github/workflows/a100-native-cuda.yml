@@ -12,6 +12,7 @@ on:
       - "tests/test_gpu_custom_cuda_variants.py"
       - "tests/test_gpu_baselines.py"
       - "tests/test_gpu_device_matrix.py"
+      - "tests/test_gpu_shared_tile_exhaustive.py"
       - "src/warp_cuda_attention.py"
       - "src/shared_tile_cuda_attention.py"
       - ".github/workflows/a100-native-cuda.yml"
@@ -75,4 +76,5 @@ jobs:
             tests/test_gpu_custom_cuda.py \
             tests/test_gpu_custom_cuda_variants.py \
             tests/test_gpu_baselines.py \
-            tests/test_gpu_device_matrix.py
+            tests/test_gpu_device_matrix.py \
+            tests/test_gpu_shared_tile_exhaustive.py
