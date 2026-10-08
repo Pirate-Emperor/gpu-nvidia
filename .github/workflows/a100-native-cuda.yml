@@ -66,9 +66,9 @@ jobs:
         run: |
           set -euo pipefail
           export PYTHONPATH="$HOME:${PYTHONPATH:-}"
-          export CUPY_CACHE_DIR="/tmp/cupy-cache-${GITHUB_RUN_ID}"
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
           mkdir -p "$CUPY_CACHE_DIR"
-          .venv-native-cuda/bin/python -m pytest -q \
+          ${NATIVE_VENV}/bin/python -m pytest -q \
             tests/test_gpu_custom_cuda.py \
             tests/test_gpu_custom_cuda_variants.py \
             tests/test_gpu_baselines.py \
