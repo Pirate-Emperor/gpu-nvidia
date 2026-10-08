@@ -182,28 +182,25 @@ def test_shared_tile_long_usage_smoke():
 
 def test_shared_tile_affine_value_transform():
     require_a100()
-    q = np.array(
-        [[[[1, 0, 1, 0], [0, 1, -1, 0], [1, 1, 0, -1]]]],
-        dtype=np.float16,
-    )
-    k = np.array(
-        [[[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]]],
-        dtype=np.float16,
-    )
-    v = np.array(
-        [[[[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]]]],
-        dtype=np.float16,
-    )
-    base = forward(
-        np.pad(q, ((0, 0), (0, 0), (0, 1), (0, 0))),
-        np.pad(k, ((0, 0), (0, 0), (0, 1), (0, 0))),
-        np.pad(v, ((0, 0), (0, 0), (0, 1), (0, 0))),
-        tile_k=2,
-    )
-    q2 = np.pad(q, ((0, 0), (0, 0), (0, 1), (0, 0)))
-    k2 = np.pad(k, ((0, 0), (0, 0), (0, 1), (0, 0)))
-    v2 = (2 * np.pad(v, ((0, 0), (0, 0), (0, 1), (0, 0))).astype(np.float32) - 3).astype(np.float16)
-    transformed = forward(q2, k2, v2, tile_k=2)
+    q = np.zeros((1, 1, 4, 32), dtype=np.float16)
+    k = np.zeros_like(q)
+    v = np.zeros_like(q)
+    q[..., 0, 0] = 1
+    q[..., 1, 1] = 1
+    q[..., 2, 2] = 1
+    v[..., 0, 0] = 1
+    v[..., 0, 1] = 2
+    v[..., 1, 0] = 2
+    v[..., 1, 1] = 4
+    v[..., 2, 0] = 3
+    v[..., 2, 1] = 6
+    v[..., 3, 0] = 4
+    v[..., 3, 1] = 8
+
+    base = forward(q, k, v, tile_k=2)
+    transformed_v = (2 * v.astype(np.float32) - 3).astype(np.float16)
+    transformed = forward(q, k, transformed_v, tile_k=2)
+
     np.testing.assert_allclose(
         transformed,
         (2 * base.astype(np.float32) - 3).astype(np.float16),
