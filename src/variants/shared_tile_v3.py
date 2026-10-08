@@ -42,8 +42,8 @@ def _import_cupy():
 @lru_cache(maxsize=8)
 def _kernel(tile_k: int):
     cp = _import_cupy()
-    if tile_k not in (32, 64):
-        raise ValueError("shared-tile kernel supports tile_k in {32, 64}")
+    if tile_k not in (16, 32, 64):
+        raise ValueError("shared-tile kernel supports tile_k in {16, 32, 64}")
 
     source = r"""
     #include <cuda_fp16.h>
