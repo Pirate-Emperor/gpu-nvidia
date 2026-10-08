@@ -46,6 +46,7 @@ REQUIRED_FILES = (
     ".github/workflows/a100-native-cuda.yml",
     ".github/workflows/a100-ncu-access.yml",
     "scripts/ncu_smoke.cu",
+    "scripts/setup_native_env.sh",
     "tests/test_gpu_device_matrix.py",
     "tests/test_gpu_shared_tile_exhaustive.py",
     "tests/test_gpu_kernel_versions.py",
