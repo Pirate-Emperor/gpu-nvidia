@@ -9,7 +9,8 @@ if [ ! -x "$VENV_ROOT/bin/python" ]; then
 fi
 
 "$VENV_ROOT/bin/python" -m pip install -q --upgrade pip
-"$VENV_ROOT/bin/python" -m pip install -q -r "$GITHUB_WORKSPACE/requirements-dev.txt"
+WORKSPACE_ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
+"$VENV_ROOT/bin/python" -m pip install -q -r "$WORKSPACE_ROOT/requirements-dev.txt"
 "$VENV_ROOT/bin/python" -m pip install -q "cupy-cuda12x"
 "$VENV_ROOT/bin/python" -m pip install -q "nvidia-cuda-runtime-cu12==12.4.*"
 
