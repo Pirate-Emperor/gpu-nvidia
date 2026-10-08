@@ -1,0 +1,46 @@
+name: A100 shared-tile version benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/shared_tile_cuda_attention.py"
+      - "src/variants/**"
+      - "benchmarks/benchmark_kernel_versions.py"
+      - ".github/workflows/a100-kernel-version-benchmark.yml"
+
+concurrency:
+  group: a100-kernel-version-benchmark-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv-kbench
+          .venv-kbench/bin/python -m pip install --upgrade pip
+          .venv-kbench/bin/python -m pip install -r requirements-dev.txt
+          .venv-kbench/bin/python -m pip install "cupy-cuda12x"
+          .venv-kbench/bin/python -m pip install "nvidia-cuda-runtime-cu12==12.4.*"
+      - name: Run v1 v2 benchmark
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CUPY_CACHE_DIR="/tmp/cupy-cache-kbench-${GITHUB_RUN_ID}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          .venv-kbench/bin/python benchmarks/benchmark_kernel_versions.py
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-version-benchmark
+          path: |
+            results/kernel_version_benchmark.json
+            results/kernel_version_benchmark.csv
