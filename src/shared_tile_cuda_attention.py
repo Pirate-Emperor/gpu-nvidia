@@ -1,7 +1,7 @@
-"""Shared-memory tiled fused CUDA attention.
+"""Shared-memory tiled fused CUDA attention (promoted v3).
 
 This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns a small query tile, each warp owns one query row, K/V are staged
+one block owns a small query tile; four QK scores are computed per loop iteration., each warp owns one query row, K/V are staged
 in shared-memory tiles, and a fused online-softmax recurrence is performed
 without materializing scores or probabilities in global memory.
 
@@ -125,34 +125,47 @@ def _kernel(tile_k: int):
             }
             __syncthreads();
 
-            for (int j = 0; j < TILE_K; ++j) {
-                const int kp = k0 + j;
-                if (kp <= qpos) {
-                    float local_dot = 0.0f;
-                    for (int d = lane; d < D; d += WARP_SIZE) {
-                        local_dot +=
-                            __half2float(q_shared[(qpos - qbase) * D + d]) *
-                            __half2float(k_shared[j * D + d]);
-                    }
+            for (int jj = 0; jj < TILE_K; jj += 4) {
+                float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+                for (int d = lane; d < D; d += WARP_SIZE) {
+                    const float qd =
+                        __half2float(q_shared[(qpos - qbase) * D + d]);
+                    s0 += qd * __half2float(k_shared[(jj + 0) * D + d]);
+                    s1 += qd * __half2float(k_shared[(jj + 1) * D + d]);
+                    s2 += qd * __half2float(k_shared[(jj + 2) * D + d]);
+                    s3 += qd * __half2float(k_shared[(jj + 3) * D + d]);
+                }
 
-                    float score = warp_broadcast(warp_sum(local_dot) * scale);
-                    float new_max = fmaxf(run_max, score);
-                    float rescale =
-                        (run_max == -INFINITY) ? 0.0f : expf(run_max - new_max);
-                    float weight = expf(score - new_max);
+                float sc0 = warp_broadcast(warp_sum(s0) * scale);
+                float sc1 = warp_broadcast(warp_sum(s1) * scale);
+                float sc2 = warp_broadcast(warp_sum(s2) * scale);
+                float sc3 = warp_broadcast(warp_sum(s3) * scale);
+                const float scores[4] = {sc0, sc1, sc2, sc3};
 
-                    run_norm = rescale * run_norm + weight;
+                #pragma unroll
+                for (int u = 0; u < 4; ++u) {
+                    const int j = jj + u;
+                    const int kp = k0 + j;
+                    if (kp <= qpos) {
+                        const float score = scores[u];
+                        const float new_max = fmaxf(run_max, score);
+                        const float rescale =
+                            (run_max == -INFINITY) ? 0.0f : expf(run_max - new_max);
+                        const float weight = expf(score - new_max);
 
-                    for (int m = 0; m < 4; ++m) {
-                        const int dv = lane + m * WARP_SIZE;
-                        if (dv < D) {
-                            out_acc[m] =
-                                rescale * out_acc[m]
-                                + weight *
-                                    __half2float(v_shared[j * D + dv]);
+                        run_norm = rescale * run_norm + weight;
+
+                        #pragma unroll
+                        for (int m = 0; m < 4; ++m) {
+                            const int dv = lane + m * WARP_SIZE;
+                            if (dv < D) {
+                                out_acc[m] =
+                                    rescale * out_acc[m]
+                                    + weight * __half2float(v_shared[j * D + dv]);
+                            }
                         }
+                        run_max = new_max;
                     }
-                    run_max = new_max;
                 }
             }
             __syncthreads();
@@ -209,7 +222,7 @@ def _validate_device_inputs(q_gpu, k_gpu, v_gpu, tile_k: int):
         )
 
 
-def launch_device(q_gpu, k_gpu, v_gpu, *, tile_k: int = 64):
+def launch_device(q_gpu, k_gpu, v_gpu, *, tile_k: int = 16):
     cp = _import_cupy()
     _validate_device_inputs(q_gpu, k_gpu, v_gpu, tile_k)
 
