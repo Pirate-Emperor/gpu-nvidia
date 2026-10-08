@@ -69,13 +69,12 @@ def test_shared_tile_matches_reference_with_batch_head_isolation(tile_k):
     np.testing.assert_allclose(out, expected, rtol=2e-2, atol=2e-2)
 
 
-@pytest.mark.parametrize("tile_k", (32, 64))
-def test_shared_tile_tile_size_invariance(tile_k):
+def test_shared_tile_all_tile_sizes_agree():
     require_a100()
     q, k, v = make_inputs(1, 2, 256, 128, 21200)
-    a = forward(q, k, v, tile_k=32)
-    b = forward(q, k, v, tile_k=64)
-    np.testing.assert_allclose(a, b, rtol=2e-2, atol=2e-2)
+    outs = [forward(q, k, v, tile_k=tk) for tk in (16, 32, 64)]
+    for out in outs[1:]:
+        np.testing.assert_allclose(outs[0], out, rtol=2e-2, atol=2e-2)
 
 
 @pytest.mark.parametrize("D", (32, 64, 128))
@@ -146,3 +145,23 @@ def test_shared_tile_rejects_nonfinite_without_launch():
     with pytest.raises(ValueError, match="NaN|infinity"):
         forward(q, k, v, tile_k=64)
 
+
+
+@pytest.mark.parametrize("tile_k", [8, 128, 20])
+def test_shared_tile_rejects_unsupported_tile_sizes(tile_k):
+    require_a100()
+    q, k, v = make_inputs(1, 1, 64, 64, 21700 + tile_k)
+    with pytest.raises(ValueError, match="tile"):
+        forward(q, k, v, tile_k=tile_k)
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_shared_tile_randomized_small_differential(seed):
+    require_a100()
+    n = 64 * (seed % 2 + 1)
+    d = (32, 64, 128)[seed % 3]
+    q, k, v = make_inputs(1, 1, n, d, 21800 + seed)
+    ref = causal_attention_fp32(q, k, v, output_dtype=np.float16)
+    for tile_k in (16, 32, 64):
+        out = forward(q, k, v, tile_k=tile_k)
+        assert passes_mixed_tolerance(out, ref, abs_scale=2e-2, rel_scale=2e-2)
