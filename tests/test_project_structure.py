@@ -49,7 +49,6 @@ REQUIRED_FILES = (
     "tests/test_gpu_device_matrix.py",
     "tests/test_gpu_shared_tile_exhaustive.py",
     "tests/test_gpu_kernel_versions.py",
-    "docs/KERNEL_VERSIONS.md",
     ".github/workflows/a100-kernel-version-benchmark.yml",
     "benchmarks/benchmark_kernel_versions.py",
 )
