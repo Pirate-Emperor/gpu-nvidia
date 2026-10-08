@@ -1,9 +1,9 @@
 """Shared-memory tiled fused CUDA attention.
 
 This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns one query row, K/V are staged in a fixed shared-memory tile,
-and the fused online-softmax recurrence is performed without materializing
-scores or probabilities in global memory.
+one block owns a small query tile, each warp owns one query row, K/V are staged
+in shared-memory tiles, and a fused online-softmax recurrence is performed
+without materializing scores or probabilities in global memory.
 
 It is intentionally independent of cuTile.
 """
@@ -44,8 +44,22 @@ def _kernel(tile_k: int):
 
     source = r"""
     #include <cuda_fp16.h>
-    #include <float.h>
     #include <math.h>
+
+    #define WARP_SIZE 32
+    #define FULL_MASK 0xffffffffu
+    #define TILE_Q 4
+
+    __device__ __forceinline__ float warp_sum(float x) {
+        for (int offset = 16; offset > 0; offset >>= 1) {
+            x += __shfl_down_sync(FULL_MASK, x, offset);
+        }
+        return x;
+    }
+
+    __device__ __forceinline__ float warp_broadcast(float x) {
+        return __shfl_sync(FULL_MASK, x, 0);
+    }
 
     extern "C" __global__
     void causal_attention_shared_tile(
@@ -60,19 +74,20 @@ def _kernel(tile_k: int):
         const int TILE_K,
         const float scale)
     {
-        __shared__ half q_shared[128];
+        __shared__ half q_shared[TILE_Q * 128];
         __shared__ half k_shared[64 * 128];
         __shared__ half v_shared[64 * 128];
-        __shared__ float reduce_buf[128];
-        __shared__ float shared_score;
-        __shared__ float shared_max;
 
         const int tid = threadIdx.x;
-        const int qpos = (int)blockIdx.z;
+        const int lane = tid & (WARP_SIZE - 1);
+        const int warp_id = tid >> 5;
+
+        const int qbase = (int)blockIdx.z * TILE_Q;
+        const int qpos = qbase + warp_id;
         const int h = (int)blockIdx.y;
         const int b = (int)blockIdx.x;
 
-        if (b >= B || h >= H || qpos >= N) {
+        if (b >= B || h >= H || warp_id >= TILE_Q) {
             return;
         }
 
@@ -81,65 +96,23 @@ def _kernel(tile_k: int):
         const long long q_base =
             head_base + (long long)qpos * D;
 
-        for (int d = tid; d < D; d += blockDim.x) {
-            q_shared[d] = Q[q_base + d];
+        // Stage a small query tile once. Each warp owns one query row.
+        for (int idx = tid; idx < TILE_Q * D; idx += blockDim.x) {
+            const int qr = idx / D;
+            const int d = idx - qr * D;
+            const int gq = qbase + qr;
+            q_shared[qr * D + d] =
+                (gq < N) ? Q[head_base + (long long)gq * D + d] : __float2half(0.0f);
         }
         __syncthreads();
 
-        float row_max = -FLT_MAX;
+        // Each lane owns up to four output dimensions.
+        float run_max = -INFINITY;
+        float run_norm = 0.0f;
+        float out_acc[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 
-        // First pass: stage each K tile and compute the running row maximum.
         for (int k0 = 0; k0 < N; k0 += TILE_K) {
-            const int valid = min(TILE_K, N - k0);
-
-            for (int idx = tid; idx < valid * D; idx += blockDim.x) {
-                const int j = idx / D;
-                const int d = idx - j * D;
-                k_shared[j * D + d] =
-                    K[head_base + (long long)(k0 + j) * D + d];
-            }
-            __syncthreads();
-
-            for (int j = 0; j < valid; ++j) {
-                float local_dot = 0.0f;
-                for (int d = tid; d < D; d += blockDim.x) {
-                    local_dot +=
-                        __half2float(q_shared[d]) *
-                        __half2float(k_shared[j * D + d]);
-                }
-
-                reduce_buf[tid] = local_dot;
-                __syncthreads();
-                for (int stride = 64; stride >= 1; stride >>= 1) {
-                    if (tid < stride) {
-                        reduce_buf[tid] += reduce_buf[tid + stride];
-                    }
-                    __syncthreads();
-                }
-
-                if (tid == 0) {
-                    shared_score = reduce_buf[0] * scale;
-                    if (k0 + j <= qpos) {
-                        row_max = fmaxf(row_max, shared_score);
-                    }
-                }
-                __syncthreads();
-            }
-        }
-
-        if (tid == 0) {
-            shared_max = row_max;
-        }
-        __syncthreads();
-
-        float norm = 0.0f;
-        float value_acc = 0.0f;
-
-        // Second pass: stage K/V tiles and accumulate the stable softmax output.
-        for (int k0 = 0; k0 < N; k0 += TILE_K) {
-            const int valid = min(TILE_K, N - k0);
-
-            for (int idx = tid; idx < valid * D; idx += blockDim.x) {
+            for (int idx = tid; idx < TILE_K * D; idx += blockDim.x) {
                 const int j = idx / D;
                 const int d = idx - j * D;
                 k_shared[j * D + d] =
@@ -149,42 +122,46 @@ def _kernel(tile_k: int):
             }
             __syncthreads();
 
-            for (int j = 0; j < valid; ++j) {
-                float local_dot = 0.0f;
-                for (int d = tid; d < D; d += blockDim.x) {
-                    local_dot +=
-                        __half2float(q_shared[d]) *
-                        __half2float(k_shared[j * D + d]);
-                }
-
-                reduce_buf[tid] = local_dot;
-                __syncthreads();
-                for (int stride = 64; stride >= 1; stride >>= 1) {
-                    if (tid < stride) {
-                        reduce_buf[tid] += reduce_buf[tid + stride];
+            for (int j = 0; j < TILE_K; ++j) {
+                const int kp = k0 + j;
+                if (kp <= qpos) {
+                    float local_dot = 0.0f;
+                    for (int d = lane; d < D; d += WARP_SIZE) {
+                        local_dot +=
+                            __half2float(q_shared[(qpos - qbase) * D + d]) *
+                            __half2float(k_shared[j * D + d]);
                     }
-                    __syncthreads();
-                }
 
-                if (tid == 0) {
-                    shared_score = reduce_buf[0] * scale;
-                }
-                __syncthreads();
+                    float score = warp_broadcast(warp_sum(local_dot) * scale);
+                    float new_max = fmaxf(run_max, score);
+                    float rescale =
+                        (run_max == -INFINITY) ? 0.0f : expf(run_max - new_max);
+                    float weight = expf(score - new_max);
 
-                if (k0 + j <= qpos) {
-                    const float weight = expf(shared_score - shared_max);
-                    norm += weight;
-                    if (tid < D) {
-                        value_acc +=
-                            weight * __half2float(v_shared[j * D + tid]);
+                    run_norm = rescale * run_norm + weight;
+
+                    for (int m = 0; m < 4; ++m) {
+                        const int dv = lane + m * WARP_SIZE;
+                        if (dv < D) {
+                            out_acc[m] =
+                                rescale * out_acc[m]
+                                + weight *
+                                    __half2float(v_shared[j * D + dv]);
+                        }
                     }
+                    run_max = new_max;
                 }
-                __syncthreads();
             }
+            __syncthreads();
         }
 
-        if (tid < D) {
-            O[q_base + tid] = __float2half(value_acc / norm);
+        if (qpos < N) {
+            for (int m = 0; m < 4; ++m) {
+                const int dv = lane + m * WARP_SIZE;
+                if (dv < D) {
+                    O[q_base + dv] = __float2half(out_acc[m] / run_norm);
+                }
+            }
         }
     }
     """
