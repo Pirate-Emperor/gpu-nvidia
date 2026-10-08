@@ -28,6 +28,7 @@ def make_inputs(N, D, seed):
 
 
 @pytest.mark.parametrize("N,D,tile_k", [
+    (64, 32, 16),
     (64, 32, 32),
     (64, 64, 64),
     (128, 64, 32),
