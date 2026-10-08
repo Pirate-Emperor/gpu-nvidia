@@ -12,15 +12,15 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-sys.path.insert(0, str(ROOT / "src" / "variants"))
 sys.path.insert(0, str(ROOT / "tests"))
+sys.path.insert(0, str(ROOT / "src" / "variants"))
 
 from cases import MANDATORY_CASES
 from shared_tile_v1 import launch_device as v1_launch
 from shared_tile_v2 import launch_device as v2_launch
 
-
-CASES = ("short_d64", "short_multihead_d64", "medium_d128")
+CASES = tuple(c.name for c in MANDATORY_CASES)
+TILES = (32, 64)
 
 
 def make_inputs(case, cp):
@@ -66,37 +66,56 @@ def main():
         case = by_name[name]
         q, k, v = make_inputs(case, cp)
         for version, fn in (("v1", v1_launch), ("v2", v2_launch)):
-            tile_k = 64
-            med, p90 = timed(lambda f=fn: f(q, k, v, tile_k=tile_k), cp, args.warmup, args.iterations)
-            rows.append({
-                "case": case.name,
-                "B": case.B,
-                "H": case.H,
-                "N": case.N,
-                "D": case.D,
-                "tile_k": tile_k,
-                "version": version,
-                "warmup": args.warmup,
-                "iterations": args.iterations,
-                "median_ms": med,
-                "p90_ms": p90,
-            })
+            for tile_k in TILES:
+                med, p90 = timed(
+                    lambda f=fn, tk=tile_k: f(q, k, v, tile_k=tk),
+                    cp, args.warmup, args.iterations
+                )
+                rows.append({
+                    "case": case.name,
+                    "B": case.B,
+                    "H": case.H,
+                    "N": case.N,
+                    "D": case.D,
+                    "tile_k": tile_k,
+                    "version": version,
+                    "warmup": args.warmup,
+                    "iterations": args.iterations,
+                    "median_ms": med,
+                    "p90_ms": p90,
+                })
         del q, k, v
         cp.get_default_memory_pool().free_all_blocks()
 
     pivot = {}
     for row in rows:
-        pivot.setdefault(row["case"], {})[row["version"]] = row["median_ms"]
+        pivot.setdefault((row["case"], row["tile_k"]), {})[row["version"]] = row["median_ms"]
     for row in rows:
         other = "v2" if row["version"] == "v1" else "v1"
-        row["speedup_vs_other"] = pivot[row["case"]][other] / row["median_ms"]
+        row["speedup_vs_other"] = pivot[(row["case"], row["tile_k"])][other] / row["median_ms"]
+
+    tile_pivot = {}
+    for row in rows:
+        tile_pivot.setdefault((row["case"], row["version"]), {})[row["tile_k"]] = row["median_ms"]
+    for row in rows:
+        row["speedup_32_vs_64"] = (
+            tile_pivot[(row["case"], row["version"])][32]
+            / tile_pivot[(row["case"], row["version"])][64]
+        )
 
     dev = cp.cuda.runtime.getDeviceProperties(0)["name"]
     if isinstance(dev, bytes):
         dev = dev.decode(errors="replace")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"gpu": dev, "results": rows}
+    payload = {
+        "gpu": dev,
+        "warmup": args.warmup,
+        "iterations": args.iterations,
+        "cases": list(CASES),
+        "tiles": list(TILES),
+        "results": rows,
+    }
     args.output.write_text(json.dumps(payload, indent=2) + "\n")
     csv_path = args.output.with_suffix(".csv")
     with csv_path.open("w", newline="") as f:
@@ -105,8 +124,13 @@ def main():
         w.writerows(rows)
 
     for case in CASES:
-        p = pivot[case]
-        print(f"{case:24s} v1={p['v1']:.3f} ms v2={p['v2']:.3f} ms v1/v2={p['v1']/p['v2']:.2f}x")
+        for tile_k in TILES:
+            p = pivot[(case, tile_k)]
+            print(
+                f"{case:24s} tk={tile_k:2d} "
+                f"v1={p['v1']:.3f} ms v2={p['v2']:.3f} ms "
+                f"v1/v2={p['v1']/p['v2']:.2f}x"
+            )
     return 0
 
 
