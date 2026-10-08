@@ -110,6 +110,51 @@ def test_online_reference_handles_entirely_future_tiles(n):
             np.testing.assert_allclose(out, scalar, rtol=4e-5, atol=4e-5)
 
 
+def scalar_online_kernel_recurrence(q, k, v, tile_k):
+    """Mirror the A100 surrogate's per-score online update in FP64."""
+    q64 = q.astype(np.float64)
+    k64 = k.astype(np.float64)
+    v64 = v.astype(np.float64)
+    bsz, heads, n, d = q.shape
+    dv = v.shape[-1]
+    scale = 1.0 / math.sqrt(d)
+    out = np.empty((bsz, heads, n, dv), dtype=np.float64)
+
+    for b in range(bsz):
+        for h in range(heads):
+            for i in range(n):
+                m = -math.inf
+                z = 0.0
+                acc = np.zeros(dv, dtype=np.float64)
+                for k0 in range(0, n, tile_k):
+                    for j in range(k0, k0 + tile_k):
+                        if j > i:
+                            continue
+                        s = float(np.dot(q64[b, h, i], k64[b, h, j]) * scale)
+                        nm = max(m, s)
+                        alpha = 0.0 if math.isinf(m) and m < 0 else math.exp(m - nm)
+                        w = math.exp(s - nm)
+                        z = alpha * z + w
+                        acc = alpha * acc + w * v64[b, h, j]
+                        m = nm
+                out[b, h, i] = acc / z
+    return out
+
+
+@pytest.mark.parametrize("n", range(1, 9))
+@pytest.mark.parametrize("d", (32, 64, 128))
+@pytest.mark.parametrize("tile_k", (1, 2, 4, 8))
+def test_a100_surrogate_recurrence_matches_fp64_oracle(n, d, tile_k):
+    if n % tile_k:
+        pytest.skip("tile does not divide sequence")
+    q, k, v = make_inputs(n, d, d, 1, 1, 20500 + n + d + tile_k)
+    scalar = scalar_attention_fp64(q, k, v)
+    online = scalar_online_kernel_recurrence(q, k, v, tile_k)
+    np.testing.assert_allclose(
+        online, scalar, rtol=3e-12, atol=3e-12
+    )
+
+
 @pytest.mark.parametrize("kind", ("zeros", "large", "alternating", "constant_v"))
 def test_reference_adversarial_patterns_match_scalar(kind):
     n, d, dv = 8, 8, 5
