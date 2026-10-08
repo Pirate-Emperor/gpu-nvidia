@@ -19,24 +19,20 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Install environment
+      - name: Prepare persistent native environment
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m venv .venv-kbench
-          .venv-kbench/bin/python -m pip install --upgrade pip
-          .venv-kbench/bin/python -m pip install -r requirements-dev.txt
-          .venv-kbench/bin/python -m pip install "cupy-cuda12x"
-          .venv-kbench/bin/python -m pip install "nvidia-cuda-runtime-cu12==12.4.*"
+          bash scripts/setup_native_env.sh
       - name: Run v1 v2 benchmark
         env:
           REQUIRE_A100: "1"
         shell: bash
         run: |
           set -euo pipefail
-          export CUPY_CACHE_DIR="/tmp/cupy-cache-kbench-${GITHUB_RUN_ID}"
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
           mkdir -p "$CUPY_CACHE_DIR"
-          .venv-kbench/bin/python benchmarks/benchmark_kernel_versions.py
+          ${NATIVE_VENV}/bin/python benchmarks/benchmark_kernel_versions.py
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
