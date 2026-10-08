@@ -14,3 +14,17 @@
 4. A version is called an improvement only after a measured steady-state median improvement on selected cases.
 
 Never delete an older implementation after creating a new version.
+
+## v3 promotion benchmark
+
+Method: 10 warmups, 30 CUDA-event timed iterations, resident inputs. Values are v2 median / v3 median; >1 means v3 is faster.
+
+| Case | tile16 | tile32 | tile64 |
+|---|---:|---:|---:|
+| short_d64 | 2.03x | 1.20x | 0.91x |
+| medium_d64 | 1.20x | 1.26x | 1.24x |
+| medium_d128 | 1.14x | 1.15x | 1.15x |
+| long_d128 | 1.07x | 1.03x | 1.01x |
+| longer_batched_d128 | 1.09x | 0.97x | 0.90x |
+
+v3/tile16 is the selected main configuration because it beat v2/tile16 on all five tested workloads and was the fastest v3 tile choice on every workload.
