@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from reference import causal_attention_fp32, passes_mixed_tolerance
+from online_reference import causal_attention_online_fp32
 
 pytestmark = pytest.mark.gpu
 
@@ -153,6 +154,92 @@ def test_shared_tile_rejects_unsupported_tile_sizes(tile_k):
     q, k, v = make_inputs(1, 1, 64, 64, 21700 + tile_k)
     with pytest.raises(ValueError, match="tile"):
         forward(q, k, v, tile_k=tile_k)
+
+
+def test_shared_tile_long_sequence_matches_online_reference():
+    require_a100()
+    q, k, v = make_inputs(1, 2, 1024, 128, 21900)
+    actual = forward(q, k, v, tile_k=64)
+    expected = causal_attention_online_fp32(
+        q, k, v, tile_q=4, tile_k=64
+    ).astype(np.float16)
+    np.testing.assert_allclose(actual, expected, rtol=2e-2, atol=2e-2)
+
+
+def test_shared_tile_long_usage_smoke():
+    require_a100()
+    q, k, v = make_inputs(1, 2, 2048, 128, 21950)
+    out = forward(q, k, v, tile_k=64)
+    assert out.shape == q.shape
+    assert out.dtype == np.float16
+    assert np.isfinite(out).all()
+
+    v2 = v.copy()
+    v2[..., 1024:, :] = np.float16(77.0)
+    out2 = forward(q, k, v2, tile_k=64)
+    np.testing.assert_array_equal(out[..., :1024, :], out2[..., :1024, :])
+
+
+def test_shared_tile_affine_value_transform():
+    require_a100()
+    q = np.array(
+        [[[[1, 0, 1, 0], [0, 1, -1, 0], [1, 1, 0, -1]]]],
+        dtype=np.float16,
+    )
+    k = np.array(
+        [[[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]]],
+        dtype=np.float16,
+    )
+    v = np.array(
+        [[[[1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]]]],
+        dtype=np.float16,
+    )
+    base = forward(
+        np.pad(q, ((0, 0), (0, 0), (0, 1), (0, 0))),
+        np.pad(k, ((0, 0), (0, 0), (0, 1), (0, 0))),
+        np.pad(v, ((0, 0), (0, 0), (0, 1), (0, 0))),
+        tile_k=2,
+    )
+    q2 = np.pad(q, ((0, 0), (0, 0), (0, 1), (0, 0)))
+    k2 = np.pad(k, ((0, 0), (0, 0), (0, 1), (0, 0)))
+    v2 = (2 * np.pad(v, ((0, 0), (0, 0), (0, 1), (0, 0))).astype(np.float32) - 3).astype(np.float16)
+    transformed = forward(q2, k2, v2, tile_k=2)
+    np.testing.assert_allclose(
+        transformed,
+        (2 * base.astype(np.float32) - 3).astype(np.float16),
+        rtol=2e-2,
+        atol=2e-2,
+    )
+
+
+def test_shared_tile_current_query_locality():
+    require_a100()
+    q, k, v = make_inputs(1, 1, 128, 64, 22000)
+    before = forward(q, k, v, tile_k=32)
+    q2 = q.copy()
+    q2[..., 64, :] = np.float16(9.0)
+    after = forward(q2, k, v, tile_k=32)
+    np.testing.assert_array_equal(before[..., :64, :], after[..., :64, :])
+    assert not np.array_equal(before[..., 64, :], after[..., 64, :])
+
+
+def test_shared_tile_resident_device_matches_host_wrapper():
+    require_a100()
+    import cupy as cp
+    q, k, v = make_inputs(1, 1, 128, 64, 22001)
+    host_out = forward(q, k, v, tile_k=64)
+    with cp.cuda.Device(0):
+        qg = cp.asarray(q)
+        kg = cp.asarray(k)
+        vg = cp.asarray(v)
+        device_out = forward(q, k, v, tile_k=64)
+        device_direct = cp.asnumpy(
+            __import__("shared_tile_cuda_attention").launch_device(
+                qg, kg, vg, tile_k=64
+            )
+        )
+    np.testing.assert_allclose(host_out, device_out, rtol=0, atol=0)
+    np.testing.assert_allclose(device_direct, host_out, rtol=2e-2, atol=2e-2)
 
 
 @pytest.mark.parametrize("seed", range(5))
