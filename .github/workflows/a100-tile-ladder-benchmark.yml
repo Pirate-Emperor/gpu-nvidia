@@ -1,0 +1,51 @@
+name: A100 tile ladder benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/shared_tile_cuda_attention.py"
+      - "src/variants/shared_tile_v1.py"
+      - "src/variants/shared_tile_v2.py"
+      - "src/variants/shared_tile_v3.py"
+      - "benchmarks/benchmark_tile_ladder.py"
+      - ".github/workflows/a100-tile-ladder-benchmark.yml"
+
+concurrency:
+  group: a100-tile-ladder-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare persistent native environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/setup_native_env.sh
+      - name: Run tile ladder benchmark
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          cache_dir="${RUNNER_TEMP}/cutile-ladder-cupy-cache-${stamp}"
+          mkdir -p "$cache_dir" results/runs
+          export CUPY_CACHE_DIR="$cache_dir"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          "${NATIVE_VENV}/bin/python" benchmarks/benchmark_tile_ladder.py \
+            --warmup 10 \
+            --iterations 30 \
+            --output "results/runs/${stamp}_A100_tile_ladder.json"
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: a100-tile-ladder-${{ github.run_id }}
+          path: |
+            results/runs/*_A100_tile_ladder.json
+            results/runs/*_A100_tile_ladder.csv
+          if-no-files-found: error
