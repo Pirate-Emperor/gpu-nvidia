@@ -1,0 +1,40 @@
+name: A100 v2 v3 experimental benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/variants/shared_tile_v2.py"
+      - "src/variants/shared_tile_v3.py"
+      - "benchmarks/benchmark_kernel_v3.py"
+      - ".github/workflows/a100-kernel-v3-benchmark.yml"
+
+concurrency:
+  group: a100-kernel-v3-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare persistent native environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/setup_native_env.sh
+      - name: Run v2 v3 benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          ${NATIVE_VENV}/bin/python benchmarks/benchmark_kernel_v3.py
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-v3-benchmark
+          path: |
+            results/kernel_v3_benchmark.json
+            results/kernel_v3_benchmark.csv
