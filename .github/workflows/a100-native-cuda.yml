@@ -37,24 +37,20 @@ jobs:
           nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
           nvcc --version
 
-      - name: Create isolated environment
+      - name: Prepare persistent native environment
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m venv .venv-native-cuda
-          .venv-native-cuda/bin/python -m pip install --upgrade pip
-          .venv-native-cuda/bin/python -m pip install -r requirements-dev.txt
-          .venv-native-cuda/bin/python -m pip install "cupy-cuda12x"
-          .venv-native-cuda/bin/python -m pip install "nvidia-cuda-runtime-cu12==12.4.*"
+          bash scripts/setup_native_env.sh
 
       - name: Verify native CUDA without cuTile
         shell: bash
         run: |
           set -euo pipefail
           export PYTHONPATH="$HOME:${PYTHONPATH:-}"
-          export CUPY_CACHE_DIR="/tmp/cupy-cache-${GITHUB_RUN_ID}"
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
           mkdir -p "$CUPY_CACHE_DIR"
-          .venv-native-cuda/bin/python - <<'PY'
+          ${NATIVE_VENV}/bin/python - <<'PY'
           import cupy as cp
           print("CuPy:", cp.__version__)
           print("GPU:", cp.cuda.runtime.getDeviceProperties(0)["name"])
