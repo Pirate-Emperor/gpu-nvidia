@@ -17,6 +17,7 @@ on:
       - ".github/workflows/a100-native-full.yml"
       - "requirements-dev.txt"
       - "pyproject.toml"
+      - "scripts/setup_native_env.sh"
 
 concurrency:
   group: a100-native-full-${{ github.repository }}-${{ github.ref }}
@@ -57,6 +58,7 @@ jobs:
             tests/test_launch_contract.py \
             tests/test_online_reference.py \
             tests/test_project_structure.py \
+            tests/test_cutile_config.py \
             tests/test_reference_contract.py \
             tests/test_reference_causal.py \
             tests/test_reference_edge_cases.py \
@@ -66,4 +68,5 @@ jobs:
             tests/test_gpu_custom_cuda.py \
             tests/test_gpu_custom_cuda_variants.py \
             tests/test_gpu_device_matrix.py \
+            tests/test_gpu_kernel_versions.py \
             tests/test_gpu_shared_tile_exhaustive.py
