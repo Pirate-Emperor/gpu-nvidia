@@ -1,0 +1,58 @@
+name: A100 shared-tile v5 experiment
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/variants/shared_tile_v5.py"
+      - "tests/test_gpu_kernel_v5.py"
+      - "benchmarks/benchmark_v5.py"
+      - ".github/workflows/a100-v5-experiment.yml"
+
+concurrency:
+  group: a100-v5-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  experiment:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare persistent native environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/setup_native_env.sh
+      - name: Run v5 correctness
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          "${NATIVE_VENV}/bin/python" -m pytest -q tests/test_gpu_kernel_v5.py
+      - name: Benchmark current vs v5
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/runs
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          "${NATIVE_VENV}/bin/python" benchmarks/benchmark_v5.py \
+            --warmup 10 --iterations 30 \
+            --output "results/runs/${stamp}_A100_v5_experiment.json"
+      - name: Upload v5 benchmark
+        uses: actions/upload-artifact@v4
+        with:
+          name: a100-v5-${{ github.run_id }}
+          path: |
+            results/runs/*_A100_v5_experiment.json
+            results/runs/*_A100_v5_experiment.csv
+          if-no-files-found: error
