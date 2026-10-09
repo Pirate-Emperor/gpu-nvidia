@@ -2,6 +2,30 @@
 
 IIT Madras GPU Programming course project: implement and optimize causal scaled dot-product self-attention as a fused NVIDIA cuTile GPU kernel, targeted at NVIDIA A100/SM80.
 
+
+## Start here: project navigation
+
+Use this order to understand the project and decide what to do next.
+
+| Purpose | Document |
+|---|---|
+| **What remains to do / completion gates** | [TODO checklist](docs/TODO_CHECKLIST.md) |
+| Documentation map and recommended reading order | [Documentation index](docs/README.md) |
+| Approaches, benchmark evidence, failure analysis, and decisions | [Experiment report](docs/EXPERIMENT_REPORT.md) |
+| Correctness contract, tolerances, and regression expectations | [Testing contract](docs/TESTING_CONTRACT.md) |
+| Coverage matrix and latest test status | [Test matrix](docs/TEST_MATRIX.md) |
+| Ordinary-CUDA implementation differences and variant decisions | [CUDA variants](docs/CUDA_VARIANTS.md) |
+| Reference/baseline comparison plan | [Baseline ladder](docs/BASELINE_LADDER.md) |
+| Driver, toolkit, compatibility, and profiler constraints | [Environment notes](docs/ENVIRONMENT.md) |
+| External cluster prerequisites and admin-side checklist | [Admin checklist](docs/ADMIN_CHECKLIST.md) |
+| Dated experiment history | [Progress log](docs/PROGRESS.md) |
+| How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
+| Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
+
+**Main code and experiment entry points:** [actual cuTile target](src/cutile_attention.py) · [current shared-tile CUDA surrogate](src/shared_tile_cuda_attention.py) · [unfused CuPy baseline](src/baseline.py) · [primary correctness tests](tests/) · [benchmark directory](benchmarks/) · [GitHub Actions workflows](.github/workflows/).
+
+> **Naming reminder:** the shared-tile CUDA versions are ordinary CUDA C++ implementations and performance/correctness controls. They are not actual NVIDIA cuTile runs.
+
 ## Goal
 
 The required kernel must:
@@ -154,7 +178,7 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 ## Current status (2026-10-09)
 
 - Latest broad non-cuTile regression: **905 passed, 52 skipped, 0 failed** ([run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578)).
-- Latest CPU/reference suite: **761 passed, 68 skipped, 0 failed** ([run #285](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885082879)).
+- Latest CPU/reference suite: **761 passed, 68 skipped, 0 failed** ([run #290](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885170761)).
 - Dedicated shared-tile v4 and v5 A100 correctness: **30/30 passed each**; neither experiment is promoted as a guaranteed performance win.
 - Actual cuTile execution remains blocked by driver R550.90.07; current cuTile environment gate requires R580+.
 - Nsight Compute is installed, but the runner lacks performance-counter permission (`ERR_NVGPUCTRPERM`), so no real counter profile was captured.
