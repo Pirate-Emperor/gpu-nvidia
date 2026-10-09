@@ -31,28 +31,34 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 
 | Area | Result |
 |---|---|
-| CPU/reference CI | PASS; latest run completed successfully |
+| CPU/reference CI | PASS: latest run #277, 761 passed / 68 skipped |
 | Self-hosted A100 runner routing | PASS |
 | Actual A100 hardware inventory | PASS; exhaustive read-only audit |
 | Basic native CUDA execution | PASS |
-| Native CUDA RawKernel correctness | BLOCKED/FAILED at JIT on initial attempt because NVRTC could not find standard headers |
-| Matching CUDA 12.4 runtime-header package | Added to native CUDA workflow; follow-up run must validate |
-| Current cuTile runtime | BLOCKED by R550.90.07 |
-| cuTile forward-compatibility experiment | CUDA error 803 |
-| Nsight binary presence | PASS |
-| Actual Nsight performance-counter access | NOT YET PROVEN; dedicated smoke test added |
+| Native CUDA RawKernel correctness | PASS: native run #44, 133 passed / 1 skipped |
+| Broad non-cuTile regression | PASS: run #51, 905 passed / 52 skipped |
+| Shared-tile v4 experiment | PASS correctness: 30/30; not promoted |
+| Shared-tile v5 experiment | PASS correctness: 30/30; performance inconclusive |
+| Current cuTile runtime | BLOCKED by R550.90.07; R580+ gate |
+| CUDA 13.4 forward-compatibility experiment | Failed: insufficient-driver / CUDA error 803 |
+| CUDA 13.0 forward-compatibility attempt | No verified successful end-to-end cuTile GPU run |
+| Nsight Compute binary presence | PASS: 2024.1.1 |
+| Nsight Compute performance-counter access | BLOCKED: `ERR_NVGPUCTRPERM`; no kernels profiled |
+| PTXAS resource reporting | PASS: v1/v2/v3/current/v4 compiled; no reported spills |
+| Native-CUDA benchmark artifacts | PASS: CUDA-event ladder and v4/v5 comparison artifacts uploaded to Actions |
+| Actual cuTile benchmark/profiler artifacts | NOT AVAILABLE; real cuTile kernel not executed |
 | Fabric Manager | PRESENT and ACTIVE |
-| Benchmark/profiler raw results | Pending supported execution |
 
 ## Interpretation
 
 The A100 hardware itself is suitable for the project. The runner is attached to a
 larger HGX/NVSwitch host but currently exposes two full, non-MIG A100s.
 
-The remaining issues are software/runtime rather than GPU capability:
-1. the host NVIDIA driver is R550.90.07 while current cuTile requires R580+;
-2. the first CuPy RawKernel attempt exposed a CUDA 12.4 NVRTC header-discovery issue;
-3. Nsight performance-counter permission still needs a real profiler smoke test.
+The native CUDA surrogate now executes correctly; the early NVRTC header-discovery issue was avoided by compiling RawKernels with NVCC and matching CUDA 12.4 headers. Remaining blockers are:
+1. actual cuTile needs a supported R580+ driver/runtime;
+2. Nsight Compute counter collection is denied to the runner account (`ERR_NVGPUCTRPERM`);
+3. v4/v5 performance evidence is mixed and needs more controlled repeatability before promotion.
 
-No cuTile correctness or performance number is considered valid until the real
-cuTile kernel executes on the supported environment.
+For the full approach matrix, test counts, timing evidence, and next decisions, see
+[docs/EXPERIMENT_REPORT.md](../docs/EXPERIMENT_REPORT.md). Ordinary-CUDA timings
+must not be reported as cuTile timings.
