@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-09  
 **Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
-**Latest project tree referenced:** `4485bdce5ed462dfbf495b8129efce91b4124585`
+**Code/experiment snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585` (documentation updates are committed afterward)
 
 ## 1. Executive status
 
