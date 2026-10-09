@@ -154,7 +154,7 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 ## Current status (2026-10-09)
 
 - Latest broad non-cuTile regression: **905 passed, 52 skipped, 0 failed** ([run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578)).
-- Latest CPU/reference suite: **761 passed, 68 skipped, 0 failed** ([run #277](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585571)).
+- Latest CPU/reference suite: **761 passed, 68 skipped, 0 failed** ([run #285](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885082879)).
 - Dedicated shared-tile v4 and v5 A100 correctness: **30/30 passed each**; neither experiment is promoted as a guaranteed performance win.
 - Actual cuTile execution remains blocked by driver R550.90.07; current cuTile environment gate requires R580+.
 - Nsight Compute is installed, but the runner lacks performance-counter permission (`ERR_NVGPUCTRPERM`), so no real counter profile was captured.
