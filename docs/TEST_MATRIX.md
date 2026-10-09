@@ -1,6 +1,17 @@
 # Test Matrix and Validation Ledger
 
-This file is the human-readable record of what the project tests, why each class exists, and the latest known execution state.
+This file records test coverage and the latest known execution state. For the consolidated approaches, exact outcomes, and measured comparisons, see [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md).
+
+## Latest verified runs (2026-10-08)
+
+| Workflow | Result | Important boundary |
+|---|---|---|
+| [A100 native CUDA #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415) | 133 passed, 1 skipped | Actual ordinary CUDA kernels on A100/R550; no cuTile claim. |
+| [A100 full non-cuTile #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578) | 905 passed, 52 skipped | Broad non-cuTile regression. |
+| [CPU/reference #277](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585571) | 761 passed, 68 skipped | GPU-only tests skip in hosted CPU environment. |
+| [v4 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) | 30 passed | Experimental variant; not promoted. |
+| [v5 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) | 30 passed | Experimental half2 variant; performance inconclusive. |
+
 
 ## 1. Reference / CPU tests
 
@@ -56,11 +67,12 @@ The A100 GPU suite is intentionally broader than the minimum course matrix.
 | Zero-logit prefix means | D=64 | BLOCKED |
 | Tile-to-tile numerical agreement | 64x64 vs 128x128 | BLOCKED |
 | Multiple B/H | B=2 and multi-head cases | BLOCKED |
-| Custom block-row CUDA | D=32/64/128 + causal/edge/stability cases | NEW; pending GPU CI |
-| Custom warp-row CUDA | D=32/64/128 + causal/edge/stability cases | NEW; pending GPU CI |
-| Cross-implementation agreement | block-row vs warp-row | NEW; pending GPU CI |
-| Shared-memory tiled CUDA | tile_k=32/64, D=32/64/128 | NEW; pending GPU CI |
-| Three-way fused agreement | block-row vs warp-row vs shared-tile | NEW; pending GPU CI |
+| Custom block-row CUDA | D=32/64/128 + causal/edge/stability cases | PASS; A100 native run #44 |
+| Custom warp-row CUDA | D=32/64/128 + causal/edge/stability cases | PASS; A100 native run #44 |
+| Cross-implementation agreement | block-row vs warp-row | PASS; native CUDA suite |
+| Shared-memory tiled CUDA (current) | tile_k=16/32/64, D=32/64/128, causality/stability/long sequences | PASS; native run #44 and broad run #51 |
+| Shared-tile v4 experimental | differential tests, future-K/V invariance, long-sequence smoke | PASS; 30/30 in dedicated workflow |
+| Shared-tile v5 experimental | differential tests, future-K/V invariance, long-sequence smoke, tile_k=16/32/64 | PASS; 30/30 in dedicated workflow; performance inconclusive |
 
 ## 3. GPU baseline ladder
 
@@ -82,17 +94,15 @@ cuTile.
 
 ## 4. Performance runs
 
-The performance suite will use CUDA events, warmups, synchronized steady-state timing, median latency, P90 latency, and raw JSON/CSV preservation.
+Native-CUDA surrogate timings have been collected on the A100 using CUDA events, 10 warmups, 30 measured iterations, median/P90, and raw JSON/CSV artifacts. The tile ladder also measures first compilation separately. See [the experiment report](EXPERIMENT_REPORT.md) for medians and the explicit warning about run-to-run timing variability.
 
-Required future runs:
-- >=6 representative configurations.
-- >=30 timed iterations per configuration.
-- JIT/cold-start latency reported separately.
-- fused vs unfused speedup.
-- effective output throughput.
-- Nsight Compute on >=2 representative configurations.
+Actual cuTile performance remains blocked until the kernel executes on a supported driver/runtime. Nsight Compute hardware profiling is additionally blocked by `ERR_NVGPUCTRPERM`; current profiling claims are therefore limited to successful compiler/PTXAS resource reports, not hardware-counter data.
 
-No GPU performance number is marked valid until the kernel executes successfully on a supported A100/cuTile environment.
+Still required for final course submission:
+- Actual cuTile execution and correctness on supported hardware (planned RTX 4060).
+- Final representative benchmark matrix and cuTile-vs-unfused/framework comparison.
+- At least two successful hardware profiles with counter access.
+- Final deliverable/report after those runs.
 
 ## 5. Environment gate
 
