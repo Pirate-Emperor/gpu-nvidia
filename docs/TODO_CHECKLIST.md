@@ -10,7 +10,7 @@
 Implement a **fused causal self-attention forward kernel**. Given FP16 query, key, and value tensors (Q, K, V), it must compute:
 
 1. query–key dot products, accumulated in FP32;
-2. scaling by (1/\sqrt{D}) and the causal mask (a token can attend only to itself and earlier tokens);
+2. scaling by 1 / sqrt(D) and the causal mask (a token can attend only to itself and earlier tokens);
 3. numerically stable softmax, preferably using an online/tiled recurrence;
 4. the probability-weighted sum of V, returned in FP16.
 
