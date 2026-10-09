@@ -145,7 +145,7 @@ The consolidated evidence and performance tables live in [docs/EXPERIMENT_REPORT
 ### Confirmed correctness state
 - A100 native CUDA run #44 on `a8172749`: **133 passed, 1 skipped**. It followed the fix to an invalid affine-property test that incorrectly requested unsupported `tile_k=2`; the kernel's supported tile sizes remain 16/32/64.
 - Broad non-cuTile run #47 on the corrected test commit: **905 passed, 52 skipped**. Latest rerun #51: **905 passed, 52 skipped, 0 failed**.
-- Latest CPU/reference run #277: **761 passed, 68 skipped, 0 failed**. Hosted CPU CI skips GPU tests when CuPy/GPU dependencies are not present.
+- Latest CPU/reference run #285: **761 passed, 68 skipped, 0 failed**. Hosted CPU CI skips GPU tests when CuPy/GPU dependencies are not present.
 - Dedicated v4 and v5 GPU correctness workflows: **30/30 passed each**. These variants remain experiments, not promoted defaults.
 
 ### Version ladder and compiler evidence
