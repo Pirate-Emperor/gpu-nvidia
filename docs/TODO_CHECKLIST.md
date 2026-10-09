@@ -23,7 +23,7 @@
 - [x] Fix the invalid `tile_k=2` affine-V test input; the implementation was correct to reject that unsupported tile size.
 - [x] Verify native CUDA correctness on A100: [run #44 — 133 passed, 1 skipped](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415).
 - [x] Verify broad non-cuTile regression: [run #51 — 905 passed, 52 skipped, 0 failed](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578).
-- [x] Verify CPU/reference suite on the latest documented commit: [run #290 — 761 passed, 68 skipped](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885170761). GPU-only skips are expected on CPU CI.
+- [x] Verify the latest CPU/reference suite known before these checklist/README edits: [run #290 — 761 passed, 68 skipped](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885170761). GPU-only skips are expected on CPU CI.
 - [x] Verify isolated shared-tile v4 correctness: [30 passed](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099); retain as an experiment, not the default.
 - [x] Verify isolated shared-tile v5 correctness: [30 passed](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734); retain as an experiment, not a claimed speedup.
 - [x] Add warmed CUDA-event timing harnesses with 10 warmups, 30 measured iterations, medians/P90, and separate cold/JIT timing in the tile ladder.
