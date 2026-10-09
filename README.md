@@ -26,6 +26,16 @@ Use this order to understand the project and decide what to do next.
 
 > **Naming reminder:** the shared-tile CUDA versions are ordinary CUDA C++ implementations and performance/correctness controls. They are not actual NVIDIA cuTile runs.
 
+## What cuTile is — and where this project stands
+
+[NVIDIA cuTile Python](https://docs.nvidia.com/cuda/cutile-python/) is a tile-based GPU programming model: we describe operations on blocks of array data, while the cuTile compiler/runtime maps those tile operations to GPU execution. Our assignment is to use this model to write a fused causal-attention forward kernel.
+
+**What is already done:** independent mathematical references, broad correctness coverage, several ordinary-CUDA comparison kernels, preserved v1–v5 experiments, a benchmark ladder, PTXAS summaries, and a consolidated experiment report. The latest recorded broad non-cuTile regression is 905 passed / 52 skipped; the CPU/reference suite is 761 passed / 68 skipped.
+
+**What is not done yet:** actual `src/cutile_attention.py` execution and full correctness on a supported GPU/runtime, controlled actual-cuTile performance comparisons, and successful Nsight Compute profiles. The available A100 runner uses driver R550.90.07, and the project's current cuTile environment gate requires R580+; its profiler also reports `ERR_NVGPUCTRPERM`. Do not count the ordinary-CUDA surrogate results as completed cuTile results.
+
+**Next action:** open [the TODO checklist](docs/TODO_CHECKLIST.md) and work through Priority 0 first. The checklist explains each completed work area and defines the evidence needed to close every remaining gate.
+
 ## Goal
 
 The required kernel must:
