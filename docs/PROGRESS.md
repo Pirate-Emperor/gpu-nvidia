@@ -136,3 +136,30 @@ Therefore the project intentionally continues without cuTile execution rather th
 6. after the driver upgrade, install/validate cuTile and run the same frozen correctness/performance matrix.
 
 Important: native CUDA results are development/control results. They are not presented as cuTile results and do not replace the required cuTile implementation.
+
+
+## 2026-10-08 / 2026-10-09 — Regression freeze and optimization experiments
+
+The consolidated evidence and performance tables live in [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md); use that report rather than reconstructing results from this chronological log.
+
+### Confirmed correctness state
+- A100 native CUDA run #44 on `a8172749`: **133 passed, 1 skipped**. It followed the fix to an invalid affine-property test that incorrectly requested unsupported `tile_k=2`; the kernel's supported tile sizes remain 16/32/64.
+- Broad non-cuTile run #47 on the corrected test commit: **905 passed, 52 skipped**. Latest rerun #51: **905 passed, 52 skipped, 0 failed**.
+- Latest CPU/reference run #277: **761 passed, 68 skipped, 0 failed**. Hosted CPU CI skips GPU tests when CuPy/GPU dependencies are not present.
+- Dedicated v4 and v5 GPU correctness workflows: **30/30 passed each**. These variants remain experiments, not promoted defaults.
+
+### Version ladder and compiler evidence
+- Added `benchmarks/benchmark_tile_ladder.py`: v1/v2/v3/current comparisons across frozen cases and tile_k 16/32/64, with 10 warmups, 30 CUDA-event iterations, median/P90, and first-compile time measured separately.
+- Ladder run #3 measured first compile as v1 1652 ms, v2 717 ms, v3 1063 ms, current 808 ms. Per-case kernel medians and limitations are documented in the experiment report.
+- Added `scripts/ptxas_tile_report.py` and ran it on SM80. v1/v2/v3/current/v4 compiled without reported spills. v3 uses 40 registers; current and v4 use 32 registers and emitted identical reported shared-memory usage/cubin size.
+- v4 tries persistent Q registers across K tiles. It passed correctness but had mixed timing, regressed a long-batched case, and generated code equivalent to current; it is not promoted.
+- v5 tries `half2` QK loads. It passed 30 correctness tests; selected cases were faster, but per-run/per-tile timing variability and mixed regressions make the result inconclusive. Current remains the main A100 surrogate until a controlled repeat confirms a robust gain.
+
+### Profiling and runtime blockers
+- Native Nsight workflow detected Nsight Compute 2024.1.1 and both A100s, but profiling failed with `ERR_NVGPUCTRPERM`; no kernels/counters were profiled.
+- CUDA 13.4 forward compatibility was not functional on R550 (insufficient-driver error / CUDA error 803). The CUDA 13.0 package/runtime attempt did not establish a verified working cuTile GPU run. Current cuTile execution remains blocked by the R580+ runtime gate.
+- The ordinary CUDA A100 work is explicitly a cuTile-like surrogate, not actual NVIDIA cuTile.
+
+### Documentation
+- Added [docs/README.md](README.md) as the documentation map.
+- Added [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md) for the consolidated test ledger, all approach families, timing results, PTXAS evidence, infrastructure attempts, and next decisions.
