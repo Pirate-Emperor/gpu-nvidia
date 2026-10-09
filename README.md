@@ -37,7 +37,11 @@ src/warp_cuda_attention.py
   Independent fused CUDA implementation using warp-shuffle reductions; no cuTile dependency.
 
 src/shared_tile_cuda_attention.py
-  Independent shared-memory tiled fused CUDA implementation; no cuTile dependency.
+  Current A100 shared-memory tiled fused CUDA surrogate; no cuTile dependency.
+
+src/variants/shared_tile_v1.py ... shared_tile_v5.py
+  Preserved optimization ladder: one-row two-pass → warp-row online softmax →
+  four-score loop → Q-register experiment → half2 QK experiment.
 
 docs/CUDA_VARIANTS.md
   Design notes and invariants for the independent CUDA fused implementations.
@@ -67,7 +71,14 @@ docs/TESTING_CONTRACT.md
   Frozen correctness contract.
 
 docs/PROGRESS.md
-  Persistent experiment log.
+  Persistent chronological experiment log.
+
+docs/README.md
+  Documentation index and recommended reading order.
+
+docs/EXPERIMENT_REPORT.md
+  Consolidated approaches, exact CI outcomes, measured latency, compiler
+  resources, infrastructure blockers, and next decisions.
 
 results/
   Raw benchmark and profiler artifacts.
@@ -140,13 +151,15 @@ Steady-state measurements use GPU events, warm-up iterations, >=30 measured iter
 
 Profiler runs use a dedicated single-kernel target so Nsight Compute measurements are not polluted by the entire benchmark harness.
 
-## Current status
+## Current status (2026-10-09)
 
-CPU/reference validation is passing on the self-hosted A100 runner.
+- Latest broad non-cuTile regression: **905 passed, 52 skipped, 0 failed** ([run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578)).
+- Latest CPU/reference suite: **761 passed, 68 skipped, 0 failed** ([run #277](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585571)).
+- Dedicated shared-tile v4 and v5 A100 correctness: **30/30 passed each**; neither experiment is promoted as a guaranteed performance win.
+- Actual cuTile execution remains blocked by driver R550.90.07; current cuTile environment gate requires R580+.
+- Nsight Compute is installed, but the runner lacks performance-counter permission (`ERR_NVGPUCTRPERM`), so no real counter profile was captured.
 
-The current A100 node reports driver R550.90.07. Current NVIDIA cuTile releases require a newer driver, so the production cuTile workflow intentionally stops at the environment gate rather than claiming unsupported kernel execution.
-
-A separate forward-compatibility experiment downloaded NVIDIA's cuda-compat-13-4 package without root and tested it, but CUDA reported error 803 (system driver mismatch). See docs/PROGRESS.md.
+**Do not confuse the native-CUDA/cuTile-like surrogate with actual NVIDIA cuTile.** The detailed evidence, approach comparison, test results, benchmarks and limitations are in [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md). See [docs/README.md](docs/README.md) for the documentation map.
 
 ## Course-scope boundary
 
