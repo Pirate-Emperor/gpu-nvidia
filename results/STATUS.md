@@ -31,7 +31,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 
 | Area | Result |
 |---|---|
-| CPU/reference CI | PASS: latest run #277, 761 passed / 68 skipped |
+| CPU/reference CI | PASS: latest run #285, 761 passed / 68 skipped |
 | Self-hosted A100 runner routing | PASS |
 | Actual A100 hardware inventory | PASS; exhaustive read-only audit |
 | Basic native CUDA execution | PASS |
