@@ -163,3 +163,20 @@ The consolidated evidence and performance tables live in [docs/EXPERIMENT_REPORT
 ### Documentation
 - Added [docs/README.md](README.md) as the documentation map.
 - Added [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md) for the consolidated test ledger, all approach families, timing results, PTXAS evidence, infrastructure attempts, and next decisions.
+
+
+## 2026-10-10 — Repeated v5 benchmark and full PTXAS comparison
+
+### Compiler resource check
+- Added `src/variants/shared_tile_v5.py` to `scripts/ptxas_tile_report.py`, enabled the workflow to archive the JSON output, and ran [PTXAS workflow #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) successfully.
+- SM80 PTXAS reports zero spill loads/stores for v1/v2/v3/current/v4/v5. v5 uses 32 registers and 33,792 B shared memory, equal to current; v5's cubin is 15,520 B vs current's 15,136 B.
+
+### Controlled v5 comparison
+- Reworked `benchmarks/benchmark_v5.py` to compare current and v5 in paired sessions, alternating which version runs first. Each version/session uses 10 warmups and 30 CUDA-event samples; three repeats are recorded for every one of seven cases and each tile_k=16/32/64. Raw session JSON/CSV and a summary CSV are uploaded by [A100 v5 run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163).
+- Correctness stage passed **30/30 tests** before timings. The run succeeded.
+- Measured v5 gains were modest on medium D=64, mixed across short cases, and only about 0.3–0.6% on long/batched D=128. Ratios varied widely for some short cases. v5 remains unpromoted because the data do not establish a robust general win.
+- Latest CPU/reference run [#306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131) passed **761 tests, 68 skipped**.
+
+### Remaining blockers
+- Actual cuTile still needs a supported driver/runtime and an actual successful compile/launch/correctness run.
+- Nsight Compute counter profiling remains blocked by `ERR_NVGPUCTRPERM`; the successful PTXAS report is compile-time evidence only, not hardware-counter profiling.
