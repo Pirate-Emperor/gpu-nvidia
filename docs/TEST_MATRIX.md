@@ -2,15 +2,17 @@
 
 This file records test coverage and the latest known execution state. For the consolidated approaches, exact outcomes, and measured comparisons, see [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md).
 
-## Latest verified runs (reviewed 2026-10-09)
+## Latest verified runs (reviewed 2026-10-10)
 
 | Workflow | Result | Important boundary |
 |---|---|---|
 | [A100 native CUDA #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415) | 133 passed, 1 skipped | Actual ordinary CUDA kernels on A100/R550; no cuTile claim. |
 | [A100 full non-cuTile #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578) | 905 passed, 52 skipped | Broad non-cuTile regression. |
-| [CPU/reference #290](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885170761) | 761 passed, 68 skipped | GPU-only tests skip in hosted CPU environment. |
+| [CPU/reference #306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131) | 761 passed, 68 skipped | GPU-only tests skip in hosted CPU environment. |
 | [v4 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) | 30 passed | Experimental variant; not promoted. |
 | [v5 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) | 30 passed | Experimental half2 variant; performance inconclusive. |
+| [v5 paired benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) | Correctness 30/30 + 3 paired repeats/case/tile | Order alternated; v5 remains unpromoted after mixed/noisy results. |
+| [PTXAS resource report #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) | v1/v2/v3/current/v4/v5 compiled; zero spills | v5 added to resource comparison; compile-time evidence only. |
 
 
 ## 1. Reference / CPU tests
@@ -94,7 +96,7 @@ cuTile.
 
 ## 4. Performance runs
 
-Native-CUDA surrogate timings have been collected on the A100 using CUDA events, 10 warmups, 30 measured iterations, median/P90, and raw JSON/CSV artifacts. The tile ladder also measures first compilation separately. See [the experiment report](EXPERIMENT_REPORT.md) for medians and the explicit warning about run-to-run timing variability.
+Native-CUDA surrogate timings have been collected on the A100 using CUDA events, 10 warmups, 30 measured iterations, median/P90, and raw JSON/CSV artifacts. The tile ladder also measures first compilation separately. The current-vs-v5 experiment uses three paired repeats with order alternating by repeat; see [v5 benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163). The v5 result remains inconclusive and it is not promoted. See [the experiment report](EXPERIMENT_REPORT.md) for medians and the explicit warning about run-to-run timing variability.
 
 Actual cuTile performance remains blocked until the kernel executes on a supported driver/runtime. Nsight Compute hardware profiling is additionally blocked by `ERR_NVGPUCTRPERM`; current profiling claims are therefore limited to successful compiler/PTXAS resource reports, not hardware-counter data.
 
