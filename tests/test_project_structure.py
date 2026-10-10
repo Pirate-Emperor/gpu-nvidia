@@ -4,6 +4,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = (
     "README.md",
+    "docs/README.md",
+    "docs/TODO_CHECKLIST.md",
+    "docs/EXPERIMENT_REPORT.md",
+    "results/STATUS.md",
+    "benchmarks/benchmark_v5.py",
+    "scripts/ptxas_tile_report.py",
+    ".github/workflows/a100-nsys-timeline.yml",
+    ".github/workflows/a100-nsight.yml",
+    ".github/workflows/a100-ptxas-report.yml",
+    ".github/workflows/a100-v5-experiment.yml",
     "run_attention.py",
     "docs/DESIGN.md",
     "docs/TESTING_CONTRACT.md",
@@ -74,3 +84,28 @@ def test_progress_log_mentions_current_environment_gate():
     progress = (ROOT / "docs/PROGRESS.md").read_text()
     assert "R550.90.07" in progress
     assert "cudaErrorSystemDriverMismatch" in progress
+
+
+def test_root_readme_links_project_tracking_and_evidence():
+    readme = (ROOT / "README.md").read_text()
+    for path in (
+        "docs/TODO_CHECKLIST.md",
+        "docs/README.md",
+        "docs/EXPERIMENT_REPORT.md",
+        "docs/TESTING_CONTRACT.md",
+        "docs/TEST_MATRIX.md",
+        "docs/PROGRESS.md",
+        "results/STATUS.md",
+    ):
+        assert path in readme, f"Root README must link or refer to {path}"
+    assert "not actual NVIDIA cuTile" in readme or "not actual cuTile" in readme
+
+
+def test_supported_cutile_profile_workflow_gates_profiles_on_correctness():
+    workflow = (ROOT / ".github/workflows/a100-nsight.yml").read_text()
+    assert "Verify supported cuTile runtime" in workflow
+    assert "Run actual cuTile correctness matrix" in workflow
+    assert "tests/test_gpu_correctness.py" in workflow
+    assert "tests/test_gpu_edge_cases.py" in workflow
+    assert "medium_d128_t64x64" in workflow
+    assert "longer_batched_d128_t64x32" in workflow
