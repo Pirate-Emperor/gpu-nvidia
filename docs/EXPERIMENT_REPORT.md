@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-10  
 **Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
-**Code/experiment snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585` (documentation updates are committed afterward)
+**Core kernel snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585`; the paired v5 benchmark uses code at `caeb6e79e4237222d021782a3a9bdb72d6c4ca7f` (documentation updates are committed afterward)
 
 ## 1. Executive status
 
@@ -173,7 +173,7 @@ This is compile-time resource evidence, **not a substitute for hardware profilin
 
 1. Keep the main shared-tile implementation as the correctness baseline for the A100/R550 phase.
 2. Keep v1-v5 preserved; do not promote v4 or v5 without repeatable gains across representative cases.
-3. Improve benchmark stability and repeatable artifact comparison; rerun current/v5 with alternating order and idle-GPU checks before accepting v5.
+3. The first order-alternating current/v5 retest is complete; do not promote v5 unless further independent sessions confirm a robust gain without meaningful regressions.
 4. Test a genuinely different SM80 optimization next (e.g. WMMA/tensor-core QK path), only after benchmark controls are trustworthy.
 5. Obtain profiler counter access through the cluster's existing policy/process; do not attempt privileged changes through the runner.
 6. On the planned RTX 4060 with updated driver, execute **actual cuTile**: correctness across frozen cases, at least two tile configurations, full benchmark matrix, JIT separation, and at least two successful profiles.
