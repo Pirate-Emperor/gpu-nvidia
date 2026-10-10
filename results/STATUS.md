@@ -31,21 +31,22 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 
 | Area | Result |
 |---|---|
-| CPU/reference CI | PASS: latest verified run #290, 761 passed / 68 skipped |
+| CPU/reference CI | PASS: latest verified run #306, 761 passed / 68 skipped |
 | Self-hosted A100 runner routing | PASS |
 | Actual A100 hardware inventory | PASS; exhaustive read-only audit |
 | Basic native CUDA execution | PASS |
 | Native CUDA RawKernel correctness | PASS: native run #44, 133 passed / 1 skipped |
 | Broad non-cuTile regression | PASS: run #51, 905 passed / 52 skipped |
 | Shared-tile v4 experiment | PASS correctness: 30/30; not promoted |
-| Shared-tile v5 experiment | PASS correctness: 30/30; performance inconclusive |
+| Shared-tile v5 experiment | PASS correctness: 30/30; three paired/order-alternating repeats; not promoted |
 | Current cuTile runtime | BLOCKED by R550.90.07; R580+ gate |
 | CUDA 13.4 forward-compatibility experiment | Failed: insufficient-driver / CUDA error 803 |
 | CUDA 13.0 forward-compatibility attempt | No verified successful end-to-end cuTile GPU run |
 | Nsight Compute binary presence | PASS: 2024.1.1 |
 | Nsight Compute performance-counter access | BLOCKED: `ERR_NVGPUCTRPERM`; no kernels profiled |
-| PTXAS resource reporting | PASS: v1/v2/v3/current/v4 compiled; no reported spills |
-| Native-CUDA benchmark artifacts | PASS: CUDA-event ladder and v4/v5 comparison artifacts uploaded to Actions |
+| PTXAS resource reporting | PASS: v1/v2/v3/current/v4/v5 compiled; no reported spills; v5 cubin 15,520 B |
+| Repeated current-vs-v5 benchmark | PASS: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163), three paired repeats/case/tile; v5 not promoted due to mixed/noisy gains |
+| Native-CUDA benchmark artifacts | PASS: CUDA-event ladder plus repeated paired current-vs-v5 artifacts uploaded to Actions |
 | Actual cuTile benchmark/profiler artifacts | NOT AVAILABLE; real cuTile kernel not executed |
 | Fabric Manager | PRESENT and ACTIVE |
 
