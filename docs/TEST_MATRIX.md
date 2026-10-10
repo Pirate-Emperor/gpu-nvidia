@@ -7,8 +7,8 @@ This file records test coverage and the latest known execution state. For the co
 | Workflow | Result | Important boundary |
 |---|---|---|
 | [A100 native CUDA #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415) | 133 passed, 1 skipped | Actual ordinary CUDA kernels on A100/R550; no cuTile claim. |
-| [A100 full non-cuTile #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578) | 905 passed, 52 skipped | Broad non-cuTile regression. |
-| [CPU/reference #306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131) | 761 passed, 68 skipped | GPU-only tests skip in hosted CPU environment. |
+| [A100 full non-cuTile #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082) | 907 passed, 52 skipped | Broad non-cuTile regression. |
+| [CPU/reference #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023) | 763 passed, 68 skipped | GPU-only tests skip in hosted CPU environment. |
 | [v4 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) | 30 passed | Experimental variant; not promoted. |
 | [v5 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) | 30 passed | Experimental half2 variant; performance inconclusive. |
 | [v5 paired benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) | Correctness 30/30 + 3 paired repeats/case/tile | Order alternated; v5 remains unpromoted after mixed/noisy results. |
