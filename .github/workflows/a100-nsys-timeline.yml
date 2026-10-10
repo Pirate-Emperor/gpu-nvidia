@@ -1,0 +1,60 @@
+name: A100 native CUDA Nsight Systems timeline
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/shared_tile_cuda_attention.py"
+      - "benchmarks/profile_shared_tile.py"
+      - ".github/workflows/a100-nsys-timeline.yml"
+
+concurrency:
+  group: a100-nsys-timeline-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  timeline:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare native CUDA environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/setup_native_env.sh
+
+      - name: Verify Nsight Systems
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi --query-gpu=index,name,driver_version,compute_cap --format=csv
+          command -v nsys
+          nsys --version
+
+      - name: Capture warmed CUDA timelines
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/nsys
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+
+          nsys profile --trace=cuda,nvtx,osrt --sample=none --force-overwrite true \
+            --output "results/nsys/${stamp}_A100_shared_medium_d128_tk64" \
+            "${NATIVE_VENV}/bin/python" benchmarks/profile_shared_tile.py \
+              --case medium_d128 --tile-k 64 --warmup 5
+
+          nsys profile --trace=cuda,nvtx,osrt --sample=none --force-overwrite true \
+            --output "results/nsys/${stamp}_A100_shared_longer_batched_d128_tk32" \
+            "${NATIVE_VENV}/bin/python" benchmarks/profile_shared_tile.py \
+              --case longer_batched_d128 --tile-k 32 --warmup 5
+
+      - name: Upload Nsight Systems reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: a100-nsys-timeline-${{ github.run_id }}
+          path: results/nsys/
+          if-no-files-found: error
