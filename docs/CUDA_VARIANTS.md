@@ -91,7 +91,7 @@ implementations are not overwritten.
 | v3 | `src/variants/shared_tile_v3.py` | Computes four QK scores per inner loop iteration. | Correct; often improves short/medium cases; long/batched performance varies. PTXAS used 40 registers. |
 | Current | `src/shared_tile_cuda_attention.py` | Reuses each loaded Q fragment across the four score calculations. | Main A100/R550 surrogate. PTXAS: 32 registers, 33,792 B shared memory, no reported spills. |
 | v4 | `src/variants/shared_tile_v4.py` | Hoists Q fragments into persistent registers across K tiles. | 30/30 isolated GPU tests passed, but timings mixed. PTXAS/cubin summary was identical to current, so not promoted. |
-| v5 | `src/variants/shared_tile_v5.py` | Uses `half2` for adjacent FP16 Q/K values in dot-product calculation. | 30/30 isolated GPU tests passed; mixed timings and high variability mean the performance gain is not yet proven. |
+| v5 | `src/variants/shared_tile_v5.py` | Uses `half2` for adjacent FP16 Q/K values in dot-product calculation. | [Run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163): 30/30 correctness tests and three order-alternating paired benchmark sessions per case/tile. Medium D=64 improves modestly; short cases are mixed and long/batched gains are only ~0.3–0.6%. Not promoted. [PTXAS #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187): same registers/shared memory as current, zero spills, 384 B larger cubin. |
 
 All five are ordinary CUDA C++ compiled through CuPy RawKernel/NVCC for SM80.
 They are structural surrogates for tile-oriented reasoning only; none is an
