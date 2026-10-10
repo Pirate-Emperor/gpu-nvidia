@@ -154,7 +154,8 @@ The updated PTXAS report [run #5](https://github.com/SpryzenHell/gpu-nvidia/acti
 | v2 | 32 | 33,792 B | 0 / 0 | 15,392 |
 | v3 | 40 | 33,792 B | 0 / 0 | 22,560 |
 | current | 32 | 33,792 B | 0 / 0 | 15,136 |
-| v4 | 32 | 33,792 B | 0 / 0 | 15,136 |\n| v5 | 32 | 33,792 B | 0 / 0 | 15,520 |
+| v4 | 32 | 33,792 B | 0 / 0 | 15,136 |
+| v5 | 32 | 33,792 B | 0 / 0 | 15,520 |
 
 This is compile-time resource evidence, **not a substitute for hardware profiling**. Nsight Compute could not collect counters because the runner account lacks GPU performance-counter permission; no occupancy, bandwidth, or instruction-counter conclusions can be drawn yet. v5 matches current on register count, shared memory, and zero reported spills, but its cubin is 384 bytes larger (15,520 B vs 15,136 B). This compiler-resource difference does not establish a runtime improvement.
 
