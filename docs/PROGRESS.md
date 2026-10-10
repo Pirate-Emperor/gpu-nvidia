@@ -180,3 +180,11 @@ The consolidated evidence and performance tables live in [docs/EXPERIMENT_REPORT
 ### Remaining blockers
 - Actual cuTile still needs a supported driver/runtime and an actual successful compile/launch/correctness run.
 - Nsight Compute counter profiling remains blocked by `ERR_NVGPUCTRPERM`; the successful PTXAS report is compile-time evidence only, not hardware-counter profiling.
+
+
+## 2026-10-10 — Nsight Systems timelines for the A100 CUDA surrogate
+
+- Added `.github/workflows/a100-nsys-timeline.yml` to capture two warmed ordinary-CUDA shared-tile launches without requiring Nsight Compute hardware counters.
+- [Workflow #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320) completed successfully on A100/R550. The runner/version check and both capture commands passed; artifact upload succeeded.
+- Uploaded [artifact #11671195371](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320/artifacts/11671195371) containing two Nsight Systems reports: medium D=128 with tile_k=64, and longer batched D=128 with tile_k=32.
+- This provides CUDA API/kernel timeline evidence for the ordinary-CUDA surrogate, not cuTile and not Nsight Compute hardware-counter metrics. Actual-cuTile profiling remains open.
