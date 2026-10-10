@@ -188,3 +188,12 @@ The consolidated evidence and performance tables live in [docs/EXPERIMENT_REPORT
 - [Workflow #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320) completed successfully on A100/R550. The runner/version check and both capture commands passed; artifact upload succeeded.
 - Uploaded [artifact #11671195371](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320/artifacts/11671195371) containing two Nsight Systems reports: medium D=128 with tile_k=64, and longer batched D=128 with tile_k=32.
 - This provides CUDA API/kernel timeline evidence for the ordinary-CUDA surrogate, not cuTile and not Nsight Compute hardware-counter metrics. Actual-cuTile profiling remains open.
+
+
+## 2026-10-10 — Nsight Systems summary export and cuTile workflow readiness
+
+- Improved the timeline workflow to run `nsys stats` for `cuda_gpu_kern_sum` and `cuda_api_sum` after capturing the warmed traces.
+- [Nsight Systems run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) completed successfully. The artifact [#11671075954](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954) contains both timeline reports and summary outputs.
+- Prepared `.github/workflows/a100-nsight.yml` to run `tests/test_gpu_correctness.py` and `tests/test_gpu_edge_cases.py` before profiling actual cuTile, and then profile two configurations (medium D=128, 64x64; longer batched D=128, 64x32).
+- This actual-cuTile workflow is **prepared but not validated on hardware**; the current R550 node is blocked at its R580+ check. Nsight Compute counter access remains separately blocked by `ERR_NVGPUCTRPERM`.
+- Updated `src/cutile_attention.py` to make the runtime-unavailable message hardware-agnostic; it no longer incorrectly directs all users to the A100 node.
