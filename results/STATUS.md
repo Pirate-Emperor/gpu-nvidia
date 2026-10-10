@@ -46,6 +46,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 | Nsight Compute performance-counter access | BLOCKED: `ERR_NVGPUCTRPERM`; no kernels profiled |
 | PTXAS resource reporting | PASS: v1/v2/v3/current/v4/v5 compiled; no reported spills; v5 cubin 15,520 B |
 | Repeated current-vs-v5 benchmark | PASS: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163), three paired repeats/case/tile; v5 not promoted due to mixed/noisy gains |
+| Nsight Systems timeline (surrogate) | PASS: [run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320); two warmed `.nsys-rep` files uploaded |
 | Native-CUDA benchmark artifacts | PASS: CUDA-event ladder plus repeated paired current-vs-v5 artifacts uploaded to Actions |
 | Actual cuTile benchmark/profiler artifacts | NOT AVAILABLE; real cuTile kernel not executed |
 | Fabric Manager | PRESENT and ACTIVE |
