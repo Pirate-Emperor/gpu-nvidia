@@ -1,6 +1,6 @@
 # Project TODO Checklist — Fused Causal Attention with NVIDIA cuTile
 
-**Last reviewed:** 2026-10-09  
+**Last reviewed:** 2026-10-10  
 **Start here:** this file explains the goal, what has already been done, what remains, and the evidence required before the course project can be marked complete. The [root README](../README.md) is the entry point; the [experiment report](EXPERIMENT_REPORT.md) contains the more detailed measurements and history.
 
 **Status key:** `[x]` done and backed by evidence · `[ ]` still to do · **BLOCKED** needs a suitable environment or permission. A task is not complete merely because code exists.
@@ -52,7 +52,7 @@ The current A100 runner uses driver R550.90.07, while the project's cuTile envir
 - [x] **Validated the native CUDA path on the A100.** [Run #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415): 133 passed, 1 skipped.
 - [x] **Ran the broad non-cuTile regression.** [Run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578): 905 passed, 52 skipped, 0 failed.
 - [x] **Ran CPU/reference validation.** [Run #306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131): 761 passed, 68 skipped. GPU-only skips are expected on a CPU-only hosted runner.
-- [x] **Checked v4 and v5 independently.** [v4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) and [v5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) each passed 30 targeted GPU tests. v4 was not promoted because its PTXAS/cubin summary matched the current version and it regressed on a longer batched case. v5 showed promising results in some cases, but other timings were neutral/slower and noisy, so its speedup remains unproven.
+- [x] **Checked v4 and v5 independently.** [v4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) and [v5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) each passed 30 targeted GPU tests. v4 was not promoted because its PTXAS/cubin summary matched the current version and it regressed on a longer batched case. the repeated paired [benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) showed a modest medium-D=64 gain but mixed short cases and only ~0.3–0.6% on long/batched inputs; it remains unpromoted.
 - [x] **Added a reproducible preliminary benchmark ladder.** CUDA-event timing uses warmups and 30 measured iterations, reporting medians/P90; the tile ladder measures first compilation separately and preserves artifacts. The ladder shows the later tiled variants generally improve many short/medium cases over v1, but timing variability across runs is high; the measurements are preliminary, not final performance claims.
 - [x] **Captured compiler resource summaries for v1–v5 and current.** [PTXAS run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) compiled all six variants for SM80 with zero reported spills. v5 uses 32 registers and 33,792 B shared memory like current, but has a 15,520 B cubin vs 15,136 B for current.
 - [x] **Recorded environment and profiling blockers honestly.** The current driver/package gate and failed compatibility attempts are documented. Nsight Compute is installed, but the existing counter-profile attempt failed with `ERR_NVGPUCTRPERM` and captured no kernel.
