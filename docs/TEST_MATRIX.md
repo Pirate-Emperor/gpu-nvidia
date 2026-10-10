@@ -13,7 +13,7 @@ This file records test coverage and the latest known execution state. For the co
 | [v5 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) | 30 passed | Experimental half2 variant; performance inconclusive. |
 | [v5 paired benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) | Correctness 30/30 + 3 paired repeats/case/tile | Order alternated; v5 remains unpromoted after mixed/noisy results. |
 | [PTXAS resource report #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) | v1/v2/v3/current/v4/v5 compiled; zero spills | v5 added to resource comparison; compile-time evidence only. |
-| [Nsight Systems timeline #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320) | Two warmed surrogate `.nsys-rep` traces captured and uploaded | CUDA API/kernel timeline only; not actual-cuTile or Nsight Compute counters. |
+| [Nsight Systems timeline #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) | Two warmed surrogate `.nsys-rep` traces plus CUDA API/kernel summaries uploaded ([artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954)) | CUDA API/kernel timeline only; not actual-cuTile or Nsight Compute counters. |
 
 
 ## 1. Reference / CPU tests
