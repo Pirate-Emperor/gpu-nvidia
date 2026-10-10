@@ -52,6 +52,22 @@ jobs:
             "${NATIVE_VENV}/bin/python" benchmarks/profile_shared_tile.py \
               --case longer_batched_d128 --tile-k 32 --warmup 5
 
+      - name: Export CUDA API and kernel summaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          reports=(results/nsys/*.nsys-rep)
+          if [ "${#reports[@]}" -eq 0 ]; then
+            echo "ERROR: no Nsight Systems reports were generated"
+            exit 1
+          fi
+          for rep in "${reports[@]}"; do
+            summary="${rep%.nsys-rep}_stats.txt"
+            nsys stats --report cuda_gpu_kern_sum,cuda_api_sum "$rep" > "$summary"
+            test -s "$summary"
+          done
+
       - name: Upload Nsight Systems reports
         uses: actions/upload-artifact@v4
         with:
