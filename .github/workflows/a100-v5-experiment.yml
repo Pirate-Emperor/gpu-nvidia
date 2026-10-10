@@ -16,7 +16,7 @@ concurrency:
 jobs:
   experiment:
     runs-on: [self-hosted, linux, x64, gpu, a100]
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Prepare persistent native environment
@@ -55,4 +55,5 @@ jobs:
           path: |
             results/runs/*_A100_v5_experiment.json
             results/runs/*_A100_v5_experiment.csv
+            results/runs/*_A100_v5_experiment_summary.csv
           if-no-files-found: error
