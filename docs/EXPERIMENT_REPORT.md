@@ -10,8 +10,8 @@
 |---|---|---|
 | Independent math references | PASS | FP64 scalar oracle, FP32 full-matrix oracle, and FP32 online recurrence provide separate checks. |
 | Native CUDA fused path on A100 | PASS | Base suite passed on A100/R550; both visible A100 devices are covered by device-matrix tests. |
-| Broad non-cuTile regression | PASS | [Run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578): **905 passed, 52 skipped, 0 failed**. |
-| CPU/reference suite | PASS | [Run #306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131): **761 passed, 68 skipped, 0 failed**. GPU-only tests skip on hosted CPU CI when dependencies/devices are absent. |
+| Broad non-cuTile regression | PASS | [Run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082): **907 passed, 52 skipped, 0 failed**. |
+| CPU/reference suite | PASS | [Run #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023): **763 passed, 68 skipped, 0 failed**. GPU-only tests skip on hosted CPU CI when dependencies/devices are absent. |
 | Experimental v4 | PASS correctness; NOT promoted | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099): **30 passed**; performance mixed; PTXAS output equivalent to current. |
 | Experimental v5 | PASS correctness; repeated benchmark complete; NOT promoted | [Run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163): **30 passed**; three order-alternating paired sessions per case/tile. Results are mixed/noisy on short cases; long/batched gains were only about 0.3–0.6%. |
 | A100 timing harness | PASS | CUDA events, warmups, 30 measured iterations, medians/P90; cold compile timed separately in the version ladder. |
