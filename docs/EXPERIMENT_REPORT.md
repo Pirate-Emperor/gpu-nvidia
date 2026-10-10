@@ -1,6 +1,6 @@
 # Fused Attention with cuTile — Experiment Report
 
-**Updated:** 2026-10-09  
+**Updated:** 2026-10-10  
 **Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
 **Code/experiment snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585` (documentation updates are committed afterward)
 
@@ -11,9 +11,9 @@
 | Independent math references | PASS | FP64 scalar oracle, FP32 full-matrix oracle, and FP32 online recurrence provide separate checks. |
 | Native CUDA fused path on A100 | PASS | Base suite passed on A100/R550; both visible A100 devices are covered by device-matrix tests. |
 | Broad non-cuTile regression | PASS | [Run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578): **905 passed, 52 skipped, 0 failed**. |
-| CPU/reference suite | PASS | [Run #290](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885170761): **761 passed, 68 skipped, 0 failed**. GPU-only tests skip on hosted CPU CI when dependencies/devices are absent. |
+| CPU/reference suite | PASS | [Run #306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131): **761 passed, 68 skipped, 0 failed**. GPU-only tests skip on hosted CPU CI when dependencies/devices are absent. |
 | Experimental v4 | PASS correctness; NOT promoted | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099): **30 passed**; performance mixed; PTXAS output equivalent to current. |
-| Experimental v5 | PASS correctness; NOT promoted | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734): **30 passed**; some cases appear faster, but timing variability is too high for a promotion claim. |
+| Experimental v5 | PASS correctness; repeated benchmark complete; NOT promoted | [Run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163): **30 passed**; three order-alternating paired sessions per case/tile. Results are mixed/noisy on short cases; long/batched gains were only about 0.3–0.6%. |
 | A100 timing harness | PASS | CUDA events, warmups, 30 measured iterations, medians/P90; cold compile timed separately in the version ladder. |
 | Nsight Compute profiling | BLOCKED | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760475268) fails with `ERR_NVGPUCTRPERM`; no kernel was profiled. |
 | Actual NVIDIA cuTile on A100 | BLOCKED | Driver is R550.90.07; current project gate requires R580+. The CUDA surrogate is not actual cuTile. |
@@ -114,13 +114,39 @@ The follow-up v1/v2 workflow [run #23](https://github.com/SpryzenHell/gpu-nvidia
 ### v4 and v5 outcomes
 
 - **v4:** 30 correctness tests passed. It was near current for short cases, faster for some D=128 cases, and substantially slower on longer batched input for `tile_k=16/32`. PTXAS report [run #3](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761390319): v2/current/v4 use **32 registers, 33,792 bytes shared memory, zero reported spills**; current and v4 cubins are both 15,136 bytes. No resource-level improvement is evident.
-- **v5:** 30 correctness tests passed. Examples from [v5 run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734): at `medium_d128, tile_k=32`, current **0.815 ms**, v5 **0.767 ms**; at `long_d128, tile_k=32`, current **6.402 ms**, v5 **5.191 ms**; at `longer_batched_d128, tile_k=64`, current **19.954 ms**, v5 **19.862 ms**. Other tile/case combinations were neutral or slower, and within-run timing variability was unexpectedly large. The result is **promising but inconclusive**, not a promotion decision.
+- **v5:** dedicated [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) passed **30/30 correctness tests** and completed a paired benchmark across all seven cases and tile_k=16/32/64. Every version/session used 10 warmups and 30 CUDA-event samples; there were three sessions per case/tile, with the order alternating. The table reports median session medians. The ratio is current latency / v5 latency, so values above 1 favor v5; the range is the observed per-session ratio range.
+
+| Case | tile_k | Current ms | v5 ms | Paired current/v5 | Observed range |
+|---|---:|---:|---:|---:|---:|
+| short_d32 | 16 | 0.050 | 0.051 | 0.980x | 0.960–0.980x |
+| short_d32 | 32 | 0.064 | 0.052 | 1.276x | 0.971–1.402x |
+| short_d32 | 64 | 0.049 | 0.050 | 0.980x | 0.980–1.353x |
+| short_d64 | 16 | 0.075 | 0.058 | 1.304x | 1.000–1.465x |
+| short_d64 | 32 | 0.057 | 0.057 | 0.982x | 0.794–1.018x |
+| short_d64 | 64 | 0.057 | 0.061 | 0.933x | 0.775–1.018x |
+| short_multihead_d64 | 16 | 0.085 | 0.085 | 0.976x | 0.950–1.012x |
+| short_multihead_d64 | 32 | 0.084 | 0.093 | 0.906x | 0.764–1.232x |
+| short_multihead_d64 | 64 | 0.082 | 0.084 | 0.988x | 0.947–1.000x |
+| medium_d64 | 16 | 0.279 | 0.251 | 1.110x | 1.020–1.110x |
+| medium_d64 | 32 | 0.276 | 0.254 | 1.116x | 0.909–1.123x |
+| medium_d64 | 64 | 0.280 | 0.247 | 1.023x | 1.015–1.135x |
+| medium_d128 | 16 | 0.933 | 0.908 | 1.024x | 1.018–1.028x |
+| medium_d128 | 32 | 0.872 | 0.829 | 0.993x | 0.989–1.083x |
+| medium_d128 | 64 | 0.807 | 0.806 | 1.002x | 0.993–1.002x |
+| long_d128 | 16 | 5.257 | 5.239 | 1.003x | 1.003–1.004x |
+| long_d128 | 32 | 5.192 | 5.170 | 1.004x | 1.004–1.005x |
+| long_d128 | 64 | 5.152 | 5.129 | 1.004x | 1.003–1.005x |
+| longer_batched_d128 | 16 | 20.421 | 20.368 | 1.004x | 0.996–1.004x |
+| longer_batched_d128 | 32 | 20.172 | 20.065 | 1.004x | 1.004–1.008x |
+| longer_batched_d128 | 64 | 20.017 | 19.902 | 1.006x | 1.003–1.007x |
+
+Interpretation: v5 is **not promoted**. It improves medium D=64 in this run, but short inputs have mixed ratios, and long/batched gains are only about 0.3–0.6%. These results do not establish a robust general speedup; more independent sessions would be needed before promoting it.
 
 The exact raw JSON/CSV benchmark artifacts are attached to their GitHub Actions runs. The repository keeps the benchmark harnesses and should preserve future dated artifacts under `results/runs/`.
 
 ## 6. Compiler resources and profiling
 
-The PTXAS report [run #3](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761390319) compiled v1/v2/v3/current/v4 for SM80 and reported:
+The updated PTXAS report [run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) compiled v1/v2/v3/current/v4/v5 for SM80 and reported:
 
 | Variant | Registers | Shared memory | Spill stores/loads | Cubin bytes |
 |---|---:|---:|---:|---:|
@@ -128,9 +154,9 @@ The PTXAS report [run #3](https://github.com/SpryzenHell/gpu-nvidia/actions/runs
 | v2 | 32 | 33,792 B | 0 / 0 | 15,392 |
 | v3 | 40 | 33,792 B | 0 / 0 | 22,560 |
 | current | 32 | 33,792 B | 0 / 0 | 15,136 |
-| v4 | 32 | 33,792 B | 0 / 0 | 15,136 |
+| v4 | 32 | 33,792 B | 0 / 0 | 15,136 |\n| v5 | 32 | 33,792 B | 0 / 0 | 15,520 |
 
-This is compile-time resource evidence, **not a substitute for hardware profiling**. Nsight Compute could not collect counters because the runner account lacks GPU performance-counter permission; no occupancy, bandwidth, or instruction-counter conclusions can be drawn yet. v5 was not included in this PTXAS comparison at report time.
+This is compile-time resource evidence, **not a substitute for hardware profiling**. Nsight Compute could not collect counters because the runner account lacks GPU performance-counter permission; no occupancy, bandwidth, or instruction-counter conclusions can be drawn yet. v5 matches current on register count, shared memory, and zero reported spills, but its cubin is 384 bytes larger (15,520 B vs 15,136 B). This compiler-resource difference does not establish a runtime improvement.
 
 ## 7. Artifacts and code map
 
