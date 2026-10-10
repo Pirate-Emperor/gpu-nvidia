@@ -51,10 +51,10 @@ The current A100 runner uses driver R550.90.07, while the project's cuTile envir
 - [x] **Fixed a test-input issue.** An affine-V test used unsupported `tile_k=2`; it was changed to a legal tile size. The failure was in the test setup, not evidence of a kernel defect.
 - [x] **Validated the native CUDA path on the A100.** [Run #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415): 133 passed, 1 skipped.
 - [x] **Ran the broad non-cuTile regression.** [Run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578): 905 passed, 52 skipped, 0 failed.
-- [x] **Ran CPU/reference validation.** [Run #290](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37885170761): 761 passed, 68 skipped. GPU-only skips are expected on a CPU-only hosted runner.
+- [x] **Ran CPU/reference validation.** [Run #306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131): 761 passed, 68 skipped. GPU-only skips are expected on a CPU-only hosted runner.
 - [x] **Checked v4 and v5 independently.** [v4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) and [v5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) each passed 30 targeted GPU tests. v4 was not promoted because its PTXAS/cubin summary matched the current version and it regressed on a longer batched case. v5 showed promising results in some cases, but other timings were neutral/slower and noisy, so its speedup remains unproven.
 - [x] **Added a reproducible preliminary benchmark ladder.** CUDA-event timing uses warmups and 30 measured iterations, reporting medians/P90; the tile ladder measures first compilation separately and preserves artifacts. The ladder shows the later tiled variants generally improve many short/medium cases over v1, but timing variability across runs is high; the measurements are preliminary, not final performance claims.
-- [x] **Captured compiler resource summaries.** PTXAS summaries exist for v1/v2/v3/current/v4. They reported zero spills; v4's resource/cubin summary matched the current kernel. v5 is not yet included.
+- [x] **Captured compiler resource summaries for v1–v5 and current.** [PTXAS run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) compiled all six variants for SM80 with zero reported spills. v5 uses 32 registers and 33,792 B shared memory like current, but has a 15,520 B cubin vs 15,136 B for current.
 - [x] **Recorded environment and profiling blockers honestly.** The current driver/package gate and failed compatibility attempts are documented. Nsight Compute is installed, but the existing counter-profile attempt failed with `ERR_NVGPUCTRPERM` and captured no kernel.
 - [x] **Organized the project documentation.** Root README, this checklist, experiment report, testing contract, test matrix, variant notes, environment/admin notes, progress log and result snapshot link together. Start from the [documentation index](README.md).
 
@@ -94,8 +94,8 @@ For detailed measurements, configurations, limitations and run links, read [the 
 
 ### Priority 2 — optimize only after a correct, measured actual-cuTile baseline
 
-- [ ] Add v5 to the PTXAS resource report and record registers, shared-memory use, spills and cubin size.
-- [ ] Retest current-vs-v5 with alternating order and multiple sessions on representative shapes and tile sizes. Promote it only if gains are repeatable and meaningful regressions are absent.
+- [x] Add v5 to the PTXAS resource report and record registers, shared-memory use, spills and cubin size; see [run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187).
+- [x] Retest current-vs-v5 with three paired sessions and alternating measurement order across all seven cases and tile_k=16/32/64: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163). Result: v5 is not promoted; gains are mixed/noisy on short cases and about 0.3–0.6% on long/batched cases, although medium D=64 improves modestly.
 - [ ] Re-measure the current ordinary-CUDA surrogate under controlled conditions when a decision depends on its absolute latency.
 - [ ] Use actual-cuTile profiler evidence to choose the next tile or memory optimization. Save each materially different approach as a new version and record both wins and regressions.
 - [ ] For each change, run targeted correctness first, then the broad regression suite before accepting the change.
