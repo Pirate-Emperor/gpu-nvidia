@@ -28,7 +28,8 @@ def _import_runtime() -> tuple[Any, Any]:
         import cuda.tile as ct
     except Exception as exc:  # pragma: no cover - depends on GPU environment
         raise CuTileUnavailableError(
-            "cuTile/CuPy runtime is unavailable; run on the A100 project node"
+            "cuTile/CuPy runtime is unavailable; use a GPU and driver/runtime "
+            "supported by the installed cuTile package"
         ) from exc
     return cp, ct
 
