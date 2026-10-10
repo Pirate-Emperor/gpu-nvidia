@@ -79,7 +79,7 @@ For detailed measurements, configurations, limitations and run links, read [the 
 - [ ] **BLOCKED: obtain authorized hardware-counter access.** Use a runner configured for Nsight Compute counters or ask the responsible administrator to enable the approved access. The current `ERR_NVGPUCTRPERM` run profiled no kernels.
 - [ ] Profile at least two real cuTile configurations, ideally one medium shape and one long/batched shape. Preserve the `.ncu-rep` files, command line, logs and metrics.
 - [ ] Inspect the metrics actually available: register/shared-memory use, occupancy, memory throughput and relevant stalls. Tie each proposed optimization to evidence rather than guessing.
-- [ ] (Recommended) Capture an Nsight Systems timeline for the complete invocation to understand launch, compilation and host overhead separately from kernel time.
+- [x] Capture Nsight Systems timelines for the warmed ordinary-CUDA surrogate at `medium_d128, tile_k=64` and `longer_batched_d128, tile_k=32`: [run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320), [uploaded `.nsys-rep` artifacts](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320/artifacts/11671195371). This is supplementary surrogate evidence; actual-cuTile timelines remain to be captured after cuTile runs on supported hardware.
 
 **Profiler completion means at least two successful, inspectable profiles of the actual cuTile kernel—not merely a working Nsight Compute executable.**
 
