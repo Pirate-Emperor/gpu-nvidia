@@ -1,4 +1,4 @@
-name: A100 Nsight profile
+name: A100 actual cuTile correctness and Nsight profile
 
 on:
   workflow_dispatch:
@@ -47,21 +47,44 @@ jobs:
           command -v ncu
           ncu --version
 
-      - name: Capture fused kernel
+      - name: Run actual cuTile correctness matrix
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          .venv-ncu/bin/python -m pytest -q \
+            tests/test_gpu_correctness.py \
+            tests/test_gpu_edge_cases.py
+
+      - name: Capture two actual cuTile configurations
+        env:
+          REQUIRE_A100: "1"
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p results/nsight
           export PYTHONPATH="$HOME:${PYTHONPATH:-}"
           stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+
           ncu --set full \
             --target-processes all \
             --force-overwrite \
-            --export "results/nsight/${stamp}_A100_cutile.ncu-rep" \
+            --export "results/nsight/${stamp}_A100_cutile_medium_d128_t64x64.ncu-rep" \
             .venv-ncu/bin/python benchmarks/profile_fused.py \
               --case medium_d128 \
               --tile-q 64 \
               --tile-k 64
+
+          ncu --set full \
+            --target-processes all \
+            --force-overwrite \
+            --export "results/nsight/${stamp}_A100_cutile_longer_batched_d128_t64x32.ncu-rep" \
+            .venv-ncu/bin/python benchmarks/profile_fused.py \
+              --case longer_batched_d128 \
+              --tile-q 64 \
+              --tile-k 32
 
       - name: Upload Nsight artifact
         uses: actions/upload-artifact@v4
