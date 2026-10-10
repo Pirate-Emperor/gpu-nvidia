@@ -197,3 +197,13 @@ The consolidated evidence and performance tables live in [docs/EXPERIMENT_REPORT
 - Prepared `.github/workflows/a100-nsight.yml` to run `tests/test_gpu_correctness.py` and `tests/test_gpu_edge_cases.py` before profiling actual cuTile, and then profile two configurations (medium D=128, 64x64; longer batched D=128, 64x32).
 - This actual-cuTile workflow is **prepared but not validated on hardware**; the current R550 node is blocked at its R580+ check. Nsight Compute counter access remains separately blocked by `ERR_NVGPUCTRPERM`.
 - Updated `src/cutile_attention.py` to make the runtime-unavailable message hardware-agnostic; it no longer incorrectly directs all users to the A100 node.
+
+
+## 2026-10-10 — Regression guardrails for documentation and workflow gates
+
+- Added required-path checks for the TODO checklist, experiment report, current status snapshot, benchmark script, PTXAS script, and profiling/benchmark workflows.
+- Added root-README navigation checks and a static workflow-contract test verifying that the future actual-cuTile profiling workflow runs correctness tests before two profile configurations.
+- Updated `src/cutile_attention.py` so runtime import failures ask for a supported GPU/driver/package combination instead of incorrectly directing all users to the A100 node.
+- CPU/reference run [#334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023): **763 passed, 68 skipped**.
+- Full A100 non-cuTile run [#52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082): **907 passed, 52 skipped, 0 failed**.
+- These checks validate project structure and the workflow's intended guardrails; they do not validate actual cuTile execution. That remains blocked by the current runner's R550 driver gate.
