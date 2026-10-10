@@ -31,12 +31,12 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 
 | Area | Result |
 |---|---|
-| CPU/reference CI | PASS: latest verified run #306, 761 passed / 68 skipped |
+| CPU/reference CI | PASS: latest verified run #334, 763 passed / 68 skipped |
 | Self-hosted A100 runner routing | PASS |
 | Actual A100 hardware inventory | PASS; exhaustive read-only audit |
 | Basic native CUDA execution | PASS |
 | Native CUDA RawKernel correctness | PASS: native run #44, 133 passed / 1 skipped |
-| Broad non-cuTile regression | PASS: run #51, 905 passed / 52 skipped |
+| Broad non-cuTile regression | PASS: [run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082), 907 passed / 52 skipped |
 | Shared-tile v4 experiment | PASS correctness: 30/30; not promoted |
 | Shared-tile v5 experiment | PASS correctness: 30/30; three paired/order-alternating repeats; not promoted |
 | Current cuTile runtime | BLOCKED by R550.90.07; R580+ gate |
