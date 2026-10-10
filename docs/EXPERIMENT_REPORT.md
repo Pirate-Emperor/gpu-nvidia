@@ -158,7 +158,16 @@ The updated PTXAS report [run #5](https://github.com/SpryzenHell/gpu-nvidia/acti
 | v4 | 32 | 33,792 B | 0 / 0 | 15,136 |
 | v5 | 32 | 33,792 B | 0 / 0 | 15,520 |
 
-A separate [Nsight Systems workflow #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) completed and uploaded two `.nsys-rep` traces plus CUDA API/kernel summary outputs in [artifact #11671075954](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954): `medium_d128, tile_k=64` and `longer_batched_d128, tile_k=32`. These timelines are supplementary evidence for the ordinary-CUDA surrogate, not actual-cuTile profiles and not Nsight Compute hardware-counter metrics.\n\nThis is compile-time resource evidence, **not a substitute for hardware profiling**. Nsight Compute could not collect counters because the runner account lacks GPU performance-counter permission; no occupancy, bandwidth, or instruction-counter conclusions can be drawn yet. v5 matches current on register count, shared memory, and zero reported spills, but its cubin is 384 bytes larger (15,520 B vs 15,136 B). This compiler-resource difference does not establish a runtime improvement.
+A separate [Nsight Systems workflow #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) completed and uploaded two `.nsys-rep` traces plus CUDA API/kernel summary outputs in [artifact #11671075954](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954): `medium_d128, tile_k=64` and `longer_batched_d128, tile_k=32`. These timelines are supplementary evidence for the ordinary-CUDA surrogate, not actual-cuTile profiles and not Nsight Compute hardware-counter metrics.
+
+The exported `cuda_gpu_kern_sum` summaries report these **instrumented trace statistics**:
+
+| Surrogate case | Tile | Kernel instances | Median duration | Mean duration | Min–max |
+|---|---:|---:|---:|---:|---:|
+| `medium_d128` | 64 | 7 | 0.977 ms | 0.998 ms | 0.975–1.126 ms |
+| `longer_batched_d128` | 32 | 7 | 25.851 ms | 25.925 ms | 25.845–26.369 ms |
+
+Each trace contains the initial call (which triggers JIT/compile), five warmups, and the final launch used as the profiling target. These values are **not steady-state benchmark results** and must not replace CUDA-event benchmark medians; profiling overhead and first-launch work are present. The CUDA API summary also shows substantial `cudaMalloc` activity during these short one-process traces, so API totals should not be interpreted as kernel latency.\n\nThis is compile-time resource evidence, **not a substitute for hardware profiling**. Nsight Compute could not collect counters because the runner account lacks GPU performance-counter permission; no occupancy, bandwidth, or instruction-counter conclusions can be drawn yet. v5 matches current on register count, shared memory, and zero reported spills, but its cubin is 384 bytes larger (15,520 B vs 15,136 B). This compiler-resource difference does not establish a runtime improvement.
 
 ## 7. Artifacts and code map
 
