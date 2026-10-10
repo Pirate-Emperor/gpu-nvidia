@@ -46,7 +46,7 @@ jobs:
           export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
           mkdir -p "$CUPY_CACHE_DIR"
           "${NATIVE_VENV}/bin/python" benchmarks/benchmark_v5.py \
-            --warmup 10 --iterations 30 \
+            --warmup 10 --iterations 30 --repeats 3 \
             --output "results/runs/${stamp}_A100_v5_experiment.json"
       - name: Upload v5 benchmark
         uses: actions/upload-artifact@v4
