@@ -16,6 +16,7 @@
 | Experimental v5 | PASS correctness; repeated benchmark complete; NOT promoted | [Run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163): **30 passed**; three order-alternating paired sessions per case/tile. Results are mixed/noisy on short cases; long/batched gains were only about 0.3–0.6%. |
 | A100 timing harness | PASS | CUDA events, warmups, 30 measured iterations, medians/P90; cold compile timed separately in the version ladder. |
 | Nsight Compute profiling | BLOCKED | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760475268) fails with `ERR_NVGPUCTRPERM`; no kernel was profiled. |
+| Nsight Systems timeline (ordinary-CUDA surrogate) | PASS | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320) captured warmed medium D=128/tile_k=64 and longer batched D=128/tile_k=32 traces; these are not actual-cuTile profiles. |
 | Actual NVIDIA cuTile on A100 | BLOCKED | Driver is R550.90.07; current project gate requires R580+. The CUDA surrogate is not actual cuTile. |
 
 **Important distinction:** ordinary-CUDA correctness and performance results are useful engineering evidence, but do not satisfy the final actual-cuTile execution/profiling requirement.
@@ -157,7 +158,7 @@ The updated PTXAS report [run #5](https://github.com/SpryzenHell/gpu-nvidia/acti
 | v4 | 32 | 33,792 B | 0 / 0 | 15,136 |
 | v5 | 32 | 33,792 B | 0 / 0 | 15,520 |
 
-This is compile-time resource evidence, **not a substitute for hardware profiling**. Nsight Compute could not collect counters because the runner account lacks GPU performance-counter permission; no occupancy, bandwidth, or instruction-counter conclusions can be drawn yet. v5 matches current on register count, shared memory, and zero reported spills, but its cubin is 384 bytes larger (15,520 B vs 15,136 B). This compiler-resource difference does not establish a runtime improvement.
+A separate [Nsight Systems workflow #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055492320) also completed and uploaded two `.nsys-rep` traces for the warmed ordinary-CUDA shared-tile surrogate: `medium_d128, tile_k=64` and `longer_batched_d128, tile_k=32`. These timelines can show process/CUDA API/kernel activity and are useful supplementary evidence, but they are not actual-cuTile profiles and do not provide Nsight Compute hardware-counter metrics.\n\nThis is compile-time resource evidence, **not a substitute for hardware profiling**. Nsight Compute could not collect counters because the runner account lacks GPU performance-counter permission; no occupancy, bandwidth, or instruction-counter conclusions can be drawn yet. v5 matches current on register count, shared memory, and zero reported spills, but its cubin is 384 bytes larger (15,520 B vs 15,136 B). This compiler-resource difference does not establish a runtime improvement.
 
 ## 7. Artifacts and code map
 
