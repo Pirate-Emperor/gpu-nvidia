@@ -187,8 +187,8 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 
 ## Current status (2026-10-10)
 
-- Latest broad non-cuTile regression: **905 passed, 52 skipped, 0 failed** ([run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578)).
-- Latest CPU/reference suite: **761 passed, 68 skipped, 0 failed** ([run #306](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001131)).
+- Latest broad non-cuTile regression: **907 passed, 52 skipped, 0 failed** ([run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082)).
+- Latest CPU/reference suite: **763 passed, 68 skipped, 0 failed** ([run #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023)).
 - Dedicated shared-tile v4 and v5 A100 correctness: **30/30 passed each**; neither experiment is promoted as a guaranteed performance win.
 - Repeated current-vs-v5 benchmark: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163), three paired/order-alternating trials for every case/tile; v5 remains unpromoted due to mixed results and sub-1% long/batched gains.
 - Updated PTXAS comparison: [run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) compiled v1–v5 plus current with zero reported spills; v5 cubin is 384 B larger than current.
