@@ -1,0 +1,27 @@
+name: A4 V12 fallback candidate search
+on:
+  push:
+    branches:
+      - a4-v12-validation-20261015
+    paths:
+      - "a4-v12/**"
+
+jobs:
+  validate:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm A100 and run one-factor fallback search
+        run: |
+          nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
+          nvcc --version
+          bash a4-v12/perf/run_fallback_candidates.sh
+      - name: Upload fallback raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a4-v12-fallback-search
+          path: a4-v12/perf/out/fallback/
+          if-no-files-found: ignore
+          retention-days: 90
