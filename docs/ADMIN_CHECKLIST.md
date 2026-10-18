@@ -2,6 +2,11 @@
 
 Use this checklist before declaring the A100/cuTile environment ready.
 
+## Continuation routing decision — 2026-10-18
+
+The existing `gpu-project` A100 runner has driver R550.90.07, below NVIDIA's documented cuTile Python minimum of R580+. Do not dispatch actual-cuTile bring-up to that runner or repeat the failed compatibility attempts without a materially different supported path. Keep it for ordinary-CUDA surrogate tests. First inventory the user's actual local GPU, driver, OS/WSL2, Python, Docker and NVCC/toolkit; then choose Windows-native or Linux/WSL2 based on NVIDIA's current support matrix. If local hardware is unsupported, use another explicitly authorized GPU environment. Do not assume an RTX 4060 or perform system-driver changes without owner/admin action. See the [current cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html).
+
+
 ## Required
 
 1. A100/SM80 GPU exposed to the runner.
