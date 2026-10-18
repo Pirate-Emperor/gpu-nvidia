@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ComposeFile = Join-Path $RepoRoot "docker/cutile-runner/compose.yml"
+$WorkflowFile = "cutile-rtx4060-docker.yml"
 Set-Location -LiteralPath $RepoRoot
 
 foreach ($command in @("docker", "gh")) {
@@ -41,17 +42,73 @@ if (-not $tokenObject.token) {
 
 $env:RUNNER_TOKEN = [string]$tokenObject.token
 $env:RUNNER_NAME = "cutile-rtx4060-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))"
+$runnerName = $env:RUNNER_NAME
+$workflowExit = 1
+$dispatchStart = [DateTime]::UtcNow
 try {
     Write-Host "Building and starting one-job, ephemeral GPU runner."
-    Write-Host "Dispatch only the RTX 4060 Docker cuTile validation workflow on main."
-    & docker compose -f $ComposeFile up --build --abort-on-container-exit --exit-code-from runner
-    $runnerExit = $LASTEXITCODE
+    & docker compose -f $ComposeFile up --build -d
+    if ($LASTEXITCODE -ne 0) { throw "Could not start Docker runner container." }
+
+    # Wait for this exact runner to register and become online before dispatching.
+    $online = $false
+    for ($attempt = 0; $attempt -lt 90; $attempt++) {
+        $runnerJson = & gh api repos/xemptynothing/gpu-nvidia/actions/runners
+        if ($LASTEXITCODE -eq 0) {
+            $runnerList = $runnerJson | ConvertFrom-Json
+            $match = $runnerList.runners | Where-Object { $_.name -eq $runnerName -and $_.status -eq "online" } | Select-Object -First 1
+            if ($match) { $online = $true; break }
+        }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $online) { throw "The ephemeral runner did not become online within 180 seconds." }
+
+    Write-Host "Runner is online. Dispatching the main-branch cuTile smoke/correctness workflow."
+    $dispatchStart = [DateTime]::UtcNow
+    & gh workflow run $WorkflowFile --ref main
+    if ($LASTEXITCODE -ne 0) { throw "GitHub rejected the workflow dispatch." }
+
+    # Resolve the newly dispatched run rather than accidentally watching an older run.
+    $runId = $null
+    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+        $runsJson = & gh run list --workflow $WorkflowFile --branch main --limit 10 --json databaseId,event,createdAt,status
+        if ($LASTEXITCODE -eq 0) {
+            $runs = $runsJson | ConvertFrom-Json
+            $newRun = $runs |
+                Where-Object { $_.event -eq "workflow_dispatch" -and ([DateTime]::Parse($_.createdAt).ToUniversalTime() -ge $dispatchStart.AddSeconds(-10)) } |
+                Sort-Object createdAt -Descending |
+                Select-Object -First 1
+            if ($newRun) { $runId = [string]$newRun.databaseId; break }
+        }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $runId) { throw "Workflow was dispatched but its run ID could not be resolved." }
+
+    Write-Host "Watching GitHub Actions run $runId. The runner will be removed after its one job."
+    & gh run watch $runId --exit-status
+    $workflowExit = $LASTEXITCODE
 }
 finally {
     Remove-Item Env:RUNNER_TOKEN -ErrorAction SilentlyContinue
     Remove-Item Env:RUNNER_NAME -ErrorAction SilentlyContinue
     & docker compose -f $ComposeFile down --remove-orphans *> $null
+
+    # If dispatch failed before the ephemeral job consumed the runner, remove
+    # its offline registration so the repository does not accumulate stale runners.
+    try {
+        $remainingJson = & gh api repos/xemptynothing/gpu-nvidia/actions/runners
+        if ($LASTEXITCODE -eq 0) {
+            $remaining = $remainingJson | ConvertFrom-Json
+            $stale = $remaining.runners | Where-Object { $_.name -eq $runnerName } | Select-Object -First 1
+            if ($stale) {
+                & gh api "repos/xemptynothing/gpu-nvidia/actions/runners/$($stale.id)" --method DELETE *> $null
+            }
+        }
+    } catch {
+        Write-Warning "Could not check/remove a leftover runner registration; inspect repository Settings > Actions > Runners."
+    }
 }
-if ($runnerExit -ne 0) {
-    throw "Docker runner exited with code $runnerExit."
+if ($workflowExit -ne 0) {
+    throw "The cuTile GitHub Actions workflow failed with exit code $workflowExit."
 }
+Write-Host "cuTile smoke/correctness workflow completed successfully."
