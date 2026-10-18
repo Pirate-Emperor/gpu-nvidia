@@ -267,3 +267,13 @@ No kernel source or benchmark algorithm was changed in this documentation-focuse
 2. Require the actual causal-attention correctness matrix to pass; do not treat the smoke as attention validation.
 3. Run the CLI/reference check and controlled benchmarks only after correctness passes.
 4. Capture at least two successful actual-cuTile profiler runs and preserve raw artifacts.
+
+## 2026-10-18 — Owner-supplied token and persistent runner repair
+
+- Investigated the initial Docker runner failure from the observed console output. The image build and container start succeeded, but the script did not confirm that the runner reached GitHub's Online state. Its cleanup then failed because the launcher removed `RUNNER_NAME` before running Compose `down`; that final cleanup error did not establish the original registration failure's cause.
+- Changed `scripts/start_cutile_docker_runner.ps1` to accept `-RunnerToken` supplied by the owner, avoid using GitHub CLI to mint tokens or dispatch workflows, check the probe image is already local rather than pulling it automatically, verify RTX 4060 passthrough, and start the runner detached.
+- Changed `docker/cutile-runner/entrypoint.sh` to remove `--ephemeral`, so the runner remains registered across jobs until the owner deletes it in GitHub. Workflow dispatch is now a manual GitHub Actions UI step.
+- Changed Compose token/name interpolation defaults so `docker compose down` works when those variables are no longer present in PowerShell. Updated `docs/CUTILE_DOCKER_RUNNER.md` with the startup, log-inspection and removal sequence.
+- Updated the structural contract test to match the persistent owner-supplied-token mode. CPU/reference CI run [#75](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39147796099) passed **764 tests, 68 skipped, 0 failed**. The skips include GPU modules unavailable on GitHub's hosted CPU runner; this is not actual-cuTile validation.
+- The user separately reported a local targeted GPU test run of 34 passed in 41.91 seconds; the copied console output did not establish the exact `REQUIRE_CUTILE` environment state, so treat this as user-reported test evidence, not as an independently audited Actions artifact.
+- **Still unverified:** re-launch with the revised script, GitHub runner Online state, the main-only cuTile smoke/attention workflow, CLI/reference check, benchmarks and actual-cuTile profiles. Do not mark the kernel complete from smoke/CPU tests alone.

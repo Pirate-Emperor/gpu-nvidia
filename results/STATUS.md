@@ -2,10 +2,10 @@
 
 ## Continuation status — 2026-10-18
 
-- At the start of this continuation, `main` was `e87d8b9352fdf6783347d5c1e1945172011ebeb9`, matching the handoff SHA.
+- Main was `e87d8b9352fdf6783347d5c1e1945172011ebeb9` at the start of the handoff audit; this runner repair advanced main through `bfa8e95bcbc40cff9bc42367f0476cbe222943cc` before this status refresh.
 - Move actual-cuTile execution away from the R550.90.07 A100. After inventory, use the user's real local GPU if the NVIDIA support prerequisites are met, otherwise choose another explicitly authorized supported environment. The A100 remains for ordinary-CUDA surrogate testing only.
-- Local inventory: RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64 build 26300, WDDM; 8,188 MiB VRAM. CPython 3.12.10 and cuTile 1.6.0 are installed in the project venv; the genuine vector-add smoke passed. System NVCC remains absent; WSL2 and Docker are still not installed. Docker runner files are now committed, but no runner has been registered and no GPU Actions workflow has run yet.
-- **Actions evidence access note (2026-10-18 continuation):** the connected Actions run list returned zero visible runs; direct run-detail, job and artifact requests for handoff IDs (including #343, #52, #340, benchmark #4 and Nsight Systems #2) returned 404; the current handoff commit had no visible combined status. This does not prove historical runs are absent. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
+- Local inventory: RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64 build 26300, WDDM; 8,188 MiB VRAM. CPython 3.12.10 and cuTile 1.6.0 are installed in the project venv; the genuine vector-add smoke passed. System NVCC remains absent. Docker Desktop with WSL2 backend now reports a working Linux Engine and Compose. The first launcher reached container start but did not confirm runner Online; the old cleanup error masked the original failure.
+- **Actions evidence access:** workflow run details and job logs are currently available through the repository connection. CPU/reference run [#75](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39147796099) passed 764 tests / 68 skipped / 0 failed on commit `bfa8e95`; hosted-CPU GPU skips do not count as local cuTile validation.
 
 ## Local actual-cuTile candidate — RTX 4060 (inventory supplied 2026-10-18)
 
@@ -24,7 +24,7 @@
 | Actual cuTile smoke | **PASS** — genuine vector-add kernel; synchronization and exact output check passed |
 | Attention correctness / performance / profiler | **NOT RUN YET** |
 
-The GPU/driver/OS meet NVIDIA's current Quickstart prerequisites on paper (Windows x86_64, CC 8.x–12.x, R580+). The genuine cuTile smoke passed, but attention correctness remains open. Docker Desktop/WSL2 are not installed; the ephemeral Docker runner is implemented in repository files but not yet launched. The launcher requires a successful Linux-container GPU passthrough probe before it requests registration credentials.
+The GPU/driver/OS meet NVIDIA's current Quickstart prerequisites on paper (Windows x86_64, CC 8.x–12.x, R580+). The genuine cuTile smoke passed, but attention correctness remains open. Docker Desktop/WSL2 are running and Compose is available. The first launcher started the container but did not confirm GitHub Online; the initial cleanup errored on missing Compose interpolation variables. The revised persistent launcher takes an owner-supplied short-lived registration token and refuses to pull the GPU-probe image if it is absent locally.
 
 ## Actual self-hosted A100 runner inventory
 
@@ -57,7 +57,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 
 | Area | Result |
 |---|---|
-| CPU/reference CI | PASS: latest verified run [#340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931), 763 passed / 68 skipped (pre-handoff main SHA afe530b) |
+| CPU/reference CI | PASS: run [#75](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39147796099), 764 passed / 68 skipped / 0 failed (commit bfa8e95; GPU tests skip on hosted CPU) |
 | Self-hosted A100 runner routing | PASS |
 | Actual A100 hardware inventory | PASS; exhaustive read-only audit |
 | Basic native CUDA execution | PASS |
@@ -90,3 +90,9 @@ The native CUDA surrogate now executes correctly; the early NVRTC header-discove
 For the full approach matrix, test counts, timing evidence, and next decisions, see
 [docs/EXPERIMENT_REPORT.md](../docs/EXPERIMENT_REPORT.md). Ordinary-CUDA timings
 must not be reported as cuTile timings.
+
+## Runner repair update — 2026-10-18
+
+- Launcher/token flow and persistent runner changes are committed in main; the latest CPU/reference structural CI for the contract update passed 764 / 68 skipped / 0 failed.
+- No statement is made that the persistent local runner is Online or that the cuTile GitHub Actions workflow passed. Re-run with an owner-created registration token and inspect the container logs / GitHub runner list.
+- The user-reported 34 local targeted GPU tests passed in 41.91 seconds, but this status does not substitute for the full workflow evidence, a verified `REQUIRE_CUTILE=1` run, the CLI contract, performance measurements, or profiles.
