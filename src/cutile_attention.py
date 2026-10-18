@@ -41,6 +41,10 @@ def _build_kernel(
     head_dim: int,
     value_dim: int,
 ):
+    # cuTile resolves kernel annotations (including ct.Constant[int]) using
+    # the function's module globals. Keep imports lazy for CPU-only users, but
+    # publish the runtime module globally before the decorator inspects them.
+    global ct
     cp, ct = _import_runtime()
 
     @ct.kernel
