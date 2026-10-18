@@ -1,125 +1,111 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$RunnerToken,
+
+    [string]$RunnerName = ""
+)
+
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ComposeFile = Join-Path $RepoRoot "docker/cutile-runner/compose.yml"
-$WorkflowFile = "cutile-rtx4060-docker.yml"
+$GpuProbeImage = "nvidia/cuda:12.4.1-base-ubuntu22.04"
 Set-Location -LiteralPath $RepoRoot
 
-foreach ($command in @("docker", "gh")) {
-    if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
-        throw "Required command '$command' was not found. Install Docker Desktop with WSL2 GPU support and GitHub CLI, then open a new PowerShell."
-    }
-}
-& docker info *> $null
-if ($LASTEXITCODE -ne 0) {
-    throw "Docker Engine is not running. Start Docker Desktop with the WSL2 backend, then retry."
-}
-& docker compose version *> $null
-if ($LASTEXITCODE -ne 0) {
-    throw "Docker Compose v2 is required."
-}
-& gh auth status
-if ($LASTEXITCODE -ne 0) {
-    throw "GitHub CLI is not authenticated. Run gh auth login locally; do not paste credentials into chat."
+# This launcher accepts a registration token supplied locally by the owner.
+# It does not use GitHub CLI to mint tokens or dispatch a workflow.
+if (-not (Get-Command "docker" -ErrorAction SilentlyContinue)) {
+    throw "Docker CLI was not found. Open a new PowerShell after installing Docker Desktop."
 }
 
-# Hard gate: prove Docker Desktop can pass the RTX 4060 into a Linux container.
-$gpuProbe = & docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi 2>&1
-if ($LASTEXITCODE -ne 0 -or ($gpuProbe -join "`n") -notmatch "RTX 4060") {
-    $gpuProbe | Write-Host
-    throw "Docker GPU passthrough did not expose the RTX 4060. Do not register a runner until WSL2/Docker GPU support works."
-}
-$gpuProbe | Write-Host
-
-# Request the short-lived registration token just in time; never write it to disk.
-$tokenJson = & gh api repos/xemptynothing/gpu-nvidia/actions/runners/registration-token --method POST
-if ($LASTEXITCODE -ne 0) {
-    throw "Could not obtain a repository runner registration token. The gh-authenticated account needs repository admin permission."
-}
-$tokenObject = $tokenJson | ConvertFrom-Json
-if (-not $tokenObject.token) {
-    throw "GitHub did not return a runner registration token."
-}
-
-$env:RUNNER_TOKEN = [string]$tokenObject.token
-$env:RUNNER_NAME = "cutile-rtx4060-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))"
-$runnerName = $env:RUNNER_NAME
-$workflowExit = 1
-$dispatchStart = [DateTime]::UtcNow
+$previousPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 try {
-    Write-Host "Building and starting one-job, ephemeral GPU runner."
-    & docker compose -f $ComposeFile up --build -d
-    if ($LASTEXITCODE -ne 0) { throw "Could not start Docker runner container." }
-
-    # Wait for this exact runner to register and become online before dispatching.
-    $online = $false
-    for ($attempt = 0; $attempt -lt 90; $attempt++) {
-        $runnerJson = & gh api repos/xemptynothing/gpu-nvidia/actions/runners
-        if ($LASTEXITCODE -eq 0) {
-            $runnerList = $runnerJson | ConvertFrom-Json
-            $match = $runnerList.runners | Where-Object { $_.name -eq $runnerName -and $_.status -eq "online" } | Select-Object -First 1
-            if ($match) { $online = $true; break }
-        }
-        Start-Sleep -Seconds 2
-    }
-    if (-not $online) { throw "The ephemeral runner did not become online within 180 seconds." }
-
-    Write-Host "Runner is online. Dispatching the main-branch cuTile smoke/correctness workflow."
-    $dispatchStart = [DateTime]::UtcNow
-    & gh workflow run $WorkflowFile --ref main
-    if ($LASTEXITCODE -ne 0) { throw "GitHub rejected the workflow dispatch." }
-
-    # Resolve the newly dispatched run rather than accidentally watching an older run.
-    $runId = $null
-    for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        $runsJson = & gh run list --workflow $WorkflowFile --branch main --limit 10 --json databaseId,event,createdAt,status
-        if ($LASTEXITCODE -eq 0) {
-            $runs = $runsJson | ConvertFrom-Json
-            $newRun = $runs |
-                Where-Object { $_.event -eq "workflow_dispatch" -and ([DateTime]::Parse($_.createdAt).ToUniversalTime() -ge $dispatchStart.AddSeconds(-10)) } |
-                Sort-Object createdAt -Descending |
-                Select-Object -First 1
-            if ($newRun) { $runId = [string]$newRun.databaseId; break }
-        }
-        Start-Sleep -Seconds 2
-    }
-    if (-not $runId) { throw "Workflow was dispatched but its run ID could not be resolved." }
-
-    Write-Host "Watching GitHub Actions run $runId. The runner will be removed after its one job."
-    & gh run watch $runId --exit-status
-    $workflowExit = $LASTEXITCODE
+    & docker info *> $null
+    $dockerInfoExit = $LASTEXITCODE
+    & docker compose version *> $null
+    $composeVersionExit = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousPreference
 }
-finally {
-    # Compose interpolates RUNNER_TOKEN and RUNNER_NAME even for "down".
-    # Keep them defined until cleanup has completed; otherwise "down" itself
-    # fails before it can stop/remove the container and network.
+if ($dockerInfoExit -ne 0) {
+    throw "Docker Engine is not ready. Start Docker Desktop and retry."
+}
+if ($composeVersionExit -ne 0) {
+    throw "Docker Compose is unavailable."
+}
+
+# Respect the no-unapproved-download requirement: do not pull probe images.
+$ErrorActionPreference = "Continue"
+try {
+    & docker image inspect $GpuProbeImage *> $null
+    $probeImageExit = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousPreference
+}
+if ($probeImageExit -ne 0) {
+    throw "GPU probe image '$GpuProbeImage' is not local. Do not auto-download it; obtain approval and run 'docker pull $GpuProbeImage' separately."
+}
+
+# Hard gate: prove the Linux container can see the physical RTX 4060.
+$ErrorActionPreference = "Continue"
+try {
+    $gpuProbe = & docker run --rm --gpus all $GpuProbeImage nvidia-smi 2>&1
+    $gpuProbeExit = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousPreference
+}
+if ($gpuProbeExit -ne 0 -or ($gpuProbe -join [Environment]::NewLine) -notmatch "RTX 4060") {
+    $gpuProbe | ForEach-Object { Write-Host "$_" }
+    throw "Docker GPU passthrough did not expose the RTX 4060. No runner was started."
+}
+$gpuProbe | ForEach-Object { Write-Host "$_" }
+
+if ([string]::IsNullOrWhiteSpace($RunnerName)) {
+    $RunnerName = "cutile-rtx4060-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))"
+}
+if ($RunnerName -notmatch '^[A-Za-z0-9._-]{1,64}$') {
+    throw "RunnerName must be 1-64 characters using letters, numbers, dot, underscore, or hyphen."
+}
+
+Write-Host ""
+Write-Host "Starting persistent self-hosted runner '$RunnerName'."
+Write-Host "The runner will NOT auto-dispatch a workflow or auto-remove itself after one job."
+Write-Host "Keep the registration token private; do not paste it into chat or commit it."
+$env:RUNNER_TOKEN = $RunnerToken
+$env:RUNNER_NAME = $RunnerName
+$launchError = $null
+$ErrorActionPreference = "Continue"
+try {
+    & docker compose -f $ComposeFile up --build -d 2>&1 | ForEach-Object { Write-Host "$_" }
+    $composeUpExit = $LASTEXITCODE
+    if ($composeUpExit -ne 0) {
+        $launchError = "Docker Compose failed to start the runner (exit code $composeUpExit)."
+    }
+} catch {
+    $launchError = $_
+} finally {
+    Remove-Item Env:RUNNER_TOKEN -ErrorAction SilentlyContinue
+    Remove-Item Env:RUNNER_NAME -ErrorAction SilentlyContinue
+    $ErrorActionPreference = $previousPreference
+}
+if ($launchError) {
+    # Compose uses safe defaults for interpolation during "down", so credentials
+    # need not remain set in this process to clean up a failed start.
+    $ErrorActionPreference = "Continue"
     try {
-        & docker compose -f $ComposeFile down --remove-orphans *> $null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Docker Compose cleanup exited with code $LASTEXITCODE. Inspect 'docker ps -a' and the runner logs."
-        }
-    } catch {
-        Write-Warning "Docker Compose cleanup raised an error: $_. Inspect 'docker ps -a' and the runner logs."
+        & docker compose -f $ComposeFile down --remove-orphans 2>&1 | ForEach-Object { Write-Host "$_" }
     } finally {
-        Remove-Item Env:RUNNER_TOKEN -ErrorAction SilentlyContinue
-        Remove-Item Env:RUNNER_NAME -ErrorAction SilentlyContinue
+        $ErrorActionPreference = $previousPreference
     }
+    throw $launchError
+}
 
-    # If dispatch failed before the ephemeral job consumed the runner, remove
-    # its offline registration so the repository does not accumulate stale runners.
-    try {
-        $remainingJson = & gh api repos/xemptynothing/gpu-nvidia/actions/runners
-        if ($LASTEXITCODE -eq 0) {
-            $remaining = $remainingJson | ConvertFrom-Json
-            $stale = $remaining.runners | Where-Object { $_.name -eq $runnerName } | Select-Object -First 1
-            if ($stale) {
-                & gh api "repos/xemptynothing/gpu-nvidia/actions/runners/$($stale.id)" --method DELETE *> $null
-            }
-        }
-    } catch {
-        Write-Warning "Could not check/remove a leftover runner registration; inspect repository Settings > Actions > Runners."
-    }
-}
-if ($workflowExit -ne 0) {
-    throw "The cuTile GitHub Actions workflow failed with exit code $workflowExit."
-}
-Write-Host "cuTile smoke/correctness workflow completed successfully."
+Write-Host ""
+Write-Host "Container started detached. Runner name: $RunnerName"
+Write-Host "Check GitHub: Settings > Actions > Runners; wait for this name to show Online."
+Write-Host "Then manually run the 'RTX 4060 Docker cuTile validation' workflow on main."
+Write-Host ('Live logs: docker compose -f "' + $ComposeFile + '" logs -f runner')
+Write-Host "When finished, remove the runner in GitHub Settings > Actions > Runners, then stop the container with:"
+Write-Host ('  docker compose -f "' + $ComposeFile + '" down --remove-orphans')
+Write-Host "Compose cleanup no longer requires RUNNER_TOKEN or RUNNER_NAME to be present."
