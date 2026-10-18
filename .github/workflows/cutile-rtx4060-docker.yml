@@ -1,6 +1,16 @@
 name: RTX 4060 native Windows cuTile validation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-rtx4060-docker.yml"
+      - "src/**"
+      - "tests/**"
+      - "benchmarks/**"
+      - "scripts/**"
+      - "run_attention.py"
+      - "requirements-dev.txt"
   workflow_dispatch:
 
 permissions:
@@ -9,82 +19,87 @@ permissions:
 jobs:
   cutile-validation:
     if: github.ref == 'refs/heads/main'
-    # Use the normal Windows self-hosted runner on the actual RTX 4060 host.
-    # No Docker/WSL layer is needed: native Windows cuTile smoke already passed.
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 180
     steps:
-      - name: Checkout trusted main branch
+      - name: Checkout project source
         uses: actions/checkout@v4
 
-      - name: Create isolated Python environment and install cuTile dependencies
+      - name: Inventory GPU and reuse existing local cuTile environment
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          python --version
-          nvidia-smi
-          if ($LASTEXITCODE -ne 0) { throw 'nvidia-smi failed; GPU is not visible to the runner.' }
+          $NvidiaSmi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
+          if (-not $NvidiaSmi) { $NvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue }
+          if (-not $NvidiaSmi) { throw 'nvidia-smi is unavailable on PATH; stopping without installing tools.' }
 
-          python -m venv .venv-runner
-          if ($LASTEXITCODE -ne 0) { throw 'Failed to create Python virtual environment.' }
-          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          $GpuInventory = & $NvidiaSmi.Source --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader
+          if ($LASTEXITCODE -ne 0) { throw 'GPU inventory failed.' }
+          $GpuInventory | Tee-Object -FilePath cutile-environment.log
+          if (-not ($GpuInventory -match 'RTX 4060')) { throw "Expected the local RTX 4060 runner; found: $GpuInventory" }
 
-          & $Py -m pip install --upgrade pip
-          if ($LASTEXITCODE -ne 0) { throw 'pip upgrade failed.' }
-          & $Py -m pip install -r requirements-dev.txt
-          if ($LASTEXITCODE -ne 0) { throw 'Development dependency installation failed.' }
-          & $Py -m pip install 'cupy-cuda13x[ctk]' 'cuda-tile[tileiras]'
-          if ($LASTEXITCODE -ne 0) { throw 'cuTile/CuPy installation failed.' }
+          $PythonCandidates = @(
+            (Join-Path $PWD '.venv-cutile-windows\Scripts\python.exe'),
+            'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
+          )
+          $Py = $PythonCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $Py) {
+            throw 'Existing .venv-cutile-windows Python was not found. No venv was created and no dependencies were downloaded. Check the existing project-local environment path.'
+          }
+          "PYTHON_EXE=$Py" | Tee-Object -FilePath cutile-environment.log -Append
+          & $Py --version 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Existing project Python failed.' }
+          & $Py -c "import numpy, cupy, cuda.tile, pytest; import importlib.metadata as m; print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda-tile='+m.version('cuda-tile')); print('pytest='+pytest.__version__)" 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Required GPU packages are missing from the existing Python environment. No packages were installed.' }
 
-      - name: Genuine cuTile compiler/runtime smoke test
+      - name: Compile and launch genuine cuTile smoke kernel
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          $Py = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          if (-not $Py) { throw 'Python path record is missing.' }
+          $Py = $Py.Substring('PYTHON_EXE='.Length)
           & $Py scripts/cutile_smoke.py 2>&1 | Tee-Object -FilePath cutile-smoke.log
           if ($LASTEXITCODE -ne 0) { throw 'Genuine cuTile smoke test failed.' }
-          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'OUTPUT_CHECK=PASS' -Quiet)) {
-            throw 'Smoke log does not contain OUTPUT_CHECK=PASS.'
-          }
-          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'CUTILE_SMOKE=PASS' -Quiet)) {
-            throw 'Smoke log does not contain CUTILE_SMOKE=PASS.'
-          }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'OUTPUT_CHECK=PASS' -Quiet)) { throw 'Smoke output check did not pass.' }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'CUTILE_SMOKE=PASS' -Quiet)) { throw 'cuTile smoke gate did not pass.' }
 
-      - name: Run actual cuTile attention correctness matrix
+      - name: Run required actual cuTile attention correctness matrix
         shell: pwsh
         env:
-          REQUIRE_CUTILE: '1'
+          REQUIRE_CUTILE: "1"
         run: |
           $ErrorActionPreference = 'Stop'
-          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
-          & $Py -m pytest -q tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 |
-            Tee-Object -FilePath cutile-pytest.log
-          if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness tests failed.' }
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          "REQUIRE_CUTILE=$env:REQUIRE_CUTILE" | Tee-Object -FilePath cutile-pytest.log
+          & $Py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 | Tee-Object -FilePath cutile-pytest.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness matrix failed.' }
 
-      - name: Verify required CLI input/output against independent reference
+      - name: Exercise CLI and verify output against independent NumPy oracle
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
           & $Py scripts/generate_inputs.py --output cutile-cli-input.npz --seq 64 --head-dim 32 --seed 20261018
-          if ($LASTEXITCODE -ne 0) { throw 'CLI input generation failed.' }
-          & $Py run_attention.py --input cutile-cli-input.npz --output cutile-cli-output.npy --backend cutile --tile-q 64 --tile-k 64
-          if ($LASTEXITCODE -ne 0) { throw 'Required CLI execution failed.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Deterministic CLI input generation failed.' }
+          & $Py run_attention.py --input cutile-cli-input.npz --output cutile-cli-output.npy --backend cutile --tile-q 64 --tile-k 64 2>&1 | Tee-Object -FilePath cutile-cli.log
+          if ($LASTEXITCODE -ne 0) { throw 'CLI inference failed.' }
+          & $Py scripts/verify_cli_output.py --input cutile-cli-input.npz --output cutile-cli-output.npy 2>&1 | Tee-Object -FilePath cutile-cli-reference.log
+          if ($LASTEXITCODE -ne 0) { throw 'CLI output mismatches the independent NumPy reference.' }
 
-          & $Py scripts/verify_cli_output.py --input cutile-cli-input.npz --output cutile-cli-output.npy
-          if ($LASTEXITCODE -ne 0) { throw 'CLI output/reference validation failed.' }
-
-      - name: Benchmark fused cuTile against unfused CuPy
+      - name: Benchmark fused cuTile versus unfused CuPy
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
           New-Item -ItemType Directory -Force -Path results | Out-Null
-          & $Py benchmarks/benchmark_attention.py --output results/cutile-benchmark.json --warmup 10 --iterations 30 --tiles 32x64 64x64 2>&1 |
-            Tee-Object -FilePath cutile-benchmark.log
-          if ($LASTEXITCODE -ne 0) { throw 'cuTile benchmark failed.' }
+          & $Py benchmarks/benchmark_attention.py --output results/cutile-benchmark.json --warmup 10 --iterations 30 --tiles 32x64 64x64 2>&1 | Tee-Object -FilePath cutile-benchmark.log
+          if ($LASTEXITCODE -ne 0) { throw 'Controlled cuTile benchmark failed.' }
 
-      - name: Capture two actual cuTile profiles when Nsight Compute is already installed
+      - name: Attempt two genuine cuTile Nsight Compute captures if already installed
         continue-on-error: true
         shell: pwsh
         run: |
@@ -99,37 +114,37 @@ jobs:
             }
           }
           if (-not $NcuPath) {
-            'NCU_NOT_INSTALLED: profiles were not captured; no tool was installed automatically.' | Tee-Object -FilePath cutile-profile-status.log
+            'NCU_NOT_INSTALLED: no profiles captured; no download/install attempted.' | Tee-Object -FilePath cutile-profile-status.log
             exit 0
           }
-
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
           New-Item -ItemType Directory -Force -Path results | Out-Null
-          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
-
           & $NcuPath --set basic --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
           $MediumExit = $LASTEXITCODE
           & $NcuPath --set basic --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 32 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
           $LongExit = $LASTEXITCODE
-          if ($MediumExit -ne 0 -or $LongExit -ne 0) {
-            throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect profile logs for counter permissions or unsupported options."
-          }
+          if ($MediumExit -ne 0 -or $LongExit -ne 0) { throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect counter permission errors." }
 
-      - name: Upload actual cuTile validation and benchmark evidence
+      - name: Upload complete run record
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cutile-rtx4060-native-validation-${{ github.run_id }}
+          name: cutile-rtx4060-experiment
           path: |
+            cutile-environment.log
             cutile-smoke.log
             cutile-pytest.log
+            cutile-cli.log
+            cutile-cli-reference.log
             cutile-benchmark.log
             cutile-profile-status.log
             cutile-profile-medium.log
             cutile-profile-long-batched.log
-            results/cutile-profile-medium.ncu-rep
-            results/cutile-profile-long-batched.ncu-rep
             cutile-cli-input.npz
             cutile-cli-output.npy
             results/cutile-benchmark.json
             results/cutile-benchmark.csv
+            results/cutile-profile-medium.ncu-rep
+            results/cutile-profile-long-batched.ncu-rep
           if-no-files-found: warn
