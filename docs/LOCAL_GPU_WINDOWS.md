@@ -47,7 +47,25 @@ The setup script deliberately avoids system-wide CUDA Toolkit and driver changes
        if ($testExit -ne 0) { throw "Required cuTile correctness tests failed" }
 
    The new `REQUIRE_CUTILE=1` mode makes missing CuPy/cuTile an error while allowing an RTX 4060 (not an A100) to run the suite. Save the console output and exact `git rev-parse HEAD` with the result.
-6. If the tests pass, then run CLI I/O validation and benchmarks. Do not benchmark or profile a kernel that has not passed correctness. Use at least 10 warmups, at least 30 CUDA-event samples, cold/JIT separate, median/P90, throughput, and raw results.
+6. If correctness passes, exercise the required CLI with a small case. These commands keep generated inputs/outputs under the local logs folder rather than the repository:
+   
+       $py = ".\\.venv-cutile-windows\\Scripts\\python.exe"
+       $work = Join-Path $env:LOCALAPPDATA "GPU-NVIDIA\\logs"
+       $input = Join-Path $work "attention_cli_input.npz"
+       $output = Join-Path $work "attention_cli_output.npy"
+       & $py scripts\\generate_inputs.py --output $input --batch 1 --heads 1 --seq 64 --head-dim 32
+       if ($LASTEXITCODE -ne 0) { throw "Input generation failed" }
+       & $py run_attention.py --input $input --output $output --backend cutile --tile-q 64 --tile-k 64
+       if ($LASTEXITCODE -ne 0) { throw "Attention CLI failed" }
+       $env:ATTENTION_INPUT = $input
+       $env:ATTENTION_OUTPUT = $output
+       $env:PYTHONPATH = Join-Path (Get-Location) "src"
+       & $py -c "import os,numpy as np; from attention_io import load_attention_npz; from reference import causal_attention_fp32; q,k,v=load_attention_npz(os.environ['ATTENTION_INPUT']); expected=causal_attention_fp32(q,k,v,output_dtype=np.float16); actual=np.load(os.environ['ATTENTION_OUTPUT']); assert actual.shape==expected.shape and actual.dtype==np.float16 and np.isfinite(actual).all(); np.testing.assert_allclose(actual,expected,rtol=2e-2,atol=2e-2); print('CLI_OUTPUT_CHECK=PASS')"
+       $checkExit = $LASTEXITCODE
+       Remove-Item Env:ATTENTION_INPUT,Env:ATTENTION_OUTPUT,Env:PYTHONPATH -ErrorAction SilentlyContinue
+       if ($checkExit -ne 0) { throw "CLI output/reference check failed" }
+
+   Do not benchmark or profile a kernel that has not passed correctness. Use at least 10 warmups, at least 30 CUDA-event samples, cold/JIT separate, median/P90, throughput, and raw results.
 7. Before detailed profiling, install/locate Nsight Compute and verify non-admin profiling access. The driver meets the documented version threshold, but the profiler binary and counter permission have not yet been checked.
 
 ## 4. Security boundary and runner policy
