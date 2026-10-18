@@ -1,5 +1,20 @@
 # Current Result Snapshot
 
+## 2026-10-19 local RTX 4060 Actions execution record — blocked before kernel execution
+
+**Workflow:** [RTX 4060 native Windows cuTile validation](https://github.com/xemptynothing/gpu-nvidia/actions/workflows/cutile-rtx4060-docker.yml)  
+**Latest attempt:** [run #39154979187](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187), commit b9189b5d8bec8666a0c22e1747639ba340e0d157.  
+**Artifact:** [cutile-rtx4060-experiment, artifact ID 12146591326](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187/artifacts/12146591326).  
+**Hardware preflight:** NVIDIA GeForce RTX 4060; driver 616.92; CC 8.9; 8188 MiB reported memory.  
+**Execution result:** failed at Python environment discovery. The only visible interpreter was global CPython 3.12, and its import probe failed with “ModuleNotFoundError: No module named 'numpy'”. The expected .venv-cutile-windows does not exist under the checked-out project root. No packages, profiler tools, or datasets were downloaded or installed. No elevated privileges were used.  
+**GPU experiment status:** cuTile smoke, actual attention correctness, CLI/reference, benchmarks and profiler steps all **skipped** because preflight failed. Thus no actual-cuTile attention outcome is available yet.
+
+Run-by-run details, including the earlier pwsh shell failure and Python path attempts, are documented in [docs/PROGRESS.md](../docs/PROGRESS.md) under the 2026-10-19 experiment heading.
+
+**Current blocker:** provide the location of the already-installed Python environment that previously passed the native Windows cuTile smoke test, or put that existing environment under the project root. This workflow will not install or download any dependency.
+
+
+
 ## Continuation status — 2026-10-18
 
 - Main was `e87d8b9352fdf6783347d5c1e1945172011ebeb9` at the start of the handoff audit; this runner repair advanced main through `bfa8e95bcbc40cff9bc42367f0476cbe222943cc` before this status refresh.

@@ -1,8 +1,23 @@
 # Fused Attention with cuTile — Experiment Report
 
-**Updated:** 2026-10-18 (continuation review; historical benchmark numbers unchanged)  
+**Updated:** 2026-10-19 (local runner audit; historical benchmark numbers unchanged)  
 **Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
 **Core kernel snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585`; the paired v5 benchmark uses code at `caeb6e79e4237222d021782a3a9bdb72d6c4ca7f` (documentation updates are committed afterward)
+
+## Update — 2026-10-19: native Windows runner experiments
+
+This update supersedes no prior benchmark values. It records the first use of the local Windows RTX 4060 Actions runner after its registration. The current run sequence **has not reached a cuTile kernel launch** and therefore adds no attention correctness, performance or profiling evidence.
+
+| Run ID | Commit (short) | Outcome | Exact finding |
+|---|---|---|---|
+| [39154733638](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154733638) | 87381e42 | Failed before GPU preflight | Windows PowerShell Core command pwsh absent; all project experiments skipped. |
+| [39154791220](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154791220) | 1cfc16dd | GPU identified; environment path missing | nvidia-smi: NVIDIA GeForce RTX 4060, driver 616.92, CC 8.9, 8188 MiB. Expected project-local .venv-cutile-windows interpreter absent. No install attempted. |
+| [39154888145](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154888145) | 2971f5ac | No in-repository Python environment | Python Launcher found the global CPython 3.12 interpreter but its package probe produced an import traceback. |
+| [39154979187](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187) | b9189b5d | Confirmed blocker | Probe error captured explicitly: ModuleNotFoundError: No module named 'numpy'. Artifact [12146591326](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187/artifacts/12146591326) preserves the environment discovery log. |
+
+The workflow is configured to reuse an existing environment only, not create one or run pip. This adheres to the no-install/no-third-party-download requirement. The absence of the existing environment within the repository means this constraint currently prevents progress into GPU kernel tests. The previously reported native vector-add smoke pass proves only that some prior Python environment could execute a trivial cuTile kernel; it does not identify a usable environment available to this runner checkout.
+
+**Remaining work is unchanged:** actual cuTile smoke in the runner environment; full required attention correctness; CLI versus independent NumPy oracle; 10 warmups and at least 30 CUDA-event benchmark samples for legal tile configurations; separate first-call/JIT reporting; per-case median/P90, throughput and speedup; and two actual cuTile profiler captures if an already-installed Nsight Compute can access counters without admin rights. No benchmark or profiler metric is asserted until a corresponding artifact exists.
 
 ## 1. Executive status
 

@@ -277,3 +277,31 @@ No kernel source or benchmark algorithm was changed in this documentation-focuse
 - Updated the structural contract test to match the persistent owner-supplied-token mode. CPU/reference CI run [#75](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39147796099) passed **764 tests, 68 skipped, 0 failed**. The skips include GPU modules unavailable on GitHub's hosted CPU runner; this is not actual-cuTile validation.
 - The user separately reported a local targeted GPU test run of 34 passed in 41.91 seconds; the copied console output did not establish the exact `REQUIRE_CUTILE` environment state, so treat this as user-reported test evidence, not as an independently audited Actions artifact.
 - **Still unverified:** re-launch with the revised script, GitHub runner Online state, the main-only cuTile smoke/attention workflow, CLI/reference check, benchmarks and actual-cuTile profiles. Do not mark the kernel complete from smoke/CPU tests alone.
+
+
+## 2026-10-19 — local Windows RTX 4060 runner bring-up and blocked cuTile execution
+
+**Scope and constraints:** used the repository's self-hosted Windows runner at the checkout below the project directory. No sudo, administrator shell, package installation, external-tool installation, or dataset download was performed. Workflow source and experiment logs stayed in the repository's Actions workspace. The only installed tools invoked were GitHub's checkout/artifact workflow steps and the already-present nvidia-smi.
+
+### Run log (UTC, exact workflow URLs and commits)
+
+| Run | Commit | Result | What actually executed | Conclusion |
+|---|---|---|---|---|
+| [#39154733638](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154733638) | 87381e42ab5a25d2db8da3c155b66dce12dbedbd | **Failed: shell setup** | Runner setup and checkout succeeded. Step 3 failed with “pwsh: command not found”. All GPU steps were skipped. | Workflow incorrectly requested PowerShell Core on a host that has only Windows PowerShell. This is infrastructure, not kernel evidence. |
+| [#39154791220](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154791220) | 1cfc16ddca9f0c7cd4506af0ce6a6dc94c55e04e | **Failed: environment path** | Switched workflow shells to built-in powershell. nvidia-smi detected **NVIDIA GeForce RTX 4060, driver 616.92, compute capability 8.9, 8188 MiB**. The configured .venv-cutile-windows Python did not exist at either candidate path. No package installation was attempted. | GPU runner visibility confirmed. Expected Python environment path was incorrect. Smoke, attention, CLI, benchmark and profile steps did not run. |
+| [#39154888145](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154888145) | 2971f5ac0a9450ebaa2cfb5cfa3e52e279700676 | **Failed: missing in-repo environment** | Added repository-root search for pre-existing venvs and inspected Python Launcher registrations. No matching venv was found under the project root. The only discovered interpreter was the global CPython 3.12 at C:\Users\Raman Singh\AppData\Local\Programs\Python\Python312\python.exe; probing it failed because NumPy is not installed. | No dependency or tool was downloaded. GPU attention did not run. |
+| [#39154979187](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187) | b9189b5d8bec8666a0c22e1747639ba340e0d157 | **Failed: no permitted existing Python environment found** | Fixed PowerShell native-stderr handling so candidate import failures were captured and the diagnostic remained visible. RTX 4060 inventory passed again. The only environment candidate found under the project root was the global Python 3.12 interpreter; its probe exited 1 with “ModuleNotFoundError: No module named 'numpy'”. | No package install/download occurred. Smoke, mandatory REQUIRE_CUTILE=1 attention tests, CLI, benchmark and profile steps were all skipped. The 531-byte environment log was uploaded as [artifact 12146591326](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187/artifacts/12146591326). |
+
+### Related regression workflow records
+
+- [CPU reference tests #39154979179](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979179), commit b9189b5d: passed. These are hosted CPU/reference tests, not GPU/cuTile validation.
+- [CPU reference tests #39154888102](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154888102), commit 2971f5ac: passed. These are hosted CPU/reference tests, not GPU/cuTile validation.
+- [A100 non-cuTile suite #39153449321](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39153449321), commit 4b5b0fbc: **908 passed, 52 skipped**, ordinary CUDA/reference coverage only.
+- [CPU reference suite #39153449254](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39153449254), commit 4b5b0fbc: **764 passed, 68 skipped**, including GPU modules skipped on the hosted CPU runner.
+- Earlier workflow attempts [#39152872387](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39152872387) and [#39152944500](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39152944500) created no jobs because the manual trigger was represented as a one-line array rather than the structural test's expected workflow_dispatch key. That contract was corrected later.
+
+### Current blocking dependency and next exact action
+
+The Windows runner is Online and sees the correct RTX 4060, but **the already-existing cuTile Python environment is not located under the repository root**. The global Python visible to the runner has no NumPy, CuPy, or cuTile. Under the no-download/no-install constraint, the workflow intentionally refuses to create a new environment or fetch Python packages.
+
+**Required before more GPU work can run:** identify the already-installed Python executable that successfully ran scripts/cutile_smoke.py with CuPy and cuda.tile (or place that existing venv within this project directory). Once the existing environment is available to the runner without installing anything, rerun the native Windows workflow. There is currently no actual-cuTile attention correctness result, benchmark result, CLI result, or Nsight Compute profile from these runs. Do not mark completion until those experiments execute and their artifacts are preserved.
