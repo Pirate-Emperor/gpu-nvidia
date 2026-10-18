@@ -92,6 +92,31 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not export raw metrics for $($Item.Label)." }
           }
 
+          # Collect scheduler and warp-state stall reasons in dedicated reports.
+          # These sections are distinct from the basic throughput/resource report.
+          $MediumStallBase = 'results/cutile-profile-medium-stalls'
+          $LongStallBase = 'results/cutile-profile-long-batched-stalls'
+          & $NcuPath --section SchedulerStats --section WarpStateStats --launch-skip 6 --launch-count 1 --force-overwrite -o $MediumStallBase $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium-stalls.log
+          if ($LASTEXITCODE -ne 0) { throw 'Scheduler/warp-state profile failed for medium_d128 64x64.' }
+          & $NcuPath --section SchedulerStats --section WarpStateStats --launch-skip 6 --launch-count 1 --force-overwrite -o $LongStallBase $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched-stalls.log
+          if ($LASTEXITCODE -ne 0) { throw 'Scheduler/warp-state profile failed for longer_batched_d128 64x128.' }
+
+          $MediumStallReport = @("$MediumStallBase.ncu-repz", "$MediumStallBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $LongStallReport = @("$LongStallBase.ncu-repz", "$LongStallBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $MediumStallReport -or -not $LongStallReport) { throw 'Both scheduler/warp-state reports must exist before exporting.' }
+
+          foreach ($Item in @(
+            @{ Label = 'medium-stalls'; Report = $MediumStallReport; Base = $MediumStallBase },
+            @{ Label = 'long-batched-stalls'; Report = $LongStallReport; Base = $LongStallBase }
+          )) {
+            "STALL_REPORT=$($Item.Report)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            "STALL_REPORT_BYTES=$((Get-Item $Item.Report).Length)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            & $NcuPath --import $Item.Report --page details 2>&1 | Tee-Object -FilePath "$($Item.Base)-details.txt"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export stall details for $($Item.Label)." }
+            & $NcuPath --import $Item.Report --page raw --csv 2>&1 | Tee-Object -FilePath "$($Item.Base)-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export raw stall metrics for $($Item.Label)." }
+          }
+
           'PROFILE_REPORTS_CREATED=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
 
       - name: Upload actual-cuTile reports and metric exports
@@ -103,6 +128,16 @@ jobs:
             cutile-ncu-profile-status.log
             cutile-profile-medium.log
             cutile-profile-long-batched.log
+            cutile-profile-medium-stalls.log
+            cutile-profile-long-batched-stalls.log
+            results/cutile-profile-medium-stalls.ncu-repz
+            results/cutile-profile-medium-stalls.ncu-rep
+            results/cutile-profile-medium-stalls-details.txt
+            results/cutile-profile-medium-stalls-raw.csv
+            results/cutile-profile-long-batched-stalls.ncu-repz
+            results/cutile-profile-long-batched-stalls.ncu-rep
+            results/cutile-profile-long-batched-stalls-details.txt
+            results/cutile-profile-long-batched-stalls-raw.csv
             results/cutile-profile-medium.ncu-repz
             results/cutile-profile-medium.ncu-rep
             results/cutile-profile-medium-details.txt
