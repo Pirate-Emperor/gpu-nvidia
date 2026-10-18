@@ -159,7 +159,8 @@ def test_cutile_numerical_stability(mode):
 
 def test_cutile_causal_future_value_invariance():
     require_a100()
-    q, k, v = make_inputs(MANDATORY_CASES[1])
+    # N=128 makes the future-token mutation real (rather than a no-op slice).
+    q, k, v = make_inputs(MANDATORY_CASES[2])
     out1 = forward(q, k, v, tile_q=64, tile_k=64)
 
     v2 = v.copy()
