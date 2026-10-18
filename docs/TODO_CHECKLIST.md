@@ -1,6 +1,6 @@
 # Project TODO Checklist — Fused Causal Attention with NVIDIA cuTile
 
-**Last reviewed:** 2026-10-18  
+**Last reviewed:** 2026-10-19  
 **Start here:** this file explains the goal, what has already been done, what remains, and the evidence required before the course project can be marked complete. The [root README](../README.md) is the entry point; the [experiment report](EXPERIMENT_REPORT.md) contains the more detailed measurements and history.
 
 **Status key:** `[x]` done and backed by evidence · `[ ]` still to do · **BLOCKED** needs a suitable environment or permission. A task is not complete merely because code exists.
