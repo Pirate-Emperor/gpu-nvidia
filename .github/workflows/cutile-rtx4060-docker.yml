@@ -59,6 +59,13 @@ jobs:
           $GpuInventory = & $NvidiaSmi.Source --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader
           if ($LASTEXITCODE -ne 0) { throw 'GPU inventory failed.' }
           $GpuInventory | Tee-Object -FilePath cutile-environment.log
+          "WORKFLOW_SHA=$env:GITHUB_SHA" | Tee-Object -FilePath cutile-environment.log -Append
+          $ObservedGitHead = & git -C $PWD rev-parse HEAD 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            "CHECKOUT_GIT_HEAD=$ObservedGitHead" | Tee-Object -FilePath cutile-environment.log -Append
+          } else {
+            "CHECKOUT_GIT_HEAD=<unavailable>" | Tee-Object -FilePath cutile-environment.log -Append
+          }
           if (-not ($GpuInventory -match 'RTX 4060')) { throw "Expected the local RTX 4060 runner; found: $GpuInventory" }
 
           $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'

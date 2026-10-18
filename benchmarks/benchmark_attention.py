@@ -7,6 +7,7 @@ import argparse
 import csv
 import importlib.metadata
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -211,11 +212,16 @@ def environment_metadata(cp, gpu_name):
     except (OSError, subprocess.CalledProcessError):
         metadata["nvidia_smi"] = None
     try:
-        metadata["git_commit"] = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        metadata["git_head_observed"] = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT,
+            capture_output=True, text=True, check=True
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
-        metadata["git_commit"] = None
+        metadata["git_head_observed"] = None
+    metadata["git_commit"] = os.environ.get("GITHUB_SHA") or metadata["git_head_observed"]
+    metadata["git_commit_source"] = (
+        "GITHUB_SHA" if os.environ.get("GITHUB_SHA") else "git rev-parse HEAD"
+    )
     return metadata
 
 

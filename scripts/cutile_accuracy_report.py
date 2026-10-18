@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import importlib.metadata
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -41,6 +42,24 @@ def make_inputs(case):
 
 
 def git_commit() -> str | None:
+    # In Actions, GITHUB_SHA is the immutable triggering revision and is the
+    # canonical provenance field. Retain the locally observed HEAD separately
+    # because self-hosted runner path/junction layouts can expose another repo.
+    workflow_sha = os.environ.get("GITHUB_SHA")
+    if workflow_sha:
+        return workflow_sha
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+def observed_git_head() -> str | None:
     try:
         return subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -148,9 +167,11 @@ def main() -> int:
     report = {
         "experiment": "cuTile accuracy against independent FP32 NumPy oracle",
         "git_commit": git_commit(),
+        "git_head_observed": observed_git_head(),
+        "git_commit_source": "GITHUB_SHA" if os.environ.get("GITHUB_SHA") else "git rev-parse HEAD",
         "gpu": gpu_name,
-        "driver_runtime_api": int(cp.cuda.runtime.driverGetVersion()),
-        "cuda_runtime_api": int(cp.cuda.runtime.runtimeGetVersion()),
+        "cuda_driver_api_version": int(cp.cuda.runtime.driverGetVersion()),
+        "cuda_runtime_api_version": int(cp.cuda.runtime.runtimeGetVersion()),
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "numpy": np.__version__,
