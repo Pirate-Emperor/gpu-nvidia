@@ -22,7 +22,7 @@ Required head dimensions are D = 32, 64, and 128. The fused kernel must not writ
 
 For this project, the important distinction is:
 
-- **Actual cuTile target:** `src/cutile_attention.py`. This is the required implementation path, but it has **not yet been validated on a supported GPU/runtime**.
+- **Actual cuTile target:** `src/cutile_attention.py`. This is the required implementation path, but only its separate vector-add smoke test has passed; causal attention remains unvalidated.
 - **Ordinary-CUDA controls:** `src/custom_cuda_attention.py`, `src/warp_cuda_attention.py`, `src/shared_tile_cuda_attention.py`, and `src/variants/shared_tile_v1.py` through `shared_tile_v5.py`. These are CUDA C++/NVCC implementations that helped us validate the mathematics and compare tile strategies on the available A100.
 - **Why the distinction matters:** the ordinary-CUDA tests and speed measurements are useful engineering evidence, but they are **not actual cuTile execution**, and cannot alone satisfy the course target.
 
@@ -39,7 +39,7 @@ The current A100 runner uses driver R550.90.07, below NVIDIA's documented R580+ 
 | Ordinary-CUDA correctness on A100 | **DONE** | Base/native and broad regression workflows passed. |
 | Shared-tile experiments v1–v5 | **DONE for implementation and targeted checks** | Variants are preserved; v4/v5 are not promoted as proven speedups. |
 | Timing harness and preliminary performance data | **DONE for surrogate CUDA** | Timings and raw artifacts exist, but run-to-run variability means the headline comparison needs controlled repeats. |
-| Actual NVIDIA cuTile compile, launch and correctness | **OPEN / BLOCKED** | No verified end-to-end cuTile GPU run on a supported environment yet. |
+| Actual NVIDIA cuTile compile, launch and correctness | **SMOKE PASS; ATTENTION OPEN** | A genuine vector-add cuTile kernel compiled, launched, synchronized, and passed exact output checks on the RTX 4060. The attention kernel has not yet passed correctness. |
 | Actual cuTile benchmark | **OPEN** | Cannot compare final target performance until it executes correctly. |
 | Nsight Compute hardware-counter evidence | **OPEN / BLOCKED** | Existing run hit `ERR_NVGPUCTRPERM`; no kernel was profiled. |
 | Final course deliverable | **NOT COMPLETE** | Actual-cuTile correctness, performance and profiler evidence remain outstanding. |
@@ -69,10 +69,10 @@ For detailed measurements, configurations, limitations and run links, read [the 
 
 ### Priority 0A — validate the local GPU, then isolate any remote runner
 
-- [x] **Inventoried the actual local machine and selected the first build path.** RTX 4060 / CC 8.9 / driver 616.92 / Windows x64 build 26300; `nvcc`, Python, WSL2 and Docker are not available. NVIDIA's current cuTile prerequisites match the GPU/driver/OS on paper. Follow [the Windows GPU guide](LOCAL_GPU_WINDOWS.md); per-user CPython 3.12 plus a project-local venv and a genuine compile/launch smoke test are the next gate.
-- [ ] **Choose an OS-enforced isolation boundary.** Prefer a disposable VM or GPU-enabled container with only the project workspace mounted writable. Use a dedicated non-admin/non-root account; drop unnecessary capabilities and enable no-new-privileges where containerization is used; keep the root filesystem read-only where practical; provide only required temporary/build paths.
+- [x] **Inventoried the actual local machine and passed the genuine cuTile smoke gate.** RTX 4060 / CC 8.9 / driver 616.92 / Windows x64 build 26300; CPython 3.12.10 and cuTile 1.6.0 are installed in `.venv-cutile-windows`. The vector-add kernel reports `GPU_SYNCHRONIZE=PASS`, `OUTPUT_CHECK=PASS`, and `CUTILE_SMOKE=PASS`. Docker Desktop and WSL2 remain absent; see [the Docker runner guide](CUTILE_DOCKER_RUNNER.md).
+- [x] **Design a constrained Docker runner boundary in repository code.** Added a non-root, capability-dropped, no-new-privileges, ephemeral one-job container with GPU passthrough and no host mounts or Docker socket. Host-side WSL2/Docker installation and GPU-passthrough verification are still required before use.
 - [ ] **Do not expose host capabilities.** Never run a privileged container, mount the host Docker socket, mount the user's home/SSH directory/browser profiles/cloud credentials, or grant sudo/administrator privileges to the job account. Restrict GPU access to compute needs and keep inbound remote access disabled.
-- [ ] **Restrict GitHub execution.** Register the runner only to this private repository; use ephemeral/disposable runners where practical; start with manually dispatched jobs from trusted main; do not execute untrusted pull-request code. Set job permissions to the minimum (usually contents: read) and avoid repository secrets for test jobs.
+- [x] **Define GitHub execution restrictions in the new workflow/launcher.** Repository-scoped ephemeral runner; automatic dispatch only for a `main`-guarded manual workflow; `contents: read`; no repository secrets. Host prerequisites and first actual run remain pending.
 - [ ] **Keep the runner's required GitHub authentication local.** GitHub Actions runner registration/connection authentication cannot be eliminated, but no personal PAT, SSH key, or admin credentials should be available to job code. Never paste runner registration tokens, config credentials, or secrets into ChatGPT or commit them.
 - [ ] **Test the boundary deliberately.** From a test job verify nvidia-smi and the CUDA compiler/runtime work, only the intended workspace is writable, outside host paths and credentials are not mounted, sudo is unavailable, and the job cannot access the host container daemon.
 - [ ] **Record the exact runner boundary before using it for experiments.** Document host OS/WSL status, GPU model, driver, CUDA toolchain, isolation model, mounts, account/UID and egress policy in the handoff/status files.
@@ -81,9 +81,9 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 
 ### Priority 0 — get actual cuTile running
 
-- [ ] **Pending smoke test: validate the native Windows cuTile stack.** The RTX 4060/driver/OS meet the published support matrix, but Python and runtime/compiler packages are not yet installed and no actual cuTile kernel has run on this machine. Run `scripts/setup_cutile_windows.ps1`; only a `CUTILE_SMOKE=PASS` log advances the project. Keep the existing R550 A100 for ordinary-CUDA surrogate validation only.
+- [x] **Validate the native Windows cuTile stack with a real kernel.** `scripts/cutile_smoke.py` passed on the RTX 4060 with Python 3.12.10, cuTile 1.6.0, and matched CUDA 13.4 TileIR compiler packages. This is smoke evidence only, not attention correctness. Keep the existing R550 A100 for ordinary-CUDA surrogate validation only.
 - [ ] **Record the environment before changing code.** Save GPU model/compute capability, driver, CUDA toolkit/runtime, Python, cuTile package version, and exact commands to the progress log or a dated run record.
-- [ ] **Run a minimal actual-cuTile smoke test.** Import cuTile, compile a tiny kernel, launch it on the real GPU, validate its output, and save the full log. This separates environment failures from attention-kernel bugs.
+- [x] **Run a minimal actual-cuTile smoke test.** The real kernel compiled, launched, synchronized, and matched the expected output for all 4,096 elements. Preserve the console log; this separates environment readiness from attention-kernel bugs.
 - [ ] **Validate and debug `src/cutile_attention.py`.** Resolve real cuTile API, tile-shape, indexing, launch/grid and compiler issues that appear. Keep failures in the cuTile path separate from the known-good ordinary-CUDA controls.
 - [ ] **Run the actual-cuTile correctness matrix.** Cover D=32/64/128, the seven representative short/medium/long cases where supported, at least two legal tile configurations, mixed-precision tolerances, numerical stability, causal masking, future-K/V invariance, and input validation.
 - [ ] **Verify the command-line path end to end.** Run `python run_attention.py --input INPUT.npz --output OUTPUT.npy --backend cutile`; check the output file, shape, FP16 dtype, finite values and tolerance against an independent oracle.
