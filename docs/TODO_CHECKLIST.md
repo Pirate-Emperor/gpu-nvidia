@@ -30,19 +30,19 @@ The current A100 runner uses driver R550.90.07, below NVIDIA's documented R580+ 
 
 ## 2. Current status at a glance
 
-**Actions evidence checked during runner repair (2026-10-18):** connected GitHub API access currently returns commits, workflow runs, jobs and logs. Latest CPU/reference run #75 passed 764 tests, skipped 68, and failed 0 on commit bfa8e95; GPU-only tests skip on the hosted CPU runner and this is not actual-cuTile validation.
-
+**Latest verified evidence:** [RTX 4060 actual cuTile run #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), commit 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428. The smoke, attention correctness, accuracy diagnostics, CLI, and three-session benchmark all passed. The full tables and artifact are linked in [the result report](CUTILE_RTX4060_RESULTS_2026-10-19.md) and [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465).
 
 | Area | Status | Meaning |
 |---|---|---|
-| Mathematics and independent references | **DONE** | Three separate references exist to catch algorithm and numerical mistakes. |
-| Ordinary-CUDA correctness on A100 | **DONE** | Base/native and broad regression workflows passed. |
-| Shared-tile experiments v1–v5 | **DONE for implementation and targeted checks** | Variants are preserved; v4/v5 are not promoted as proven speedups. |
-| Timing harness and preliminary performance data | **DONE for surrogate CUDA** | Timings and raw artifacts exist, but run-to-run variability means the headline comparison needs controlled repeats. |
-| Actual NVIDIA cuTile compile, launch and correctness | **SMOKE PASS; ATTENTION OPEN** | A genuine vector-add cuTile kernel compiled, launched, synchronized, and passed exact output checks on the RTX 4060. The attention kernel has not yet passed correctness. |
-| Actual cuTile benchmark | **OPEN** | Cannot compare final target performance until it executes correctly. |
-| Nsight Compute hardware-counter evidence | **OPEN / BLOCKED** | Existing run hit `ERR_NVGPUCTRPERM`; no kernel was profiled. |
-| Final course deliverable | **NOT COMPLETE** | Actual-cuTile correctness, performance and profiler evidence remain outstanding. |
+| Mathematics and independent references | **DONE** | Independent scalar and FP32 matrix references are used for checks. |
+| Ordinary-CUDA correctness on A100 | **DONE as control only** | Historical ordinary-CUDA runs do not count as cuTile results. |
+| Shared-tile experiments v1–v5 | **DONE for implementation and targeted checks** | Versions are preserved; no unproven win is promoted. |
+| Actual cuTile smoke and attention correctness | **PASS** | The RTX 4060 run passed 48 required tests with REQUIRE_CUTILE=1. |
+| Numerical diagnostics | **PASS** | 29 legal case/tile combinations; zero mixed-tolerance violations. |
+| CLI and independent oracle | **PASS** | FP16 output verified by the independent NumPy oracle. |
+| Actual cuTile benchmark | **PASS WITH CAVEATS** | Three sessions cover five tiles; long cases are stable, very short cases are noisy. |
+| Nsight Compute profiles | **OPEN / BLOCKED** | ncu executable absent from allowed project directories; no download attempted. |
+| Final course deliverable | **NOT COMPLETE** | Two actual-cuTile profiler reports remain required. |
 
 ## 3. Done so far — brief explanations and evidence
 
@@ -83,18 +83,18 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 ### Priority 0 — get actual cuTile running
 
 - [x] **Validate the native Windows cuTile stack with a real kernel.** `scripts/cutile_smoke.py` passed on the RTX 4060 with Python 3.12.10, cuTile 1.6.0, and matched CUDA 13.4 TileIR compiler packages. This is smoke evidence only, not attention correctness. Keep the existing R550 A100 for ordinary-CUDA surrogate validation only.
-- [ ] **Record the environment before changing code.** Save GPU model/compute capability, driver, CUDA toolkit/runtime, Python, cuTile package version, and exact commands to the progress log or a dated run record.
+- [x] **Record the environment before changing code.** Save GPU model/compute capability, driver, CUDA toolkit/runtime, Python, cuTile package version, and exact commands to the progress log or a dated run record.
 - [x] **Run a minimal actual-cuTile smoke test.** The real kernel compiled, launched, synchronized, and matched the expected output for all 4,096 elements. Preserve the console log; this separates environment readiness from attention-kernel bugs.
-- [ ] **Validate and debug `src/cutile_attention.py`.** Resolve real cuTile API, tile-shape, indexing, launch/grid and compiler issues that appear. Keep failures in the cuTile path separate from the known-good ordinary-CUDA controls.
-- [ ] **Run the actual-cuTile correctness matrix.** Cover D=32/64/128, the seven representative short/medium/long cases where supported, at least two legal tile configurations, mixed-precision tolerances, numerical stability, causal masking, future-K/V invariance, and input validation.
-- [ ] **Verify the command-line path end to end.** Run `python run_attention.py --input INPUT.npz --output OUTPUT.npy --backend cutile`; check the output file, shape, FP16 dtype, finite values and tolerance against an independent oracle.
-- [ ] **Record proof that the actual tests executed.** Save the run URL, tested commit, GPU/toolchain versions, pass/skip/fail counts, and logs. A workflow that skips cuTile tests does not count.
+- [x] **Validate `src/cutile_attention.py` on a supported GPU.** Run #39160827910 passed the frozen attention matrix after the causal K/V bound and FP16 P×V optimizations.
+- [x] **Run the actual-cuTile correctness matrix.** Cover D=32/64/128, the seven representative short/medium/long cases where supported, at least two legal tile configurations, mixed-precision tolerances, numerical stability, causal masking, future-K/V invariance, and input validation.
+- [x] **Verify the command-line path end to end.** Run `python run_attention.py --input INPUT.npz --output OUTPUT.npy --backend cutile`; check the output file, shape, FP16 dtype, finite values and tolerance against an independent oracle.
+- [x] **Record proof that the actual tests executed.** Save the run URL, tested commit, GPU/toolchain versions, pass/skip/fail counts, and logs. A workflow that skips cuTile tests does not count.
 
-**Priority 0 is complete only when an actual cuTile kernel successfully compiles and launches on the supported GPU and the required correctness suite passes.**
+**Priority 0 is complete:** the actual kernel compiles/launches and the required correctness suite passes (run #39160827910).
 
 ### Priority 1 — obtain profiler evidence
 
-- [ ] **BLOCKED: obtain authorized hardware-counter access.** Use a runner configured for Nsight Compute counters or ask the responsible administrator to enable the approved access. The current `ERR_NVGPUCTRPERM` run profiled no kernels.
+- [ ] **BLOCKED: make Nsight Compute available inside the project directory.** The RTX 4060 workflow did not find ncu.exe in the project root or .tools and did not download it. Obtain explicit approval for the official Windows package in .tools; do not install globally or use administrator privileges. Counter permission on the RTX 4060 remains untested.
 - [ ] Profile at least two real cuTile configurations, ideally one medium shape and one long/batched shape. Preserve the `.ncu-rep` files, command line, logs and metrics.
 - [ ] Inspect the metrics actually available: register/shared-memory use, occupancy, memory throughput and relevant stalls. Tie each proposed optimization to evidence rather than guessing.
 - [x] Capture Nsight Systems timelines and CUDA API/kernel summaries for the warmed ordinary-CUDA surrogate at `medium_d128, tile_k=64` and `longer_batched_d128, tile_k=32`: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950), [uploaded trace + summary artifacts](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954). This is supplementary surrogate evidence; actual-cuTile timelines remain to be captured after cuTile runs on supported hardware.
@@ -103,12 +103,12 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 
 ### Priority 1 — complete a reliable performance comparison
 
-- [ ] Benchmark actual cuTile only after correctness passes. Use at least 10 warmups and 30 CUDA-event timed iterations per configuration; report median, P90 and output throughput.
-- [ ] Measure cold compile/JIT separately from steady-state latency.
-- [ ] Compare actual cuTile with the unfused CuPy baseline and the best validated ordinary-CUDA surrogate; include PyTorch SDPA only if installed and validated.
-- [ ] Report per-case latency and speedup with exact shape, tile settings, device/driver/toolchain, correctness status and raw artifact links.
-- [ ] Repeat sessions under comparable GPU load and alternate/interleave variant order. Check variation before making a performance claim.
-- [ ] Save raw JSON/CSV and logs under the existing results/artifact convention; never overwrite earlier experiment evidence.
+- [x] Benchmark actual cuTile after correctness passed. Three sessions use 10 warmups and 30 CUDA-event samples with five launches averaged per sample; median/P90, first-call, throughput, speedup, and raw JSON/CSV are preserved.
+- [x] Record first-call/JIT-associated wall time separately from steady-state event timing, with the caveat that a compiler-cache hit can be included.
+- [x] Compare actual cuTile with the unfused FP32 CuPy baseline. [ ] A CUDA PyTorch SDPA comparison was not run because a CUDA-enabled build is not installed in the project venv.
+- [x] Report per-case latency/speedup, tiles, environment, correctness, and the raw artifact in CUTILE_RTX4060_RESULTS_2026-10-19.md.
+- [x] Run three sessions with alternate tile order and report spread and baseline drift; short noisy timings are excluded from headline claims.
+- [x] Archive raw three-session JSON/CSV and summary plus logs in artifact 12148414465; earlier artifacts remain preserved.
 
 ### Priority 2 — optimize only after a correct, measured actual-cuTile baseline
 
@@ -120,10 +120,10 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 
 ## 5. Final submission and definition of done
 
-- [ ] Update the root README, [experiment report](EXPERIMENT_REPORT.md), [test matrix](TEST_MATRIX.md), [progress log](PROGRESS.md) and [result snapshot](../results/STATUS.md) with the final actual-cuTile results and exact run/commit references.
+- [x] Update the root README, experiment report, test matrix, progress log, and results snapshot with current evidence.
 - [ ] Verify required deliverables: actual fused cuTile implementation, independent correctness tests, at least two tile configurations, comparison against an unfused baseline and an appropriate framework/vendor reference where available, at least 30 timed iterations, separate JIT timing, and profiler evidence for at least two configurations.
-- [ ] Reproduce the documented commands from a clean checkout or CI run and preserve the raw outputs.
-- [ ] Clearly label all ordinary-CUDA measurements as surrogate/control results; do not mix them with cuTile timing tables.
+- [x] Reproduced through native Windows workflow checkout and preserved raw output in artifact 12148414465.
+- [x] Keep ordinary-CUDA metrics labelled as controls; actual cuTile data are tabulated separately.
 - [ ] Mark the project complete only after actual-cuTile correctness, performance and profiling gates have supporting evidence.
 
 ## Decision rules
