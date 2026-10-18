@@ -19,7 +19,7 @@
 | OS | Windows 10 Pro x64, build 26300; WDDM |
 | Python | CPython 3.12.10 in project virtual environment |
 | System NVCC/Toolkit | `nvcc` not found |
-| WSL2 / Docker | Not installed |
+| WSL2 / Docker | WSL2 backend active; Docker Desktop 4.95.0, Engine 29.8.2, Compose 5.6.0; the launcher reached container start after its GPU probe gate |
 | Initial route | Native Windows x64 venv; see [local GPU guide](../docs/LOCAL_GPU_WINDOWS.md) |
 | Actual cuTile smoke | **PASS** — genuine vector-add kernel; synchronization and exact output check passed |
 | Attention correctness / performance / profiler | **NOT RUN YET** |
