@@ -143,6 +143,7 @@ def test_cutile_runner_and_native_windows_workflow_contract():
     assert "docker image inspect $GpuProbeImage" in launcher
     assert "workflow_dispatch:" in workflow
     assert "self-hosted, windows, x64" in workflow
+    assert "github.ref == 'refs/heads/main'" in workflow
     assert "contents: read" in workflow
     assert "REQUIRE_CUTILE" in workflow
     assert "benchmarks/benchmark_attention.py" in workflow
