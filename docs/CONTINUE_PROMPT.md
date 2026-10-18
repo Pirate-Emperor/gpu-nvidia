@@ -18,21 +18,19 @@ Complete the actual NVIDIA cuTile fused causal attention implementation—not ju
 
 ## Immediate local-GPU/runner task
 
-The immediate next task is to provide the actual local GPU inventory. Do not assume the GPU model, driver, OS or toolkit. Run these commands in Windows PowerShell, or the equivalent terminal on Linux/WSL2:
+The user's actual local inventory has been supplied:
 
-    nvidia-smi
-    nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv
-    nvcc --version
+- NVIDIA GeForce RTX 4060, compute capability 8.9, driver 616.92, reported CUDA UMD 13.4, 8,188 MiB total / 7,925 MiB free VRAM at capture.
+- Windows 10 Pro x64, build 26300, WDDM.
+- `nvcc` and Python are unavailable; WSL2 and Docker are not installed.
 
-Inventory is complete; treat only the user's reported GPU/driver/OS facts as known. Native Windows x64 meets NVIDIA's published requirements on paper. Actual CuPy/cuTile runtime support is still unverified until `scripts/cutile_smoke.py` passes. Design a secure, project-only GitHub Actions runner:
-- dedicated non-admin/non-root account;
-- preferably disposable VM or tightly isolated GPU-enabled container;
-- only this project's workspace writable/mounted;
-- no sudo/administrator membership, no privileged container, no host Docker socket, no personal home/SSH/browser/cloud credential mounts, no unrelated files;
-- minimal outbound network, no inbound remote shell, only the needed GPU compute interface;
-- private-repository runner, trusted/manual workflows first, no untrusted pull-request execution, minimal workflow token permissions, ephemeral/disposable lifecycle.
+NVIDIA's current cuTile Python Quickstart lists Windows x86_64, CC 8.x–12.x, driver R580+ and Python 3.10–3.14. The local GPU/driver/OS therefore pass the public support gates on paper. Initial path: native Windows with per-user CPython 3.12, then the project venv and genuine smoke test in [docs/LOCAL_GPU_WINDOWS.md](LOCAL_GPU_WINDOWS.md). The existing `gpu-project` A100/R550 runner is only an ordinary-CUDA control; do not use it as the actual-cuTile route.
 
-The GitHub runner must authenticate to receive jobs, but registration/connection credentials must stay local and must never be pasted into chat or exposed to workflow code. Do not request passwords, PATs, runner tokens, or sudo credentials. Be clear that connecting an Actions runner does not give ChatGPT a live shell; Actions workflows execute on that runner.
+New repository tooling:
+- `scripts/setup_cutile_windows.ps1` creates `.venv-cutile-windows` and installs `cuda-tile[tileiras]` + `cupy-cuda13x[ctk]` without driver/system-Toolkit changes.
+- `scripts/cutile_smoke.py` compiles, launches, synchronizes and verifies a genuine cuTile vector-add kernel.
+- Run the smoke first and require `CUTILE_SMOKE=PASS`. Only then set `$env:REQUIRE_CUTILE = "1"` and run the strict actual attention correctness/edge tests. Do not interpret missing imports or skipped tests as success.
+- Do not register a GitHub Actions runner on the personal Windows host until smoke/correctness pass and a separate OS-enforced least-privilege boundary has been tested. A runner executes workflow code with its account's OS permissions. Runner registration credentials must stay local and never be exposed to job steps or pasted into chat.
 
 ## Known technical state — do not lose this
 
