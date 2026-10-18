@@ -4,7 +4,7 @@
 
 - At the start of this continuation, `main` was `e87d8b9352fdf6783347d5c1e1945172011ebeb9`, matching the handoff SHA.
 - Move actual-cuTile execution away from the R550.90.07 A100. After inventory, use the user's real local GPU if the NVIDIA support prerequisites are met, otherwise choose another explicitly authorized supported environment. The A100 remains for ordinary-CUDA surrogate testing only.
-- Local inventory is now available: RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64 build 26300, WDDM; 8,188 MiB VRAM. Python and system NVCC are absent; WSL2 and Docker are not installed. Native Windows is selected for the first local venv/smoke attempt because it is explicitly listed by NVIDIA as supported. No runner has been registered and no isolation boundary is claimed.
+- Local inventory: RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64 build 26300, WDDM; 8,188 MiB VRAM. CPython 3.12.10 and cuTile 1.6.0 are installed in the project venv; the genuine vector-add smoke passed. System NVCC remains absent; WSL2 and Docker are still not installed. Docker runner files are now committed, but no runner has been registered and no GPU Actions workflow has run yet.
 - **Actions evidence access note (2026-10-18 continuation):** the connected Actions run list returned zero visible runs; direct run-detail, job and artifact requests for handoff IDs (including #343, #52, #340, benchmark #4 and Nsight Systems #2) returned 404; the current handoff commit had no visible combined status. This does not prove historical runs are absent. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
 
 ## Local actual-cuTile candidate — RTX 4060 (inventory supplied 2026-10-18)
@@ -17,14 +17,14 @@
 | NVIDIA-SMI CUDA UMD | 13.4 (driver-reported support level, not Toolkit proof) |
 | VRAM | 8,188 MiB total; 7,925 MiB free at capture |
 | OS | Windows 10 Pro x64, build 26300; WDDM |
-| Python | Not installed/available from `python` command yet |
+| Python | CPython 3.12.10 in project virtual environment |
 | System NVCC/Toolkit | `nvcc` not found |
 | WSL2 / Docker | Not installed |
 | Initial route | Native Windows x64 venv; see [local GPU guide](../docs/LOCAL_GPU_WINDOWS.md) |
-| Actual cuTile smoke | **NOT RUN YET** |
+| Actual cuTile smoke | **PASS** — genuine vector-add kernel; synchronization and exact output check passed |
 | Attention correctness / performance / profiler | **NOT RUN YET** |
 
-The GPU/driver/OS meet NVIDIA's current Quickstart prerequisites on paper (Windows x86_64, CC 8.x–12.x, R580+); Python and a real compile/launch smoke remain gates. Do not register a self-hosted runner on the personal Windows host until smoke/correctness and OS-enforced isolation are verified.
+The GPU/driver/OS meet NVIDIA's current Quickstart prerequisites on paper (Windows x86_64, CC 8.x–12.x, R580+). The genuine cuTile smoke passed, but attention correctness remains open. Docker Desktop/WSL2 are not installed; the ephemeral Docker runner is implemented in repository files but not yet launched. The launcher requires a successful Linux-container GPU passthrough probe before it requests registration credentials.
 
 ## Actual self-hosted A100 runner inventory
 
@@ -65,7 +65,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 | Broad non-cuTile regression | PASS: [run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082), 907 passed / 52 skipped |
 | Shared-tile v4 experiment | PASS correctness: 30/30; not promoted |
 | Shared-tile v5 experiment | PASS correctness: 30/30; three paired/order-alternating repeats; not promoted |
-| Current cuTile runtime | BLOCKED by R550.90.07; R580+ gate |
+| Local cuTile runtime smoke | PASS on RTX 4060 / driver 616.92; attention correctness not yet run |
 | CUDA 13.4 forward-compatibility experiment | Failed: insufficient-driver / CUDA error 803 |
 | CUDA 13.0 forward-compatibility attempt | No verified successful end-to-end cuTile GPU run |
 | Nsight Compute binary presence | PASS: 2024.1.1 |
@@ -74,7 +74,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 | Repeated current-vs-v5 benchmark | PASS: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163), three paired repeats/case/tile; v5 not promoted due to mixed/noisy gains |
 | Nsight Systems timeline (surrogate) | PASS: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950); two `.nsys-rep` traces + CUDA API/kernel summaries uploaded ([artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954)) |
 | Native-CUDA benchmark artifacts | PASS: CUDA-event ladder plus repeated paired current-vs-v5 artifacts uploaded to Actions |
-| Actual cuTile benchmark/profiler artifacts | NOT AVAILABLE; real cuTile kernel not executed |
+| Actual cuTile benchmark/profiler artifacts | NOT AVAILABLE; only the vector-add smoke has executed, not the attention kernel |
 | Fabric Manager | PRESENT and ACTIVE |
 
 ## Interpretation
