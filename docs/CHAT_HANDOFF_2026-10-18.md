@@ -6,7 +6,9 @@
 **Source snapshot reviewed before this documentation commit:** afe530bc090c779ebe5d741dcf7ae544985570d1  
 **Purpose:** resume the technical project in a new chat without losing prior tests, benchmarks, failures, environment facts, or next steps.
 
-> **Critical distinction:** the project's ordinary CUDA C++ kernels are well tested on A100. Actual NVIDIA cuTile execution has **not** been successfully validated. Never relabel surrogate results as cuTile results.
+> **Current status override — verified 2026-10-19:** the earlier handoff state below has been superseded. Native Windows RTX 4060 cuTile smoke, 48 required attention tests, 29 numerical configurations, CLI/oracle, three controlled benchmark sessions, and two actual-cuTile Nsight Compute configurations have passed. See [native validation run #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223), [profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066), [profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039), [current result report](CUTILE_RTX4060_RESULTS_2026-10-19.md), and [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). The CUDA-enabled PyTorch SDPA comparison remains optional/unrun. Sections below document the state as it was on 2026-10-18 and should be read as historical context.
+
+> **Critical distinction:** actual NVIDIA cuTile execution is now validated on the RTX 4060. The project's ordinary CUDA C++ kernels on A100 remain useful controls only; never relabel ordinary-CUDA surrogate results as cuTile results.
 
 ## 1. Project target and completion contract
 
