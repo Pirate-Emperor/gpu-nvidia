@@ -338,9 +338,9 @@ The Windows runner is Online and sees the correct RTX 4060, but **the already-ex
 
 ### Execution and artifacts
 - Updated the native Windows cuTile workflow to find the installed Nsight Compute CLI under the standard NVIDIA installation location and profile only the intended steady-state launch. The repeated end-to-end native run [#39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223) succeeded: smoke, 48 required actual-cuTile tests, 29 numerical configurations, CLI/oracle, and all three controlled benchmark sessions passed.
-- Nsight Compute CLI **2026.3.1.0 (build 38829034)** was found at the standard NVIDIA Program Files location. RTX 4060 hardware-counter collection succeeded; no \`ERR_NVGPUCTRPERM\` was observed.
-- Captured basic throughput/resource profiles and supplemental scheduler/warp-state profiles for both \`medium_d128\` tile 64×64 and \`longer_batched_d128\` tile 64×128.
-- Profile workflow: [#39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066). Complete report artifact: [12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). It contains four compressed \`.ncu-repz\` reports, their exported detail text/raw CSVs, and CLI logs/status.
+- Nsight Compute CLI **2026.3.1.0 (build 38829034)** was found at the standard NVIDIA Program Files location. RTX 4060 hardware-counter collection succeeded; no `ERR_NVGPUCTRPERM` was observed.
+- Captured basic throughput/resource profiles and supplemental scheduler/warp-state profiles for both `medium_d128` tile 64×64 and `longer_batched_d128` tile 64×128.
+- Profile workflow: [#39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066). Complete report artifact: [12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). It contains four compressed `.ncu-repz` reports, their exported detail text/raw CSVs, and CLI logs/status.
 
 ### Measured profiler findings
 | Metric | medium_d128 64×64 | longer_batched_d128 64×128 |
@@ -355,7 +355,7 @@ The Windows runner is Online and sees the correct RTX 4060, but **the already-ex
 | Warp cycles per issued instruction | 7.08 | 6.78 |
 | Nsight rule execution-pipeline stall estimate | 2.4 cycles | 3.1 cycles |
 
-The occupancy section identifies shared memory as the CTA-residency limiter (one CTA per SM). Nsight's estimated local speedup from the warp-state rule (33.57% and 46.04%) is a heuristic, not a measured speedup guarantee. The optional \`smsp__pcsamp_sample_count\` metric was unavailable, so source-level stall-sampling locations were not accessible.
+The occupancy section identifies shared memory as the CTA-residency limiter (one CTA per SM). Nsight's estimated local speedup from the warp-state rule (33.57% and 46.04%) is a heuristic, not a measured speedup guarantee. The optional `smsp__pcsamp_sample_count` metric was unavailable, so source-level stall-sampling locations were not accessible.
 
 ### Decision and next-step boundary
 - Mark the hard profiling gate complete. The dedicated [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) discusses the evidence and limitations.
