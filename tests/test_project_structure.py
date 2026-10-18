@@ -125,6 +125,7 @@ def test_docker_cutile_runner_is_ephemeral_and_unprivileged():
     compose = (ROOT / "docker/cutile-runner/compose.yml").read_text()
     entrypoint = (ROOT / "docker/cutile-runner/entrypoint.sh").read_text()
     workflow = (ROOT / ".github/workflows/cutile-rtx4060-docker.yml").read_text()
+    smoke = (ROOT / "scripts/cutile_smoke.py").read_text()
     assert "gpus: all" in compose
     assert "no-new-privileges:true" in compose
     assert "cap_drop:" in compose and "ALL" in compose
@@ -135,3 +136,4 @@ def test_docker_cutile_runner_is_ephemeral_and_unprivileged():
     assert "workflow_dispatch:" in workflow
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "contents: read" in workflow
+    assert "global ct" in smoke, "cuTile smoke kernel annotations need module-global ct resolution"
