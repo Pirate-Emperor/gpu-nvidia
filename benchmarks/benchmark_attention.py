@@ -7,6 +7,7 @@ import argparse
 import csv
 import importlib.metadata
 import json
+import platform
 import subprocess
 import sys
 import time
@@ -80,7 +81,7 @@ def parse_tile(value: str) -> tuple[int, int]:
     return q, k
 
 
-def run_case(case, cp, tiles, warmup, iterations):
+def run_case(case, cp, tiles, warmup, iterations, seen_specializations):
     q, k, v = make_inputs(case, cp)
     q32 = q.astype(cp.float32)
     k32 = k.astype(cp.float32)
@@ -97,7 +98,14 @@ def run_case(case, cp, tiles, warmup, iterations):
         )
         baseline_call = lambda: baseline_launch_device(q32, k32, v32)
 
-        jit_ms = cold_start_ms(fused_call, cp)
+        specialization = (tile_q, tile_k, case.D, case.Dv)
+        if specialization in seen_specializations:
+            # The cuTile kernel is cached by tile/head dimensions; don't label
+            # a warmed launch as JIT time for every later case.
+            jit_ms = None
+        else:
+            jit_ms = cold_start_ms(fused_call, cp)
+            seen_specializations.add(specialization)
         fused_ms, fused_p90 = timed_gpu(
             fused_call, cp, warmup=warmup, iterations=iterations
         )
@@ -113,6 +121,7 @@ def run_case(case, cp, tiles, warmup, iterations):
                 "N": case.N,
                 "D": case.D,
                 "Dv": case.Dv,
+                "seed": case.seed,
                 "tile_q": tile_q,
                 "tile_k": tile_k,
                 "jit_ms": jit_ms,
@@ -136,10 +145,12 @@ def run_case(case, cp, tiles, warmup, iterations):
 def environment_metadata(cp, gpu_name):
     metadata = {
         "gpu": gpu_name,
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
         "cupy": cp.__version__,
         "cuda_runtime_version": int(cp.cuda.runtime.runtimeGetVersion()),
         "cutile": importlib.metadata.version("cuda-tile"),
-        "compilation_mode": "JIT excluded from steady-state timing; cold-start reported separately",
+        "compilation_mode": "First-call wall time is reported once per (tile_q, tile_k, D, Dv) specialization; it may include a compiler-cache hit. Steady-state CUDA-event timing excludes that first call.",
     }
     try:
         result = subprocess.run(
@@ -155,6 +166,12 @@ def environment_metadata(cp, gpu_name):
         metadata["nvidia_smi"] = result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         metadata["nvidia_smi"] = None
+    try:
+        metadata["git_commit"] = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        metadata["git_commit"] = None
     return metadata
 
 
@@ -208,6 +225,7 @@ def main() -> int:
         selected_cases = tuple(case for case in MANDATORY_CASES if case.name in selected_names)
 
     all_rows = []
+    seen_specializations = set()
     for case in selected_cases:
         all_rows.extend(
             run_case(
@@ -216,6 +234,7 @@ def main() -> int:
                 args.tiles,
                 warmup=args.warmup,
                 iterations=args.iterations,
+                seen_specializations=seen_specializations,
             )
         )
 
@@ -243,12 +262,17 @@ def main() -> int:
     print(f"Results: {args.output}")
     print(f"CSV: {csv_path}")
     for row in all_rows:
+        first_call = (
+            f"{row['jit_ms']:.1f} ms"
+            if row["jit_ms"] is not None
+            else "already compiled"
+        )
         print(
             f"{row['case']:24s} tile={row['tile_q']}x{row['tile_k']} "
             f"fused={row['fused_median_ms']:.3f} ms "
             f"baseline={row['baseline_median_ms']:.3f} ms "
             f"speedup={row['speedup_vs_unfused']:.2f}x "
-            f"jit={row['jit_ms']:.1f} ms"
+            f"first_call={first_call}"
         )
     return 0
 
