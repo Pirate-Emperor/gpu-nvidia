@@ -21,7 +21,8 @@ Use this order to understand the project and decide what to do next.
 | Dated experiment history | [Progress log](docs/PROGRESS.md) |
 | How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
 | Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
-| Local RTX 4060/Windows cuTile bring-up and first smoke test | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
+| Local RTX 4060/Windows cuTile bring-up and smoke evidence | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
+| Dockerized ephemeral RTX 4060 Actions runner setup | [Docker runner guide](docs/CUTILE_DOCKER_RUNNER.md) |
 | Full handoff for a new chat: runs, benchmarks, environment, security plan, and next steps | [Chat handoff](docs/CHAT_HANDOFF_2026-10-18.md) |
 | Copy-paste prompt to continue in a new chat | [Continuation prompt](docs/CONTINUE_PROMPT.md) |
 
@@ -37,9 +38,9 @@ Use this order to understand the project and decide what to do next.
 
 **What is not done yet:** actual `src/cutile_attention.py` execution and full correctness on a supported GPU/runtime, controlled actual-cuTile performance comparisons, and successful Nsight Compute profiles. The available A100 runner uses driver R550.90.07, and the project's current cuTile environment gate requires R580+; its profiler also reports `ERR_NVGPUCTRPERM`. Do not count the ordinary-CUDA surrogate results as completed cuTile results.
 
-**Execution decision (2026-10-18):** stop using the existing A100 runner as the actual-cuTile route; its R550.90.07 driver is below NVIDIA's documented R580 minimum. The user's local RTX 4060 is now inventoried at compute capability 8.9 and driver 616.92 on 64-bit Windows. That GPU/driver/OS combination meets the documented cuTile prerequisites on paper. Native Windows is the first attempt because NVIDIA lists Windows x86_64 as supported and WSL2/Docker are not installed. Python and system NVCC are absent, but the isolated `cuda-tile[tileiras]` and `cupy-cuda13x[ctk]` packages can supply compiler/runtime components without a global Toolkit install. Windows CuPy/NVRTC has a reported DLL failure history, so a genuine compile/launch/output smoke test remains mandatory.
+**Execution decision (2026-10-18):** stop using the existing A100 runner as the actual-cuTile route; its R550.90.07 driver is below NVIDIA's documented R580 minimum. The user's local RTX 4060 is now inventoried at compute capability 8.9 and driver 616.92 on 64-bit Windows. That GPU/driver/OS combination meets the documented cuTile prerequisites on paper. Native Windows cuTile smoke now passes on the RTX 4060: cuTile 1.6.0 with matching CUDA 13.4 TileIRAS/NVCC/NVVM components compiled and launched a genuine vector-add kernel, synchronized, and exactly validated 4,096 outputs. This is a runtime smoke pass only; actual causal attention remains unvalidated. Docker Desktop/WSL2 are not installed yet. The next step is the ephemeral Dockerized Actions runner described in [docs/CUTILE_DOCKER_RUNNER.md](docs/CUTILE_DOCKER_RUNNER.md).
 
-**Immediate next action:** install per-user 64-bit CPython 3.12, check out this repository, then follow [the local Windows GPU guide](docs/LOCAL_GPU_WINDOWS.md). Do not register a runner or claim isolation until the local smoke/correctness tests pass and the security boundary is tested.
+**Immediate next action:** prepare Docker Desktop with WSL2 GPU passthrough, then run `scripts/start_cutile_docker_runner.ps1`. The launcher refuses to register until a Linux container demonstrably sees the RTX 4060. It starts a one-job ephemeral runner for a manual `main`-only cuTile smoke/correctness workflow. The attention implementation is not complete until those tests pass, benchmarks are recorded, and two actual cuTile profiles are captured.
 
 ## Goal
 
@@ -213,7 +214,7 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 3. **Validate CLI I/O end-to-end.** Run `python run_attention.py --input INPUT.npz --output OUTPUT.npy --backend cutile`; verify output shape, FP16 dtype, finite values and independent-reference tolerance.
 4. **Benchmark only after correctness passes.** Cover D=32/64/128, at least two legal tiles and frozen cases; compare with unfused CuPy and a suitable framework baseline where available. Use at least 10 warmups and at least 30 CUDA-event samples, separately report cold/JIT, per-case median/P90, throughput, speedup, and raw JSON/CSV.
 5. **Profile on supported tooling.** Confirm Nsight Compute is installed and its counters are available without privileged workarounds. The current driver exceeds the documented Windows detailed-profiling minimum, but the profiler installation/access itself is not yet verified. Preserve at least two actual-cuTile profile files and logs.
-6. **Only then decide whether to use Actions on the local GPU.** Do not register a runner on the personal Windows host before testing a real OS-enforced least-privilege boundary. A runner executes repository workflow code as its account and is not itself a sandbox. Keep registration credentials local and run trusted manual workflows from `main` only.
+6. **Run the local Dockerized Actions workflow.** Follow [docs/CUTILE_DOCKER_RUNNER.md](docs/CUTILE_DOCKER_RUNNER.md). It uses an ephemeral non-root container without host bind mounts or a Docker socket, and only runs the manual workflow from `main`. Container isolation reduces exposure but is not a perfect security boundary. Keep registration credentials local.
 
 The [handoff document](docs/CHAT_HANDOFF_2026-10-18.md) contains historical benchmark data and the remaining course completion gates.
  
