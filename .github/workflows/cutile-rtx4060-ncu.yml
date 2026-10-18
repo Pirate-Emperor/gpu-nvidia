@@ -1,0 +1,114 @@
+name: RTX 4060 actual cuTile Nsight Compute profiles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-rtx4060-ncu.yml"
+      - "src/cutile_attention.py"
+      - "benchmarks/profile_fused.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ncu-profiles:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 30
+    steps:
+      # Keep reports from the prior run: its capture succeeded, but upload omitted .ncu-repz.
+      - name: Checkout source without deleting existing reports
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Recover or capture and export two cuTile Nsight Compute reports
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Project-local Python is missing: $Py" }
+
+          $NcuPath = $null
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          if ($NcuCommand) { $NcuPath = $NcuCommand.Source }
+          if (-not $NcuPath) {
+            $SearchRoots = @()
+            if ($env:ProgramFiles) { $SearchRoots += (Join-Path $env:ProgramFiles 'NVIDIA Corporation') }
+            if ($env:LOCALAPPDATA) { $SearchRoots += (Join-Path $env:LOCALAPPDATA 'NVIDIA Corporation') }
+            foreach ($SearchRoot in $SearchRoots) {
+              if (-not (Test-Path $SearchRoot)) { continue }
+              $InstallDirs = Get-ChildItem -Path $SearchRoot -Directory -Filter 'Nsight Compute*' -ErrorAction SilentlyContinue
+              foreach ($InstallDir in $InstallDirs) {
+                $Found = Get-ChildItem -Path $InstallDir.FullName -Filter 'ncu.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($Found) { $NcuPath = $Found.FullName; break }
+              }
+              if ($NcuPath) { break }
+            }
+          }
+          if (-not $NcuPath) { throw 'Nsight Compute CLI was not found in PATH or NVIDIA install folders.' }
+
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          "PROJECT_ROOT=$ProjectRoot" | Tee-Object -FilePath cutile-ncu-profile-status.log
+          "PYTHON_EXE=$Py" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          "NCU_PATH=$NcuPath" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          & $NcuPath --version 2>&1 | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute CLI --version failed.' }
+
+          $MediumBase = 'results/cutile-profile-medium'
+          $LongBase = 'results/cutile-profile-long-batched'
+          $MediumExists = (Test-Path "$MediumBase.ncu-repz") -or (Test-Path "$MediumBase.ncu-rep")
+          $LongExists = (Test-Path "$LongBase.ncu-repz") -or (Test-Path "$LongBase.ncu-rep")
+          if ($MediumExists -and $LongExists) {
+            'REUSED_EXISTING_PROFILES=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          } else {
+            'REUSED_EXISTING_PROFILES=False; generating any missing report(s).' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            if (-not $MediumExists) {
+              & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o $MediumBase $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
+              if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute capture failed for medium_d128 64x64.' }
+            }
+            if (-not $LongExists) {
+              & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o $LongBase $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
+              if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute capture failed for longer_batched_d128 64x128.' }
+            }
+          }
+
+          $MediumReport = @("$MediumBase.ncu-repz", "$MediumBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $LongReport = @("$LongBase.ncu-repz", "$LongBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $MediumReport -or -not $LongReport) { throw 'Both profiler reports must exist before exporting.' }
+
+          foreach ($Item in @(
+            @{ Label = 'medium'; Report = $MediumReport; Base = $MediumBase },
+            @{ Label = 'long-batched'; Report = $LongReport; Base = $LongBase }
+          )) {
+            "REPORT=$($Item.Report)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            "REPORT_BYTES=$((Get-Item $Item.Report).Length)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            & $NcuPath --import $Item.Report --page details 2>&1 | Tee-Object -FilePath "$($Item.Base)-details.txt"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export details for $($Item.Label)." }
+            & $NcuPath --import $Item.Report --page raw --csv 2>&1 | Tee-Object -FilePath "$($Item.Base)-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export raw metrics for $($Item.Label)." }
+          }
+
+          'PROFILE_REPORTS_CREATED=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+
+      - name: Upload actual-cuTile reports and metric exports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-rtx4060-ncu-profiles
+          path: |
+            cutile-ncu-profile-status.log
+            cutile-profile-medium.log
+            cutile-profile-long-batched.log
+            results/cutile-profile-medium.ncu-repz
+            results/cutile-profile-medium.ncu-rep
+            results/cutile-profile-medium-details.txt
+            results/cutile-profile-medium-raw.csv
+            results/cutile-profile-long-batched.ncu-repz
+            results/cutile-profile-long-batched.ncu-rep
+            results/cutile-profile-long-batched-details.txt
+            results/cutile-profile-long-batched-raw.csv
+          if-no-files-found: error
