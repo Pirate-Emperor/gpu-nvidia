@@ -114,19 +114,17 @@ cuTile.
 
 Native-CUDA surrogate timings have been collected on the A100 using CUDA events, 10 warmups, 30 measured iterations, median/P90, and raw JSON/CSV artifacts. The tile ladder also measures first compilation separately. The current-vs-v5 experiment uses three paired repeats with order alternating by repeat; see [v5 benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163). The v5 result remains inconclusive and it is not promoted. See [the experiment report](EXPERIMENT_REPORT.md) for medians and the explicit warning about run-to-run timing variability.
 
-Actual cuTile performance remains blocked until the kernel executes on a supported driver/runtime. Nsight Compute hardware profiling is additionally blocked by `ERR_NVGPUCTRPERM`; current profiling claims are therefore limited to successful compiler/PTXAS resource reports, not hardware-counter data.
+**Current actual-cuTile performance status (2026-10-19): PASS with caveats.** Run #39160827910 executed three benchmark sessions over five tile configurations. Long D=128 at 64×64 measured 0.267059 ms (16.53× vs unfused CuPy, 2.0% session spread); longer batched D=128 at 64×128 measured 0.923034 ms (18.54×, 0.9% spread). See [full results](CUTILE_RTX4060_RESULTS_2026-10-19.md). **Profiling remains open:** ncu was not present under the project root or .tools, so no actual-cuTile hardware profile was captured. The old ERR_NVGPUCTRPERM refers to the historical A100 profiler attempt, not the RTX 4060.
 
-Still required for final course submission:
-- Actual cuTile execution and correctness on the inventoried local RTX 4060 after CPython 3.12 and the real cuTile smoke test pass. The current R550 A100 is not the actual-cuTile route.
-- Final representative benchmark matrix and cuTile-vs-unfused/framework comparison.
-- At least two successful hardware profiles with counter access.
-- Final deliverable/report after those runs.
+Remaining hard gate for final course submission:
+- Obtain owner approval for a project-local official NVIDIA Nsight Compute download, then capture and inspect two cuTile reports: medium D=128 at 64×64 and longer batched D=128 at 64×128.
+- Optional, not a substitute for profiling: add CUDA-enabled PyTorch SDPA as a performance reference if it can be installed safely in the project venv.
 
 ## 5. Environment gate
 
 **Existing hosted/self-hosted control runner:** NVIDIA A100-SXM4-40GB, SM80, driver R550.90.07. This runner is below NVIDIA's R580+ cuTile Python requirement and remains for ordinary-CUDA surrogate validation only. Prior forward-compatibility attempts did not establish actual cuTile execution.
 
-**Local actual-cuTile candidate (inventory 2026-10-18):** GeForce RTX 4060, CC 8.9, driver 616.92, Windows x64 build 26300, 8,188 MiB VRAM. These GPU/driver/OS facts fit NVIDIA's documented support matrix on paper. Python and system NVCC are not installed; native Windows venv setup and the genuine cuTile smoke test are pending. Do not convert a skipped GPU test into a pass. See [local GPU guide](LOCAL_GPU_WINDOWS.md).
+**Validated actual-cuTile target:** GeForce RTX 4060, CC 8.9, driver 616.92, Windows x64 build 26300, 8,188 MiB VRAM. Run #39160827910 confirmed the installed Python/CuPy/cuTile environment, passed the actual attention matrix and CLI, and produced controlled benchmark artifacts. See [local GPU guide](LOCAL_GPU_WINDOWS.md) and [current result report](CUTILE_RTX4060_RESULTS_2026-10-19.md).
 ## 6. Dual-device hardware validation
 
 The actual runner exposes two full A100-SXM4-40GB GPUs through `CUDA_VISIBLE_DEVICES=0,1`.
