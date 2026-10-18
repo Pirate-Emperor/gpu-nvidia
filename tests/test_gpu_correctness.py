@@ -96,7 +96,8 @@ def gpu_config_id(config):
 @pytest.mark.parametrize(
     "case,tile_q,tile_k",
     GPU_CORRECTNESS_CONFIGS,
-    ids=gpu_config_id,
+    # pytest's ids callable is invoked per scalar argument, not per full tuple.
+    ids=[gpu_config_id(config) for config in GPU_CORRECTNESS_CONFIGS],
 )
 def test_cutile_matches_independent_reference(case, tile_q, tile_k):
     require_a100()
@@ -123,7 +124,8 @@ def test_cutile_matches_independent_reference(case, tile_q, tile_k):
 @pytest.mark.parametrize(
     "tile_q,tile_k",
     EXPLORATORY_TILE_CONFIGS,
-    ids=lambda x: f"tile{x[0]}x{x[1]}",
+    # Provide one ID per pair; pytest id functions receive scalar values.
+    ids=[f"tile{tile_q}x{tile_k}" for tile_q, tile_k in EXPLORATORY_TILE_CONFIGS],
 )
 def test_cutile_exploratory_tile_configuration(tile_q, tile_k):
     require_a100()
