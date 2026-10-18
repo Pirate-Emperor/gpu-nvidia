@@ -32,25 +32,49 @@ jobs:
           $NvidiaSmi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
           if (-not $NvidiaSmi) { $NvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue }
           if (-not $NvidiaSmi) { throw 'nvidia-smi is unavailable on PATH; stopping without installing tools.' }
-
           $GpuInventory = & $NvidiaSmi.Source --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader
           if ($LASTEXITCODE -ne 0) { throw 'GPU inventory failed.' }
           $GpuInventory | Tee-Object -FilePath cutile-environment.log
           if (-not ($GpuInventory -match 'RTX 4060')) { throw "Expected the local RTX 4060 runner; found: $GpuInventory" }
 
-          $PythonCandidates = @(
-            (Join-Path $PWD '.venv-cutile-windows\Scripts\python.exe'),
-            'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
-          )
-          $Py = $PythonCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          # The Actions checkout lives under actions-runner\_work, inside the
+          # project root. Search only this repository directory for existing
+          # virtual environments; never install or download dependencies.
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          "PROJECT_ROOT=$ProjectRoot" | Tee-Object -FilePath cutile-environment.log -Append
+          $Candidates = New-Object System.Collections.Generic.List[string]
+          $RootVenvs = Get-ChildItem -LiteralPath $ProjectRoot -Directory -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'venv|virtual' -or $_.Name -in @('env') }
+          foreach ($Venv in $RootVenvs) {
+            $Candidate = Join-Path $Venv.FullName 'Scripts\python.exe'
+            if (Test-Path $Candidate) { $Candidates.Add($Candidate) }
+          }
+          $Candidates.Add((Join-Path $PWD '.venv-cutile-windows\Scripts\python.exe'))
+          $Candidates.Add((Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'))
+          $PyCommand = Get-Command python.exe -ErrorAction SilentlyContinue
+          if ($PyCommand) { $Candidates.Add($PyCommand.Source) }
+          $PyLauncher = Get-Command py.exe -ErrorAction SilentlyContinue
+          if ($PyLauncher) {
+            $InstalledPython = & $PyLauncher.Source -0p 2>&1
+            $InstalledPython | Tee-Object -FilePath cutile-environment.log -Append
+            foreach ($Line in $InstalledPython) {
+              if ($Line -match '([A-Za-z]:\\.+python\.exe)\s*$') { $Candidates.Add($Matches[1]) }
+            }
+          }
+
+          $Py = $null
+          foreach ($Candidate in ($Candidates | Select-Object -Unique)) {
+            if (-not (Test-Path $Candidate)) { continue }
+            "CHECK_PYTHON=$Candidate" | Tee-Object -FilePath cutile-environment.log -Append
+            $Probe = & $Candidate -c "import numpy, cupy, cuda.tile, pytest; import importlib.metadata as m; print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda-tile='+m.version('cuda-tile')); print('pytest='+pytest.__version__)" 2>&1
+            $Probe | Tee-Object -FilePath cutile-environment.log -Append
+            if ($LASTEXITCODE -eq 0) { $Py = $Candidate; break }
+          }
           if (-not $Py) {
-            throw 'Existing .venv-cutile-windows Python was not found. No venv was created and no dependencies were downloaded. Check the existing project-local environment path.'
+            throw 'No existing Python environment under the project root can import NumPy, CuPy, cuda.tile and pytest. No packages were installed or downloaded; see the recorded candidate probes.'
           }
           "PYTHON_EXE=$Py" | Tee-Object -FilePath cutile-environment.log -Append
           & $Py --version 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
-          if ($LASTEXITCODE -ne 0) { throw 'Existing project Python failed.' }
-          & $Py -c "import numpy, cupy, cuda.tile, pytest; import importlib.metadata as m; print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda-tile='+m.version('cuda-tile')); print('pytest='+pytest.__version__)" 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
-          if ($LASTEXITCODE -ne 0) { throw 'Required GPU packages are missing from the existing Python environment. No packages were installed.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Selected existing project Python failed.' }
 
       - name: Compile and launch genuine cuTile smoke kernel
         shell: powershell
