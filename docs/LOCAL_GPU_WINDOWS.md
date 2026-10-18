@@ -28,15 +28,15 @@ The setup and validation path is no longer pending: [workflow #39160827910](http
 
 **Native Windows cuTile smoke and attention correctness both pass.** Workflow #39160827910 passed the actual vector-add smoke and the 48-test fused attention matrix under REQUIRE_CUTILE=1.
 
-The next execution path is a normal native-Windows GitHub Actions self-hosted runner on the same RTX 4060. The repository workflow now targets the default `self-hosted`, `windows`, and `x64` labels, so no Docker or WSL setup is needed. This is not merely a habitual choice: NVIDIA's current [cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) explicitly supports Windows x86_64, compute capability 8.x–12.x, drivers R580+, and Python 3.10–3.14. The observed GPU/driver/OS satisfy those documented hardware/driver/OS gates. The driver also exceeds the Quickstart's Windows R582.16+ requirement for detailed cuTile profiling.
+The successful execution path is the normal native-Windows GitHub Actions self-hosted runner on the same RTX 4060. The repository workflow targets the default `self-hosted`, `windows`, and `x64` labels, so no Docker or WSL setup is needed. This is based on NVIDIA's documented supported platforms: NVIDIA's current [cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) explicitly supports Windows x86_64, compute capability 8.x–12.x, drivers R580+, and Python 3.10–3.14. The observed GPU/driver/OS satisfy those documented hardware/driver/OS gates. The driver also exceeds the Quickstart's Windows R582.16+ requirement for detailed cuTile profiling.
 
 System NVCC remains absent, but the isolated compiler wheels work for the smoke test. An official NVIDIA issue documents an earlier Windows cuTile + CuPy installation failing in NVRTC with `nvrtc-builtins64_131.dll`; the issue is marked closed/waiting-for-feedback, not as a universal fix. See [NVIDIA cuTile Python issue #57](https://github.com/NVIDIA/cutile-python/issues/57). The smoke gate and actual attention correctness are passed; the remaining hard gate is two NCU reports.
 
 The setup script deliberately avoids system-wide CUDA Toolkit and driver changes. It installs the TileIR compiler through `cuda-tile[tileiras]` and asks current CuPy to install matched CUDA component wheels through `cupy-cuda13x[ctk]`. CuPy documents this [component-wheel installation path](https://docs.cupy.dev/en/stable/install.html); NVIDIA requires the `nvidia-cuda-tileiras`, `nvidia-cuda-nvcc` and `nvidia-nvvm` versions to match major.minor when using the cuTile extra.
 
-## 3. Original bootstrap sequence (the current setup and attention workflow has already passed)
+## 3. Original bootstrap sequence for reproduction (already passed in the current environment)
 
-For the quickest path, add this Windows host as a repository self-hosted runner via **Settings → Actions → Runners → New self-hosted runner**, follow GitHub's displayed PowerShell commands, and wait for the runner to show **Online**. Then manually dispatch **RTX 4060 native Windows cuTile validation** from Actions on branch `main`. The workflow creates a project-local Python venv, runs the genuine smoke test, runs required cuTile attention correctness tests, validates the CLI against the independent NumPy oracle, and only then records numerical diagnostics and benchmarks five legal tile configurations across three alternating-order sessions.
+To reproduce from a clean project checkout, use the ordinary repository-scoped self-hosted runner shown by GitHub as Online and run the workflow on main. The tested workflow creates or reuses the project-local Python venv, installs the pinned dependencies there, runs the genuine smoke test and required attention tests, writes numerical diagnostics, validates CLI output against the independent NumPy oracle, and then benchmarks five legal tile configurations across three alternating-order sessions. The complete successful evidence is run #39160827910 and artifact 12148414465.
 
 1. Install **64-bit CPython 3.12** for the current Windows user from [Python for Windows](https://www.python.org/downloads/windows/). Enable the Python Launcher, then open a new PowerShell and check `py -3.12 --version`. Use a supported 3.10–3.14 CPython build; 3.12 aligns with the repository's existing CI version.
 2. Check out the private `xemptynothing/gpu-nvidia` repository into a project-only working directory. If Git for Windows is available, run `git clone https://github.com/xemptynothing/gpu-nvidia.git` and then `cd gpu-nvidia`; otherwise use GitHub Desktop or install Git for Windows. Authenticate through your normal browser/Git Credential Manager flow; do not paste a PAT or any credential into chat. Do not put personal documents or credentials in the project directory.
@@ -55,10 +55,10 @@ For the quickest path, add this Windows host as a repository self-hosted runner 
        if ($testExit -ne 0) { throw "Required cuTile correctness tests failed" }
 
    The new `REQUIRE_CUTILE=1` mode makes missing CuPy/cuTile an error while allowing an RTX 4060 (not an A100) to run the suite. Save the console output and exact `git rev-parse HEAD` with the result.
-6. If correctness passes, exercise the required CLI with a small case. These commands keep generated inputs/outputs under the local logs folder rather than the repository:
+6. If correctness passes, exercise the required CLI with a small case. These commands keep generated inputs/outputs in the project-local temporary directory:
    
        $py = ".\\.venv-cutile-windows\\Scripts\\python.exe"
-       $work = Join-Path $env:LOCALAPPDATA "GPU-NVIDIA\\logs"
+       $work = Join-Path (Get-Location) ".tmp\\logs"
        $input = Join-Path $work "attention_cli_input.npz"
        $output = Join-Path $work "attention_cli_output.npy"
        & $py scripts\\generate_inputs.py --output $input --batch 1 --heads 1 --seq 64 --head-dim 32
@@ -78,6 +78,6 @@ For the quickest path, add this Windows host as a repository self-hosted runner 
 
 ## 4. Optional Dockerized Actions runner (not used for successful cuTile attention validation)
 
-The native cuTile smoke gate has passed. Docker Desktop and WSL2 are still absent from the observed host inventory, so the Docker runner cannot yet start. The intended isolated runner setup, GPU passthrough preflight, ephemeral registration, and manual main-only correctness workflow are documented in [CUTILE_DOCKER_RUNNER.md](CUTILE_DOCKER_RUNNER.md). Do not register the runner until the launcher verifies that a Linux container can see the RTX 4060. The container has no host bind mounts or Docker socket, runs non-root with dropped capabilities, and is ephemeral/one-job; this reduces exposure but does not make Docker a perfect security boundary.
+Docker/WSL2 are not prerequisites for this project because native Windows cuTile attention already passed. The Docker runner design is retained only as an optional future isolation route. Do not install or configure Docker as part of the remaining task unless the project owner asks for that separate route. If used later, keep the no-host-mount/no-Docker-socket/non-root constraints from [CUTILE_DOCKER_RUNNER.md](CUTILE_DOCKER_RUNNER.md); those controls reduce exposure but are not a perfect security boundary.
 
 No driver upgrade or machine-wide CUDA Toolkit installation is performed by project scripts.
