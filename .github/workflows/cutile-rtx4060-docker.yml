@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inventory GPU and reuse existing local cuTile environment
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $NvidiaSmi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
@@ -53,7 +53,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Required GPU packages are missing from the existing Python environment. No packages were installed.' }
 
       - name: Compile and launch genuine cuTile smoke kernel
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $Py = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
@@ -65,7 +65,7 @@ jobs:
           if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'CUTILE_SMOKE=PASS' -Quiet)) { throw 'cuTile smoke gate did not pass.' }
 
       - name: Run required actual cuTile attention correctness matrix
-        shell: pwsh
+        shell: powershell
         env:
           REQUIRE_CUTILE: "1"
         run: |
@@ -77,7 +77,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness matrix failed.' }
 
       - name: Exercise CLI and verify output against independent NumPy oracle
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
@@ -90,7 +90,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'CLI output mismatches the independent NumPy reference.' }
 
       - name: Benchmark fused cuTile versus unfused CuPy
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
@@ -101,7 +101,7 @@ jobs:
 
       - name: Attempt two genuine cuTile Nsight Compute captures if already installed
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $Ncu = Get-Command ncu.exe -ErrorAction SilentlyContinue
