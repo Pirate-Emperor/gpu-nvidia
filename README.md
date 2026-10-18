@@ -21,6 +21,7 @@ Use this order to understand the project and decide what to do next.
 | Dated experiment history | [Progress log](docs/PROGRESS.md) |
 | How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
 | Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
+| Local RTX 4060/Windows cuTile bring-up and first smoke test | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
 | Full handoff for a new chat: runs, benchmarks, environment, security plan, and next steps | [Chat handoff](docs/CHAT_HANDOFF_2026-10-18.md) |
 | Copy-paste prompt to continue in a new chat | [Continuation prompt](docs/CONTINUE_PROMPT.md) |
 
@@ -36,9 +37,9 @@ Use this order to understand the project and decide what to do next.
 
 **What is not done yet:** actual `src/cutile_attention.py` execution and full correctness on a supported GPU/runtime, controlled actual-cuTile performance comparisons, and successful Nsight Compute profiles. The available A100 runner uses driver R550.90.07, and the project's current cuTile environment gate requires R580+; its profiler also reports `ERR_NVGPUCTRPERM`. Do not count the ordinary-CUDA surrogate results as completed cuTile results.
 
-**Execution decision (2026-10-18):** stop using the existing A100 runner as the actual-cuTile route. Its verified R550.90.07 driver is below NVIDIA's documented R580 minimum, and prior CUDA compatibility attempts did not produce a verified cuTile run. Keep that A100 runner for ordinary-CUDA surrogate tests only. Move actual-cuTile bring-up to the user's local GPU after its real hardware/OS/toolchain inventory, or to another explicitly authorized GPU environment meeting NVIDIA's current requirements. Do not assume an RTX 4060 or any local driver/toolkit state.
+**Execution decision (2026-10-18):** stop using the existing A100 runner as the actual-cuTile route; its R550.90.07 driver is below NVIDIA's documented R580 minimum. The user's local RTX 4060 is now inventoried at compute capability 8.9 and driver 616.92 on 64-bit Windows. That GPU/driver/OS combination meets the documented cuTile prerequisites on paper. Native Windows is the first attempt because NVIDIA lists Windows x86_64 as supported and WSL2/Docker are not installed. Python and system NVCC are absent, but the isolated `cuda-tile[tileiras]` and `cupy-cuda13x[ctk]` packages can supply compiler/runtime components without a global Toolkit install. Windows CuPy/NVRTC has a reported DLL failure history, so a genuine compile/launch/output smoke test remains mandatory.
 
-**Immediate next action:** collect the local machine inventory in "Next objectives" below. Choose Windows-native versus Linux/WSL2 only after seeing the actual OS/GPU/driver output. Do not register a runner or claim isolation until the OS-enforced security boundary is matched to and tested on that environment. See the [TODO checklist](docs/TODO_CHECKLIST.md) and [environment notes](docs/ENVIRONMENT.md).
+**Immediate next action:** install per-user 64-bit CPython 3.12, check out this repository, then follow [the local Windows GPU guide](docs/LOCAL_GPU_WINDOWS.md). Do not register a runner or claim isolation until the local smoke/correctness tests pass and the security boundary is tested.
 
 ## Goal
 
@@ -207,13 +208,7 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 
 ## Next objectives (do these in order)
 
-1. **Inventory the local GPU before configuring a runner.** On Windows PowerShell, run:
-
-       nvidia-smi
-       nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv
-       nvcc --version
-
-   If a query field is unsupported, use `nvidia-smi -q`. Also report OS/build or Linux distro/kernel, WSL2 status, Python version and Docker availability. On Windows PowerShell: `Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber, OsArchitecture`, `wsl --status`, `python --version`, `docker --version`. On Linux/WSL2: `cat /etc/os-release`, `uname -a`, `python3 --version`, and whether `docker` and `nvcc` are present. Missing `nvcc` is useful information; the CUDA version shown by `nvidia-smi` is not proof that NVCC/the toolkit is installed. Keep credentials and machine secrets out of the output.
+1. **Run the first genuine cuTile smoke test on the local GPU.** The confirmed candidate is RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64. Install per-user 64-bit CPython 3.12, then follow [docs/LOCAL_GPU_WINDOWS.md](docs/LOCAL_GPU_WINDOWS.md): `scripts/setup_cutile_windows.ps1` creates a project virtual environment, installs `cuda-tile[tileiras]` and `cupy-cuda13x[ctk]`, and runs `scripts/cutile_smoke.py`. Require `CUTILE_SMOKE=PASS` before testing attention.
 2. **Create a least-privilege, project-only GPU runner.** Prefer a disposable Linux VM or a tightly isolated GPU-enabled container. Use a dedicated unprivileged account, one writable project workspace, no sudo/administrator role, no personal home-directory mounts, no host Docker socket, no privileged container, no personal tokens/SSH keys/cloud credentials, minimal outbound network, and an ephemeral runner when feasible. Restrict it to this private repository and trusted/manual workflows; do not run untrusted pull-request code on it. The runner itself must authenticate to GitHub, but its registration/connection credentials must stay local and never be pasted into chat or exposed to job steps. ChatGPT does not gain interactive shell access merely because a runner is registered; Actions workflows run commands on the runner.
 3. **Prove the environment first.** Check driver, GPU visibility, toolkit/compiler and Python environment, then compile and launch a tiny actual cuTile smoke kernel and compare its output. Do not count imports or skipped tests as successful GPU execution.
 4. **Run actual-cuTile correctness, then benchmark.** Exercise src/cutile_attention.py, D=32/64/128, causal/stability/edge invariants, two or more legal tile configurations, and the CLI. Only after correctness passes, capture cold/JIT time separately and run CUDA-event timing with at least 10 warmups and at least 30 timed iterations.
