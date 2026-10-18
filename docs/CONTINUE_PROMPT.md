@@ -24,7 +24,7 @@ The immediate next task is to provide the actual local GPU inventory. Do not ass
     nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv
     nvcc --version
 
-First use the currently documented facts; do not invent my local GPU specs or assume the OS/driver/toolkit. Help choose Windows-native vs WSL2/Linux after the output is available. Design a secure, project-only GitHub Actions runner:
+Inventory is complete; treat only the user's reported GPU/driver/OS facts as known. Native Windows x64 meets NVIDIA's published requirements on paper. Actual CuPy/cuTile runtime support is still unverified until `scripts/cutile_smoke.py` passes. Design a secure, project-only GitHub Actions runner:
 - dedicated non-admin/non-root account;
 - preferably disposable VM or tightly isolated GPU-enabled container;
 - only this project's workspace writable/mounted;
@@ -61,4 +61,4 @@ End technical updates with:
     ACTUAL:
     DECISION/NEXT:
 
-**Start now** by reading the handoff and inspecting the current repository head/workflows; then determine whether the safe local GPU runner can be configured from the actual machine inventory. If the machine inventory has not yet been supplied in this conversation, continue work that does not depend on guessing it and state exactly which local-only input is still needed.
+**Start now** by reading the handoff and inspecting the current repository head/workflows; then determine whether the safe local GPU runner can be configured from the actual machine inventory. Current next gate: real `CUTILE_SMOKE=PASS`; then strict actual-cuTile correctness tests with `REQUIRE_CUTILE=1`. No runner registration or attention benchmark before those gates.
