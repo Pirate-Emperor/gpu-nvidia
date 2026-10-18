@@ -27,6 +27,7 @@ def main() -> int:
     print(f"OS={platform.platform()}")
     print(f"ARCH={platform.machine()}")
     print(f"PYTHON={sys.version.split()[0]}")
+    package_versions = {}
     for package in (
         "numpy",
         "cupy-cuda13x",
@@ -35,7 +36,28 @@ def main() -> int:
         "nvidia-cuda-nvcc",
         "nvidia-nvvm",
     ):
-        print(f"PACKAGE_{package.upper().replace('-', '_')}={distribution_version(package)}")
+        version = distribution_version(package)
+        package_versions[package] = version
+        print(f"PACKAGE_{package.upper().replace('-', '_')}={version}")
+
+    # NVIDIA documents that these three compiler package versions must match
+    # major.minor. Fail early and visibly rather than compiling with a mixed
+    # TileIR / ptxas / NVVM toolchain.
+    toolchain_packages = (
+        "nvidia-cuda-tileiras",
+        "nvidia-cuda-nvcc",
+        "nvidia-nvvm",
+    )
+    toolchain_major_minor = {}
+    for package in toolchain_packages:
+        version = package_versions[package]
+        parts = version.split(".")
+        if version.startswith("<") or len(parts) < 2 or not parts[0].isdigit() or not parts[1].isdigit():
+            raise RuntimeError(f"Cannot verify required compiler package version for {package}: {version}")
+        toolchain_major_minor[package] = ".".join(parts[:2])
+    if len(set(toolchain_major_minor.values())) != 1:
+        raise RuntimeError(f"cuTile compiler components have mismatched major.minor versions: {toolchain_major_minor}")
+    print(f"TILEIR_TOOLCHAIN_MAJOR_MINOR={next(iter(toolchain_major_minor.values()))}")
 
     # Import only after printing the environment so missing runtime pieces are
     # distinguishable from a compiler/launch failure in the captured log.
