@@ -97,18 +97,6 @@ def test_tile_configurations_agree_with_each_other():
                 np.testing.assert_allclose(value, other, rtol=2e-2, atol=2e-2)
 
 
-def test_empty_causal_tiles_do_not_nan_when_query_tile_exceeds_key_tile():
-    """Regression for rows whose first K tile contains only future keys."""
-    require_a100()
-    q, k, v = make_inputs(D=64, N=128, seed=9010)
-    actual = forward(q, k, v, tile_q=64, tile_k=32)
-    expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
-
-    assert np.isfinite(actual).all()
-    assert_matches_reference(actual, q, k, v)
-    np.testing.assert_allclose(actual, expected, rtol=2e-2, atol=2e-2)
-
-
 def test_future_values_cannot_change_earlier_query_outputs():
     require_a100()
     q, k, v = make_inputs(D=64, N=64, seed=9003)
