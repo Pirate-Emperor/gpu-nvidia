@@ -332,3 +332,32 @@ The Windows runner is Online and sees the correct RTX 4060, but **the already-ex
 - The prior A100 ERR_NVGPUCTRPERM event is a distinct historical ordinary-CUDA issue; RTX 4060 counter access remains untested because ncu was not found.
 - To finish: after owner approval for a project-local official NVIDIA Nsight Compute download, capture medium D=128 tile 64×64 and longer-batched D=128 tile 64×128, inspect reports, and preserve both reports/logs. No system-wide install, admin rights, or download has been performed.
 - CUDA-enabled PyTorch SDPA comparison remains optional/unrun; the measured baseline is the intentionally unfused FP32 CuPy implementation.
+
+
+## 2026-10-19 — actual-cuTile Nsight Compute profiling completed
+
+### Execution and artifacts
+- Updated the native Windows cuTile workflow to find the installed Nsight Compute CLI under the standard NVIDIA installation location and profile only the intended steady-state launch. The repeated end-to-end native run [#39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223) succeeded: smoke, 48 required actual-cuTile tests, 29 numerical configurations, CLI/oracle, and all three controlled benchmark sessions passed.
+- Nsight Compute CLI **2026.3.1.0 (build 38829034)** was found at the standard NVIDIA Program Files location. RTX 4060 hardware-counter collection succeeded; no \`ERR_NVGPUCTRPERM\` was observed.
+- Captured basic throughput/resource profiles and supplemental scheduler/warp-state profiles for both \`medium_d128\` tile 64×64 and \`longer_batched_d128\` tile 64×128.
+- Profile workflow: [#39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066). Complete report artifact: [12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). It contains four compressed \`.ncu-repz\` reports, their exported detail text/raw CSVs, and CLI logs/status.
+
+### Measured profiler findings
+| Metric | medium_d128 64×64 | longer_batched_d128 64×128 |
+|---|---:|---:|
+| Nsight kernel duration | 52.90 µs | 984.26 µs |
+| Registers per thread | 231 | 255 |
+| Static shared memory per CTA | 65.54 KiB | 81.92 KiB |
+| Achieved occupancy | 8.35% | 8.33% |
+| SM compute throughput | 18.81% | 30.27% |
+| DRAM throughput | 22.88% | 11.89% |
+| Scheduler cycles with no eligible warp | 85.83% | 85.26% |
+| Warp cycles per issued instruction | 7.08 | 6.78 |
+| Nsight rule execution-pipeline stall estimate | 2.4 cycles | 3.1 cycles |
+
+The occupancy section identifies shared memory as the CTA-residency limiter (one CTA per SM). Nsight's estimated local speedup from the warp-state rule (33.57% and 46.04%) is a heuristic, not a measured speedup guarantee. The optional \`smsp__pcsamp_sample_count\` metric was unavailable, so source-level stall-sampling locations were not accessible.
+
+### Decision and next-step boundary
+- Mark the hard profiling gate complete. The dedicated [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) discusses the evidence and limitations.
+- Keep the validated 64×64 general default and the promising 64×128 longer-batched tile. The evidence points to shared-memory/register footprint and instruction scheduling as possible optimization areas, but no kernel change is justified without a new version passing correctness and repeated benchmarks.
+- The optional CUDA-enabled PyTorch SDPA comparison remains outside the completed core scope. Current speedups are versus the deliberately unfused FP32 CuPy baseline, not a vendor-optimized attention kernel.
