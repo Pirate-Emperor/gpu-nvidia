@@ -108,12 +108,21 @@ Use **64×64 as the general default**. It was best on long D=128 (0.267059 ms, 1
 
 Do not headline the short_d32/short_d64 speedups: Windows/WDDM timings varied massively between sessions, and short_d32 baseline drift reached 87.2%. Medium D=128 fused spread reached 10.8%, so tile ranking there is also provisional.
 
-## Remaining profiling gate
+## Nsight Compute profiling — PASS (2026-10-19)
 
-The latest workflow writes this status:
+Two genuine cuTile reports were captured on the Windows RTX 4060 with Nsight Compute CLI 2026.3.1.0. The GPU accepted hardware-counter collection; there was no RTX 4060 `ERR_NVGPUCTRPERM`.
 
-    NCU_NOT_PRESENT_IN_PROJECT_DIRECTORY: not searched outside the project and no download/install attempted.
+- Full native run, including the repeated smoke/correctness/CLI/benchmark path: [workflow #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223).
+- Final reports and metric exports: [profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039), produced by [profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066).
+- Detailed interpretation: [CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 
-Nsight Compute was not launched and captured zero kernels. This does not establish whether the RTX 4060 runner's counters are permitted: no profiler executable was available in the allowed project directories. The earlier A100 ERR_NVGPUCTRPERM issue is a separate historical ordinary-CUDA result and is not the Windows RTX 4060 outcome.
+| Profile | Kernel duration | Registers/thread | Static shared memory/block | Achieved occupancy | Compute throughput | DRAM throughput |
+|---|---:|---:|---:|---:|---:|---:|
+| medium_d128, 64×64 | 52.90 µs | 231 | 65.54 KiB | 8.35% | 18.81% | 22.88% |
+| longer_batched_d128, 64×128 | 984.26 µs | 255 | 81.92 KiB | 8.33% | 30.27% | 11.89% |
 
-Two real cuTile profiles are still required, ideally medium_d128 at 64×64 and longer_batched_d128 at 64×128. A download of the official NVIDIA profiling tool is outside the previous allowance for installing Python packages into the venv. Do not install globally, use admin privileges, or mark this project complete until that remaining tool download is authorized and two inspectable profile files/logs are preserved.
+The basic Occupancy section identifies shared memory as the CTA-residency limiter (one CTA per SM, about 8.3% achieved occupancy). The supplemental Scheduler/ Warp State sections recorded no-eligible-warp cycles of 85.83% and 85.26%, respectively, and Nsight's execution-pipeline-stall rule estimated 2.4 / 3.1 cycles per issued instruction. The rule's estimated local speedups (33.57% / 46.04%) are heuristic outputs, not measured gains. The optional `smsp__pcsamp_sample_count` metric was unavailable, so detailed source-level stall sampling could not be inspected.
+
+**Optimization decision:** retain the validated 64×64 general default and 64×128 longer-batched specialization. The reports make shared-memory/register pressure and instruction scheduling the evidence-based next research targets, but do not justify an untested change by themselves. Any new kernel variant must pass correctness first and then repeat the controlled benchmark sessions before promotion.
+
+The raw compressed `.ncu-repz` reports, exported details and raw CSVs are preserved in artifact 12149902039. Historical A100 `ERR_NVGPUCTRPERM` evidence is separate and does not describe the RTX 4060 result.
