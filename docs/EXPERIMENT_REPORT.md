@@ -1,6 +1,6 @@
 # Fused Attention with cuTile — Experiment Report
 
-**Updated:** 2026-10-10  
+**Updated:** 2026-10-18 (continuation review; historical benchmark numbers unchanged)  
 **Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
 **Core kernel snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585`; the paired v5 benchmark uses code at `caeb6e79e4237222d021782a3a9bdb72d6c4ca7f` (documentation updates are committed afterward)
 
@@ -20,6 +20,14 @@
 | Actual NVIDIA cuTile on A100 | BLOCKED | Driver is R550.90.07; current project gate requires R580+. The CUDA surrogate is not actual cuTile. |
 
 **Important distinction:** ordinary-CUDA correctness and performance results are useful engineering evidence, but do not satisfy the final actual-cuTile execution/profiling requirement.
+
+## 1A. Continuation review: routing and current evidence access
+
+- At the start of this continuation, `main` was verified at `e87d8b9352fdf6783347d5c1e1945172011ebeb9`, matching the handoff commit.
+- The existing A100 runner's verified driver is R550.90.07, below NVIDIA's documented R580+ cuTile Python runtime minimum. The actual-cuTile route moves to the user's local GPU after inventory, or another explicitly authorized supported environment. Retain the A100 for ordinary-CUDA surrogate controls only; do not assume local hardware or repeat the failed compatibility path.
+- NVIDIA's [current cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) lists Linux x86_64/Linux aarch64/Windows x86_64, compute capability 8.x–12.x, driver R580+, and Python 3.10–3.14. The `[tileiras]` path provides compiler components in the venv with matching major.minor package versions; system CUDA Toolkit 13.1+ is an alternative. Detailed profiling requires Linux R580.126.09+ or Windows R582.16+.
+- **Actions evidence access note (2026-10-18 continuation):** the connected Actions run list returned zero visible runs; direct run-detail, job and artifact requests for handoff IDs (including #343, #52, #340, benchmark #4 and Nsight Systems #2) returned 404; the current handoff commit had no visible combined status. This does not prove historical runs are absent. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
+- The local GPU inventory was not supplied in this continuation, so no Windows-native/WSL2 decision, runner registration, isolation claim or actual GPU test has been made.
 
 ## 2. Hardware and software constraints
 
