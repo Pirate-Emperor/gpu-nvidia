@@ -4,9 +4,30 @@
 **Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
 **Core kernel snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585`; the paired v5 benchmark uses code at `caeb6e79e4237222d021782a3a9bdb72d6c4ca7f` (documentation updates are committed afterward)
 
-## Update — 2026-10-19: native Windows runner experiments
 
-This update supersedes no prior benchmark values. It records the first use of the local Windows RTX 4060 Actions runner after its registration. The current run sequence **has not reached a cuTile kernel launch** and therefore adds no attention correctness, performance or profiling evidence.
+## Current verified result — 2026-10-19 actual cuTile attention on RTX 4060
+
+The previous runner-discovery table below documents failures before the project venv existed. It is historical and superseded by [successful workflow #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), commit 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428.
+
+| Gate | Current result | Evidence |
+|---|---|---|
+| Genuine cuTile smoke | PASS | Vector-add compile/launch, synchronization and exact output validation passed. |
+| Attention correctness | PASS | 48 passed / 0 failed with REQUIRE_CUTILE=1. |
+| Numerical diagnostics | PASS | 29 legal case/tile configurations, zero tolerance violations. |
+| CLI / NumPy oracle | PASS | FP16 output contract and independent reference check passed. |
+| Performance comparison | PASS with caveats | Three repeat sessions, five tile configurations, 10 warmups and 30 CUDA-event samples with five launches/sample; raw JSON/CSV archived. |
+| Actual-cuTile NCU profiles | OPEN / BLOCKED | No ncu executable under project root or .tools; no download or profile attempted. |
+
+All evidence is in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465) and the [detailed current results](CUTILE_RTX4060_RESULTS_2026-10-19.md).
+
+The current fused kernel skips wholly-future K/V tiles and uses FP16 probability operands for P×V with FP32 accumulation and online-softmax state. Use 64×64 as the general default; 64×128 measured best for the longer batched D=128 case. The 128×128 tile loses on long D=128 cases. Short sequence timings are extremely noisy on Windows/WDDM and should not be used as headline speedup claims.
+
+The remaining hard gate is two actual cuTile Nsight Compute report files, medium D=128 at 64×64 and longer batched D=128 at 64×128. Tool download needs owner approval for project-local .tools. The CUDA-enabled PyTorch SDPA comparison remains unrun; this benchmark uses the deliberately unfused FP32 CuPy baseline.
+
+
+## Historical runner setup failures — before local venv creation (superseded by the successful run above)
+
+These first attempts happened before the project-local venv existed. They are retained as chronological history; later run #39160827910 executed and passed actual attention correctness and the controlled benchmark.
 
 | Run ID | Commit (short) | Outcome | Exact finding |
 |---|---|---|---|
@@ -17,7 +38,7 @@ This update supersedes no prior benchmark values. It records the first use of th
 
 The workflow is configured to reuse an existing environment only, not create one or run pip. This adheres to the no-install/no-third-party-download requirement. The absence of the existing environment within the repository means this constraint currently prevents progress into GPU kernel tests. The previously reported native vector-add smoke pass proves only that some prior Python environment could execute a trivial cuTile kernel; it does not identify a usable environment available to this runner checkout.
 
-**Remaining work is unchanged:** actual cuTile smoke in the runner environment; full required attention correctness; CLI versus independent NumPy oracle; 10 warmups and at least 30 CUDA-event benchmark samples for legal tile configurations; separate first-call/JIT reporting; per-case median/P90, throughput and speedup; and two actual cuTile profiler captures if an already-installed Nsight Compute can access counters without admin rights. No benchmark or profiler metric is asserted until a corresponding artifact exists.
+**Remaining work after the successful run:** capture and inspect two actual-cuTile Nsight Compute reports after an official profiler is approved for project-local .tools. Correctness, CLI, numerical diagnostics, and performance metrics are now available above and in the linked artifact.
 
 ## 1. Executive status
 
