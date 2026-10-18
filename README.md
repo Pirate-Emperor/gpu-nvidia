@@ -1,6 +1,6 @@
 # Fused Causal Attention with NVIDIA cuTile
 
-IIT Madras GPU Programming course project: implement and optimize causal scaled dot-product self-attention as a fused NVIDIA cuTile GPU kernel, targeted at NVIDIA A100/SM80.
+IIT Madras GPU Programming course project: implement and optimize causal scaled dot-product self-attention as a fused NVIDIA cuTile GPU kernel. The current actual-cuTile bring-up target is the inventoried GeForce RTX 4060 (SM89) on native Windows; the existing A100/R550 machine remains an ordinary-CUDA control only.
 
 
 ## Start here: project navigation
@@ -21,6 +21,7 @@ Use this order to understand the project and decide what to do next.
 | Dated experiment history | [Progress log](docs/PROGRESS.md) |
 | How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
 | Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
+| Local RTX 4060/Windows cuTile bring-up and first smoke test | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
 | Local RTX 4060/Windows cuTile bring-up and first smoke test | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
 | Full handoff for a new chat: runs, benchmarks, environment, security plan, and next steps | [Chat handoff](docs/CHAT_HANDOFF_2026-10-18.md) |
 | Copy-paste prompt to continue in a new chat | [Continuation prompt](docs/CONTINUE_PROMPT.md) |
@@ -208,15 +209,15 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 
 ## Next objectives (do these in order)
 
-1. **Run the first genuine cuTile smoke test on the local GPU.** The confirmed candidate is RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64. Install per-user 64-bit CPython 3.12, then follow [docs/LOCAL_GPU_WINDOWS.md](docs/LOCAL_GPU_WINDOWS.md): `scripts/setup_cutile_windows.ps1` creates a project virtual environment, installs `cuda-tile[tileiras]` and `cupy-cuda13x[ctk]`, and runs `scripts/cutile_smoke.py`. Require `CUTILE_SMOKE=PASS` before testing attention.
-2. **Create a least-privilege, project-only GPU runner.** Prefer a disposable Linux VM or a tightly isolated GPU-enabled container. Use a dedicated unprivileged account, one writable project workspace, no sudo/administrator role, no personal home-directory mounts, no host Docker socket, no privileged container, no personal tokens/SSH keys/cloud credentials, minimal outbound network, and an ephemeral runner when feasible. Restrict it to this private repository and trusted/manual workflows; do not run untrusted pull-request code on it. The runner itself must authenticate to GitHub, but its registration/connection credentials must stay local and never be pasted into chat or exposed to job steps. ChatGPT does not gain interactive shell access merely because a runner is registered; Actions workflows run commands on the runner.
-3. **Prove the environment first.** Check driver, GPU visibility, toolkit/compiler and Python environment, then compile and launch a tiny actual cuTile smoke kernel and compare its output. Do not count imports or skipped tests as successful GPU execution.
-4. **Run actual-cuTile correctness, then benchmark.** Exercise src/cutile_attention.py, D=32/64/128, causal/stability/edge invariants, two or more legal tile configurations, and the CLI. Only after correctness passes, capture cold/JIT time separately and run CUDA-event timing with at least 10 warmups and at least 30 timed iterations.
-5. **Complete hardware profiling.** Obtain explicitly authorized Nsight Compute counter access, then save at least two real actual-cuTile profiles (medium and long/batched). The existing Nsight Systems traces cover only ordinary CUDA.
-6. **Optimize based on evidence and update all result docs.** Keep current/v5 performance claims conservative, preserve regressions and artifacts, and update the experiment report, test matrix, progress log, and status snapshot after each meaningful run.
+1. **Bootstrap and smoke-test actual cuTile on the local RTX 4060.** Install per-user 64-bit CPython 3.12, then follow [docs/LOCAL_GPU_WINDOWS.md](docs/LOCAL_GPU_WINDOWS.md). Run `scripts/setup_cutile_windows.ps1`; it creates a project virtual environment, installs `cuda-tile[tileiras]` and `cupy-cuda13x[ctk]`, and launches the genuine `scripts/cutile_smoke.py` kernel. Require `CUTILE_SMOKE=PASS`.
+2. **Run actual cuTile correctness without allowing skips.** Set `$env:REQUIRE_CUTILE = "1"` and run `python -m pytest -q tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py` from the project venv. Record exact commit, package/GPU versions and logs. Do not set `REQUIRE_A100` on the RTX 4060.
+3. **Validate CLI I/O end-to-end.** Run `python run_attention.py --input INPUT.npz --output OUTPUT.npy --backend cutile`; verify output shape, FP16 dtype, finite values and independent-reference tolerance.
+4. **Benchmark only after correctness passes.** Cover D=32/64/128, at least two legal tiles and frozen cases; compare with unfused CuPy and a suitable framework baseline where available. Use at least 10 warmups and at least 30 CUDA-event samples, separately report cold/JIT, per-case median/P90, throughput, speedup, and raw JSON/CSV.
+5. **Profile on supported tooling.** Confirm Nsight Compute is installed and its counters are available without privileged workarounds. The current driver exceeds the documented Windows detailed-profiling minimum, but the profiler installation/access itself is not yet verified. Preserve at least two actual-cuTile profile files and logs.
+6. **Only then decide whether to use Actions on the local GPU.** Do not register a runner on the personal Windows host before testing a real OS-enforced least-privilege boundary. A runner executes repository workflow code as its account and is not itself a sandbox. Keep registration credentials local and run trusted manual workflows from `main` only.
 
-The [handoff document](docs/CHAT_HANDOFF_2026-10-18.md) contains exact prior results, benchmark numbers, runner details, the secure setup checklist, and a ready-to-paste continuation prompt.
-
+The [handoff document](docs/CHAT_HANDOFF_2026-10-18.md) contains historical benchmark data and the remaining course completion gates.
+ 
 ## Course-scope boundary
 
 The following are exploratory only and should be postponed until the required path is correct, benchmarked, and profiled:
