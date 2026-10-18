@@ -24,6 +24,14 @@ The clean path is:
 
 The repository does not attempt a host driver mutation automatically.
 
+## Actual-cuTile routing decision — 2026-10-18
+
+Do not continue trying to force actual cuTile onto the existing A100 runner at R550.90.07. It remains useful for ordinary-CUDA surrogate tests but does not meet NVIDIA's documented R580+ cuTile Python driver prerequisite. Move actual-cuTile bring-up to the user's local GPU after collecting real inventory, or to another explicitly authorized supported GPU environment. Do not assume a local model or change a system driver without owner/admin action.
+
+NVIDIA's [current cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) lists Linux x86_64, Linux aarch64 and Windows x86_64, compute capability 8.x–12.x, driver R580+, and Python 3.10–3.14. The optional `[tileiras]` installation supplies compiler components inside a Python environment; `nvidia-cuda-tileiras`, `nvidia-cuda-nvcc` and `nvidia-nvvm` must match in major.minor. A system CUDA Toolkit 13.1+ is an alternative, not automatically a global installation requirement. Detailed cuTile profiling requires R580.126.09+ on Linux or R582.16+ on Windows.
+
+Choose Windows-native versus Linux/WSL2 only after gathering GPU model/compute capability, driver, OS/build or distro/kernel, WSL2 status, Python, Docker availability, and `nvcc --version`. The CUDA level shown by `nvidia-smi` is not proof NVCC/the Toolkit is installed. Do not register a runner until its OS-enforced isolation, mounts, privileges and workflow trigger policy have been verified.
+
 ## Forward compatibility
 
 NVIDIA documents CUDA forward compatibility for supported data-center GPUs through cuda-compat-<major>-<minor> packages. The compatibility package supplies user-space driver components, including libcuda and, for newer CUDA releases, TileIR-related components.
