@@ -41,7 +41,19 @@ def make_inputs(case, cp):
     return cp.asarray(q), cp.asarray(k), cp.asarray(v)
 
 
-def timed_gpu(fn, cp, warmup: int, iterations: int) -> tuple[float, float]:
+def timed_gpu(
+    fn,
+    cp,
+    warmup: int,
+    iterations: int,
+    repeats_per_sample: int,
+) -> tuple[float, float]:
+    """Measure 30+ event samples, each averaging several identical invocations.
+
+    A short kernel can be near the timer resolution and one event sample is
+    sensitive to scheduling noise. Grouping 5 calls per event makes each
+    reported sample longer while preserving per-invocation latency.
+    """
     stream = cp.cuda.get_current_stream()
     for _ in range(warmup):
         fn()
@@ -52,10 +64,12 @@ def timed_gpu(fn, cp, warmup: int, iterations: int) -> tuple[float, float]:
         start = cp.cuda.Event()
         end = cp.cuda.Event()
         start.record(stream)
-        fn()
+        for _repeat in range(repeats_per_sample):
+            fn()
         end.record(stream)
         end.synchronize()
-        samples.append(float(cp.cuda.get_elapsed_time(start, end)))
+        elapsed = float(cp.cuda.get_elapsed_time(start, end))
+        samples.append(elapsed / repeats_per_sample)
 
     samples = np.asarray(samples, dtype=np.float64)
     return float(np.median(samples)), float(np.percentile(samples, 90))
@@ -81,13 +95,24 @@ def parse_tile(value: str) -> tuple[int, int]:
     return q, k
 
 
-def run_case(case, cp, tiles, warmup, iterations, seen_specializations):
+def run_case(
+    case, cp, tiles, warmup, iterations, repeats_per_sample, seen_specializations
+):
     q, k, v = make_inputs(case, cp)
     q32 = q.astype(cp.float32)
     k32 = k.astype(cp.float32)
     v32 = v.astype(cp.float32)
     output_bytes = case.B * case.H * case.N * case.Dv * np.dtype(np.float16).itemsize
     rows = []
+    baseline_call = lambda: baseline_launch_device(q32, k32, v32)
+
+    # Bracket the tile sweep with unfused-baseline measurements. This avoids
+    # timing the same baseline separately after every tile and lets us detect
+    # drift during the session rather than confounding it with tile order.
+    baseline_before_ms, baseline_before_p90 = timed_gpu(
+        baseline_call, cp, warmup=warmup, iterations=iterations,
+        repeats_per_sample=repeats_per_sample,
+    )
 
     for tile_q, tile_k in tiles:
         if case.N % tile_q or case.N % tile_k:
@@ -96,21 +121,17 @@ def run_case(case, cp, tiles, warmup, iterations, seen_specializations):
         fused_call = lambda: cutile_launch_device(
             q, k, v, tile_q=tile_q, tile_k=tile_k
         )
-        baseline_call = lambda: baseline_launch_device(q32, k32, v32)
-
         specialization = (tile_q, tile_k, case.D, case.Dv)
         if specialization in seen_specializations:
-            # The cuTile kernel is cached by tile/head dimensions; don't label
-            # a warmed launch as JIT time for every later case.
+            # Each benchmark process reports first-call timing only once per
+            # specialization. This can still be a compiler-cache hit.
             jit_ms = None
         else:
             jit_ms = cold_start_ms(fused_call, cp)
             seen_specializations.add(specialization)
         fused_ms, fused_p90 = timed_gpu(
-            fused_call, cp, warmup=warmup, iterations=iterations
-        )
-        baseline_ms, baseline_p90 = timed_gpu(
-            baseline_call, cp, warmup=warmup, iterations=iterations
+            fused_call, cp, warmup=warmup, iterations=iterations,
+            repeats_per_sample=repeats_per_sample,
         )
 
         rows.append(
@@ -127,15 +148,33 @@ def run_case(case, cp, tiles, warmup, iterations, seen_specializations):
                 "jit_ms": jit_ms,
                 "fused_median_ms": fused_ms,
                 "fused_p90_ms": fused_p90,
-                "baseline_median_ms": baseline_ms,
-                "baseline_p90_ms": baseline_p90,
-                "speedup_vs_unfused": baseline_ms / fused_ms,
+                "baseline_before_median_ms": baseline_before_ms,
+                "baseline_before_p90_ms": baseline_before_p90,
+                "baseline_median_ms": None,
+                "baseline_p90_ms": None,
+                "speedup_vs_unfused": None,
                 "fused_output_GiB_s": output_bytes / fused_ms / 2**30 * 1000.0,
-                "baseline_output_GiB_s": output_bytes / baseline_ms / 2**30 * 1000.0,
+                "baseline_output_GiB_s": None,
                 "iterations": iterations,
                 "warmup": warmup,
+                "repeats_per_sample": repeats_per_sample,
+                "measured_launches": iterations * repeats_per_sample,
             }
         )
+
+    baseline_after_ms, baseline_after_p90 = timed_gpu(
+        baseline_call, cp, warmup=warmup, iterations=iterations,
+        repeats_per_sample=repeats_per_sample,
+    )
+    baseline_ms = (baseline_before_ms + baseline_after_ms) / 2.0
+    baseline_p90 = (baseline_before_p90 + baseline_after_p90) / 2.0
+    for row in rows:
+        row["baseline_after_median_ms"] = baseline_after_ms
+        row["baseline_after_p90_ms"] = baseline_after_p90
+        row["baseline_median_ms"] = baseline_ms
+        row["baseline_p90_ms"] = baseline_p90
+        row["speedup_vs_unfused"] = baseline_ms / row["fused_median_ms"]
+        row["baseline_output_GiB_s"] = output_bytes / baseline_ms / 2**30 * 1000.0
 
     del q, k, v, q32, k32, v32
     cp.get_default_memory_pool().free_all_blocks()
@@ -184,7 +223,7 @@ def main() -> int:
         help="JSON output path; a sibling CSV is also written",
     )
     parser.add_argument("--warmup", type=int, default=10)
-    parser.add_argument("--iterations", type=int, default=50)
+    parser.add_argument("--iterations", type=int, default=30)
     parser.add_argument(
         "--tiles",
         nargs="+",
@@ -198,10 +237,11 @@ def main() -> int:
         choices=[case.name for case in MANDATORY_CASES],
         help="benchmark only the selected case; repeat the option for multiple cases",
     )
+    parser.add_argument("--repeats-per-sample", type=int, default=5, help="GPU launches inside each CUDA-event sample")
     args = parser.parse_args()
 
-    if args.warmup < 1 or args.iterations < 30:
-        parser.error("--warmup must be >= 1 and --iterations must be >= 30")
+    if args.warmup < 1 or args.iterations < 30 or args.repeats_per_sample < 1:
+        parser.error("--warmup must be >= 1, --iterations >= 30, and --repeats-per-sample >= 1")
 
     try:
         import cupy as cp
@@ -234,6 +274,7 @@ def main() -> int:
                 args.tiles,
                 warmup=args.warmup,
                 iterations=args.iterations,
+                repeats_per_sample=args.repeats_per_sample,
                 seen_specializations=seen_specializations,
             )
         )
@@ -247,6 +288,9 @@ def main() -> int:
         "environment": environment_metadata(cp, gpu_name),
         "warmup": args.warmup,
         "iterations": args.iterations,
+        "repeats_per_sample": args.repeats_per_sample,
+        "timed_launches_per_configuration": args.iterations * args.repeats_per_sample,
+        "baseline_measurement": "baseline median/P90 is the average of measurements bracketed around the tile sweep",
         "tiles": [{"tile_q": q, "tile_k": k} for q, k in args.tiles],
         "results": all_rows,
     }

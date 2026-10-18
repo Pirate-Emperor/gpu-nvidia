@@ -36,6 +36,8 @@ def main() -> int:
             "gpu": data.get("environment", {}).get("gpu"),
             "warmup": data.get("warmup"),
             "iterations": data.get("iterations"),
+            "repeats_per_sample": data.get("repeats_per_sample", 1),
+            "baseline_measurement": data.get("baseline_measurement"),
             "tiles": data.get("tiles"),
         })
         for row in data["results"]:
