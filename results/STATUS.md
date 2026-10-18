@@ -1,5 +1,12 @@
 # Current Result Snapshot
 
+## Continuation status — 2026-10-18
+
+- At the start of this continuation, `main` was `e87d8b9352fdf6783347d5c1e1945172011ebeb9`, matching the handoff SHA.
+- Move actual-cuTile execution away from the R550.90.07 A100. After inventory, use the user's real local GPU if the NVIDIA support prerequisites are met, otherwise choose another explicitly authorized supported environment. The A100 remains for ordinary-CUDA surrogate testing only.
+- Local GPU inventory and runner setup are pending. Do not select Windows-native versus WSL2/Linux, register a runner, or claim OS isolation before the actual GPU/OS/driver/toolchain is known and the boundary is tested.
+- **Actions evidence access note (2026-10-18 continuation):** the connected Actions run list returned zero visible runs; direct run-detail, job and artifact requests for handoff IDs (including #343, #52, #340, benchmark #4 and Nsight Systems #2) returned 404; the current handoff commit had no visible combined status. This does not prove historical runs are absent. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
+
 ## Actual self-hosted A100 runner inventory
 
 Verified by successful A100 driver-access audit run on the self-hosted runner:
