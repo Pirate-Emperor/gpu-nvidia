@@ -14,6 +14,10 @@ if (-not $PythonLauncher) {
 if ($LASTEXITCODE -ne 0) {
     throw "CPython 3.12 was not found through 'py -3.12'. Install 64-bit CPython 3.12 for the current user, then rerun."
 }
+$PythonBits = & py -3.12 -c "import struct; print(struct.calcsize('P') * 8)"
+if ($LASTEXITCODE -ne 0 -or "$PythonBits".Trim() -ne "64") {
+    throw "This setup requires 64-bit CPython 3.12. Found bitness: $PythonBits"
+}
 
 $VenvPath = Join-Path $RepoRoot ".venv-cutile-windows"
 $PythonPath = Join-Path $VenvPath "Scripts\python.exe"
