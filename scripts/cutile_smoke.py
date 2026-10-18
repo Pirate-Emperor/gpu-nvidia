@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from importlib import metadata
 import platform
+import subprocess
 import sys
 
 import numpy as np
@@ -54,6 +55,21 @@ def main() -> int:
     print(f"CUDA_RUNTIME_API_VERSION={cp.cuda.runtime.runtimeGetVersion()}")
     print(f"CUPY_VERSION={cp.__version__}")
     print(f"CUTILE_MODULE={getattr(ct, '__file__', '<unknown>')}")
+    try:
+        gpu_inventory = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free",
+                "--format=csv,noheader",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        print("NVIDIA_SMI_INVENTORY=" + (gpu_inventory.stdout.strip() or gpu_inventory.stderr.strip()))
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"NVIDIA_SMI_INVENTORY=<unavailable: {exc}>")
 
     @ct.kernel
     def vector_add(a, b, c, tile_size: ct.Constant[int]):
