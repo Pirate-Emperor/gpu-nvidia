@@ -1,7 +1,7 @@
 # New-chat handoff — Fused Causal Attention with NVIDIA cuTile
 
 **Prepared:** 2026-10-18  
-**Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia) (private)  
+**Repository:** [xemptynothing/gpu-nvidia](https://github.com/xemptynothing/gpu-nvidia) (private)  
 **Branch:** main  
 **Source snapshot reviewed before this documentation commit:** afe530bc090c779ebe5d741dcf7ae544985570d1  
 **Purpose:** resume the technical project in a new chat without losing prior tests, benchmarks, failures, environment facts, or next steps.
@@ -88,16 +88,16 @@ Input-contract tests check rank, shapes, dtype, contiguity, finite values, legal
 
 | Run | Result | What it validates | Link |
 |---|---|---|---|
-| A100 native CUDA #44 | 133 passed / 1 skipped | Ordinary CUDA RawKernel correctness and native CUDA path; not actual cuTile | [Run #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415) |
-| A100 full non-cuTile #52 | 907 passed / 52 skipped / 0 failed | Broad non-cuTile regression (references, ordinary CUDA and project guardrails) | [Run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082) |
-| CPU/reference #334 | 763 passed / 68 skipped | Earlier CPU/reference run; subsequently repeated | [Run #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023) |
-| CPU/reference #340 | 763 passed / 68 skipped / 0 failed | Latest CPU/reference suite; its head was the pre-handoff main SHA afe530bc090c779ebe5d741dcf7ae544985570d1 | [Run #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931) |
-| Isolated v4 A100 tests #1 | 30 passed | v4 differential/edge tests; not promoted | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) |
-| Isolated v5 A100 tests | 30 passed | v5 differential/edge tests; not promoted | [Run](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) |
-| Current-vs-v5 paired benchmark #4 | Correctness 30/30 + 3 paired sessions for each case/tile | Order alternates by paired session; see numerical table below | [Run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) |
-| PTXAS report #5 | v1/v2/v3/current/v4/v5 compiled for SM80; zero reported spills | Compile/resource information, not proof of runtime occupancy or speed | [Run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) |
-| Nsight Systems timeline #2 | Two .nsys-rep traces + readable CUDA API/kernel summaries | Ordinary-CUDA surrogate timeline only | [Run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950); [artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954) |
-| Nsight Compute #1 | FAILED before useful profiling | ERR_NVGPUCTRPERM; no actual profile collected | [Run #1](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760475268) |
+| A100 native CUDA #44 | 133 passed / 1 skipped | Ordinary CUDA RawKernel correctness and native CUDA path; not actual cuTile | [Run #44](https://github.com/xemptynothing/gpu-nvidia/actions/runs/37756646415) |
+| A100 full non-cuTile #52 | 907 passed / 52 skipped / 0 failed | Broad non-cuTile regression (references, ordinary CUDA and project guardrails) | [Run #52](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38056264082) |
+| CPU/reference #334 | 763 passed / 68 skipped | Earlier CPU/reference run; subsequently repeated | [Run #334](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38056264023) |
+| CPU/reference #340 | 763 passed / 68 skipped / 0 failed | Latest CPU/reference suite; its head was the pre-handoff main SHA afe530bc090c779ebe5d741dcf7ae544985570d1 | [Run #340](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38056390931) |
+| Isolated v4 A100 tests #1 | 30 passed | v4 differential/edge tests; not promoted | [Run #1](https://github.com/xemptynothing/gpu-nvidia/actions/runs/37760982099) |
+| Isolated v5 A100 tests | 30 passed | v5 differential/edge tests; not promoted | [Run](https://github.com/xemptynothing/gpu-nvidia/actions/runs/37761585734) |
+| Current-vs-v5 paired benchmark #4 | Correctness 30/30 + 3 paired sessions for each case/tile | Order alternates by paired session; see numerical table below | [Run #4](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38055001163) |
+| PTXAS report #5 | v1/v2/v3/current/v4/v5 compiled for SM80; zero reported spills | Compile/resource information, not proof of runtime occupancy or speed | [Run #5](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38054963187) |
+| Nsight Systems timeline #2 | Two .nsys-rep traces + readable CUDA API/kernel summaries | Ordinary-CUDA surrogate timeline only | [Run #2](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38055834950); [artifact](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954) |
+| Nsight Compute #1 | FAILED before useful profiling | ERR_NVGPUCTRPERM; no actual profile collected | [Run #1](https://github.com/xemptynothing/gpu-nvidia/actions/runs/37760475268) |
 
 **Run/commit caveat:** the broad A100 #52 run is the latest verified broad GPU regression cited here, but it ran before the last docs-focused main commits; the CPU/reference #340 run ran on the pre-handoff main SHA noted above. This documentation handoff itself does not modify kernel source. Re-run the relevant test suite on the new main head when CI is available rather than assuming documentation changes were GPU-tested.
 
@@ -154,7 +154,7 @@ No reported spills is useful compile-time evidence, but it is **not** a substitu
 
 ## 7. Nsight Systems summary and interpretation
 
-Successful surrogate timeline: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950), artifact [11671075954](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954).
+Successful surrogate timeline: [run #2](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38055834950), artifact [11671075954](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954).
 
 - Case 1: medium_d128, tile_k=64. Seven kernel instances per trace (initial call/JIT, five warmups, final profiled call); instrumented trace duration median **0.977 ms**, mean **0.998 ms**, range **0.975–1.126 ms**.
 - Case 2: longer_batched_d128, tile_k=32. Seven kernel instances per trace; instrumented trace duration median **25.851 ms**, mean **25.925 ms**, range **25.845–26.369 ms**.
@@ -273,3 +273,12 @@ ChatGPT does not receive a remote shell or direct filesystem access simply becau
 - In the final report, include TEST / WHY / EXPECTED / ACTUAL / DECISION/NEXT.
 - Never ask for sudo passwords, GitHub PATs, runner registration tokens, proxy passwords, or other credentials. Explain if a local user action is required.
 - **First action in a new chat:** read this file and docs/TODO_CHECKLIST.md, verify current main, then proceed with the local GPU inventory/security boundary rather than reopening already-settled history.
+
+## 12. Continuation audit — 2026-10-18
+
+- At session start, the repository's `main` HEAD was `e87d8b9352fdf6783347d5c1e1945172011ebeb9`, matching the handoff commit.
+- The actual cuTile kernel, independent references, CUDA variants, GPU tests, benchmark scripts and workflows were inspected. No actual-cuTile compile/launch/correctness result was produced in this continuation; no local GPU inventory was supplied.
+- Route decision: do not use the existing R550.90.07 A100 as the actual-cuTile path. Keep it for ordinary-CUDA surrogate testing. Use the local GPU only after confirming its GPU model/compute capability, driver, OS, Python, Docker and NVCC/toolkit, or another explicitly authorized environment meeting NVIDIA's current cuTile support requirements. Do not assume a specific GPU or register a runner before testing the OS-enforced boundary.
+- Official Quickstart check: https://docs.nvidia.com/cuda/cutile-python/quickstart.html states Linux x86_64, Linux aarch64 and Windows x86_64 support; compute capability 8.x–12.x; driver R580+; and Python 3.10–3.14. The optional [tileiras] packages require matching major.minor versions. Detailed profiling requires R580.126.09+ on Linux or R582.16+ on Windows.
+- Actions re-audit limitation: The connected GitHub Actions run-list endpoint returned zero visible runs; direct run-detail/job/artifact requests for the prior handoff run IDs returned 404. The current handoff commit also had no visible combined status. This is an access/visibility limitation, not proof historical runs do not exist; previous pass/skip counts are retained as handoff records and were not independently re-audited in this continuation.
+- The continuation updated routing and evidence notes in README, TODO checklist, test matrix, experiment report, environment/admin notes, progress log and current result status. No test execution or profiler capture was claimed. Actual-cuTile correctness, benchmark and profile gates remain open.
