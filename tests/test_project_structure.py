@@ -34,6 +34,12 @@ REQUIRED_FILES = (
     "scripts/cutile_sanity_check.py",
     "scripts/cutile_smoke.py",
     "scripts/setup_cutile_windows.ps1",
+    "scripts/start_cutile_docker_runner.ps1",
+    "docker/cutile-runner/Dockerfile",
+    "docker/cutile-runner/entrypoint.sh",
+    "docker/cutile-runner/compose.yml",
+    "docs/CUTILE_DOCKER_RUNNER.md",
+    ".github/workflows/cutile-rtx4060-docker.yml",
     "docs/LOCAL_GPU_WINDOWS.md",
     "src/torch_reference.py",
     "src/cutile_attention.py",
@@ -113,3 +119,19 @@ def test_supported_cutile_profile_workflow_gates_profiles_on_correctness():
     assert "tests/test_gpu_edge_cases.py" in workflow
     assert "medium_d128_t64x64" in workflow
     assert "longer_batched_d128_t64x32" in workflow
+
+
+def test_docker_cutile_runner_is_ephemeral_and_unprivileged():
+    compose = (ROOT / "docker/cutile-runner/compose.yml").read_text()
+    entrypoint = (ROOT / "docker/cutile-runner/entrypoint.sh").read_text()
+    workflow = (ROOT / ".github/workflows/cutile-rtx4060-docker.yml").read_text()
+    assert "gpus: all" in compose
+    assert "no-new-privileges:true" in compose
+    assert "cap_drop:" in compose and "ALL" in compose
+    assert "/var/run/docker.sock" not in compose
+    assert "privileged: true" not in compose
+    assert "--ephemeral" in entrypoint
+    assert "unset RUNNER_TOKEN" in entrypoint
+    assert "workflow_dispatch:" in workflow
+    assert "github.ref == 'refs/heads/main'" in workflow
+    assert "contents: read" in workflow
