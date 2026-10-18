@@ -120,38 +120,8 @@ def _build_kernel(
             tile_max = ct.max(scores, axis=1, keepdims=True)
             new_max = ct.maximum(running_max, tile_max)
 
-            # A query row can have no causal keys in this K tile (for example,
-            # TQ=64/TK=32 on the first tile). If both maxima are -inf, the
-            # naive recurrence evaluates -inf - -inf and emits NaNs. Keep
-            # empty rows unchanged; when the first valid K tile arrives, the
-            # old-state rescale must be zero.
-            old_valid = running_max > float("-inf")
-            tile_valid = tile_max > float("-inf")
-
-            # Sanitize before subtraction so invalid rows do not form NaNs
-            # even in intermediate values selected away by ct.where.
-            safe_old_max = ct.where(old_valid, running_max, 0.0)
-            safe_new_max = ct.where(old_valid, new_max, 0.0)
-            rescale_arg = ct.where(
-                old_valid,
-                safe_old_max - safe_new_max,
-                float("-inf"),
-            )
-            rescale = ct.where(tile_valid, ct.exp(rescale_arg), 1.0)
-
-            valid_scores = scores > float("-inf")
-            safe_scores = ct.where(valid_scores, scores, 0.0)
-            safe_score_max = ct.where(valid_scores, new_max, 0.0)
-            probability_arg = ct.where(
-                valid_scores,
-                safe_scores - safe_score_max,
-                0.0,
-            )
-            probabilities = ct.where(
-                valid_scores,
-                ct.exp(probability_arg),
-                0.0,
-            )
+            rescale = ct.exp(running_max - new_max)
+            probabilities = ct.exp(scores - new_max)
 
             new_norm = rescale * running_norm + ct.sum(
                 probabilities,
