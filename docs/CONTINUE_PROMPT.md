@@ -2,6 +2,8 @@
 
 Continue the ongoing project in the private GitHub repository **xemptynothing/gpu-nvidia**.
 
+> **Current status override — verified 2026-10-19:** do not repeat GPU bring-up or the required profiling work. The native Windows RTX 4060 path passed genuine cuTile smoke, 48 attention tests, 29 numeric configurations, CLI/NumPy oracle, and three controlled benchmark sessions. Two actual-cuTile Nsight Compute configurations plus scheduler/warp-state reports were captured and inspected. See [native run #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223), [profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066), [profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039), [current checklist](TODO_CHECKLIST.md), and [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). Core correctness, performance, and profiling gates are complete. The CUDA-enabled PyTorch SDPA comparison is an optional follow-up and has not been installed or run. Older negative results below are historical, mostly from the A100/R550 path; do not treat them as current RTX 4060 status.
+
 **Before doing anything else, read these repository documents from main:**
 1. docs/CHAT_HANDOFF_2026-10-18.md
 2. README.md
@@ -12,28 +14,23 @@ Continue the ongoing project in the private GitHub repository **xemptynothing/gp
 
 Do not ask me to repeat project history or known results. First inspect the current main HEAD because the handoff documentation commit will advance it.
 
-## Primary objective
+## Primary objective — verified core scope is complete
 
-Complete the actual NVIDIA cuTile fused causal attention implementation—not just ordinary CUDA surrogates. Follow the project's frozen scope: FP16 Q/K/V, FP32 accumulation, causal online softmax, D=32/64/128, no global N×N score/probability matrix, at least two tile configurations, rigorous independent-reference correctness, measured comparisons, separate JIT timing, and two successful actual-cuTile hardware profiles.
+Do not restart implementation or profiler setup. If asked to continue improving the project, first inspect current main, README, docs/TODO_CHECKLIST.md, docs/CUTILE_RTX4060_RESULTS_2026-10-19.md, docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md, and results/STATUS.md. Keep the existing kernel unchanged unless a specific optimization is justified by profile evidence; any candidate must pass correctness before controlled benchmark repeats. Do not install PyTorch or other additional packages without explicit approval.
 
-## Immediate local-GPU/runner task
+## Local GPU and profiler task — completed
 
-The user's actual local inventory has been supplied:
-
-- NVIDIA GeForce RTX 4060, compute capability 8.9, driver 616.92, reported CUDA UMD 13.4, 8,188 MiB total / 7,925 MiB free VRAM at capture.
-- Windows 10 Pro x64, build 26300, WDDM.
-- System `nvcc` remains unavailable; CPython 3.12.10 and cuTile 1.6.0 are installed in the project venv. WSL2 and Docker Desktop are not installed yet.
-
-NVIDIA's current cuTile Python Quickstart lists Windows x86_64, CC 8.x–12.x, driver R580+ and Python 3.10–3.14. The genuine cuTile vector-add smoke now passes locally (`GPU_SYNCHRONIZE=PASS`, `OUTPUT_CHECK=PASS`, `CUTILE_SMOKE=PASS`). The actual attention kernel remains unvalidated. The existing `gpu-project` A100/R550 runner is only an ordinary-CUDA control; do not use it as the actual-cuTile route.
-
-New repository tooling:
-- `scripts/setup_cutile_windows.ps1` creates `.venv-cutile-windows` and installs `cuda-tile[tileiras]` + `cupy-cuda13x[ctk]` without driver/system-Toolkit changes.
-- `scripts/cutile_smoke.py` compiles, launches, synchronizes and verifies a genuine cuTile vector-add kernel; this has passed locally.
-- Docker runner setup is now implemented: `docker/cutile-runner/`, `.github/workflows/cutile-rtx4060-docker.yml`, and `scripts/start_cutile_docker_runner.ps1`. The launcher checks GPU passthrough before requesting a short-lived token, registers an ephemeral one-job container, dispatches the workflow on main, watches its result, and cleans up.
-- Next local prerequisite: install/enable WSL2, install Docker Desktop and GitHub CLI, authenticate `gh`, then run `scripts/start_cutile_docker_runner.ps1` once. The workflow itself runs the strict actual attention correctness/edge tests with `REQUIRE_CUTILE=1`.
-- Container isolation reduces host exposure but is not a perfect security boundary. The runner has no host mounts or Docker socket, runs non-root with dropped capabilities, and only the trusted main-branch workflow is eligible. Runner registration credentials must stay local and never be exposed to job steps or pasted into chat.
+- Target: NVIDIA GeForce RTX 4060, CC 8.9, driver 616.92, Windows x64 build 26300.
+- Project venv: CPython 3.12.10, NumPy 2.5.4, CuPy 14.2.0, cuda-tile 1.6.0, TileIRAS/NVCC/NVVM 13.4.92.
+- Nsight Compute CLI 2026.3.1.0 was found in the standard NVIDIA Program Files location. Counter collection worked; no RTX 4060 ERR_NVGPUCTRPERM occurred.
+- Basic and supplemental reports cover medium_d128 64×64 and longer_batched_d128 64×128; four compressed .ncu-repz files, detail text, raw CSVs, and logs are archived in artifact 12149902039.
+- Profiles show about 8.3% achieved occupancy with shared memory limiting CTA residency to one CTA per SM; scheduler diagnostics show roughly 85% cycles with no eligible warp. Details, caveats, and decisions are in docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md.
+- Do not start scripts/start_cutile_docker_runner.ps1 or install WSL2/Docker solely for actual cuTile bring-up; native Windows validation is already complete. The optional CUDA-enabled PyTorch SDPA comparison remains unrun.
+- The local .venv remains project scoped; do not make further system-level changes or download packages without permission.
 
 ## Known technical state — do not lose this
+
+> **Historical context only:** the list below captures earlier project findings, particularly the A100/R550 runner and the period before native Windows attention passed. Where it says attention is unvalidated or Nsight Compute is blocked, that describes the older environment/run, not the current RTX 4060. The current evidence above and the linked profile analysis supersede those statements for the actual-cuTile target.
 
 - Available project runner: gpu-project on scn21-mn; two full visible A100-SXM4-40GB GPUs (SM80/CC 8.0), R550.90.07, CUDA Toolkit 12.4.131, GCC 11.4.0, Nsight Compute 2024.1.1.0, Nsight Systems 2023.4.4.54, Fabric Manager active, non-root, no passwordless sudo.
 - Actual cuTile target src/cutile_attention.py has not completed a verified compile + launch + correctness run. NVIDIA's current Quickstart requires R580+; detailed profiling requires R580.126.09+ on Linux or R582.16+ on Windows. Stop using the R550.90.07 A100 as the actual-cuTile route, but keep it for ordinary-CUDA surrogate tests. Use the inventoried local GPU or another explicitly authorized supported environment.
@@ -60,4 +57,4 @@ End technical updates with:
     ACTUAL:
     DECISION/NEXT:
 
-**Start now** by inspecting the current main HEAD and the new Docker runner files. The local smoke gate has passed. The immediate next gate is the one-time host prerequisite installation (WSL2 + Docker Desktop + GitHub CLI), then run `scripts/start_cutile_docker_runner.ps1` to automatically launch the ephemeral runner and dispatch/watch the real attention correctness workflow. Do not claim attention correctness, benchmark success, or profiler completion until those runs actually produce evidence.
+**Start now** by checking the current main HEAD and the latest result/checklist documents before doing any new work. The core required task is complete; do not rerun profiling or install packages unless a new objective requires it and the user approves it. Any optimization proposal should explain how it addresses shared-memory/register pressure, pass correctness first, and then be judged with controlled repeated benchmarks.
