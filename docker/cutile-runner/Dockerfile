@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git jq \
-      libicu74 libkrb5-3 libssl3 zlib1g libstdc++6 libgcc-s1 \
+      libicu74 libkrb5-3 libssl3t64 zlib1g libstdc++6 libgcc-s1 \
       libcurl4t64 libunwind8 liblttng-ust1t64 \
       python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/* \
