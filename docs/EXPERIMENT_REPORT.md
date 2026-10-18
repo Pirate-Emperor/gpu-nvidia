@@ -36,11 +36,11 @@ These first attempts happened before the project-local venv existed. They are re
 | [39154888145](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154888145) | 2971f5ac | No in-repository Python environment | Python Launcher found the global CPython 3.12 interpreter but its package probe produced an import traceback. |
 | [39154979187](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187) | b9189b5d | Confirmed blocker | Probe error captured explicitly: ModuleNotFoundError: No module named 'numpy'. Artifact [12146591326](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187/artifacts/12146591326) preserves the environment discovery log. |
 
-The workflow is configured to reuse an existing environment only, not create one or run pip. This adheres to the no-install/no-third-party-download requirement. The absence of the existing environment within the repository means this constraint currently prevents progress into GPU kernel tests. The previously reported native vector-add smoke pass proves only that some prior Python environment could execute a trivial cuTile kernel; it does not identify a usable environment available to this runner checkout.
+At that historical point, the workflow only searched for an existing environment and no install was attempted. After the user created the project-local venv and allowed packages to be installed there, the workflow was updated to install dependencies inside that venv, and run #39160827910 completed the attention, CLI, accuracy, and benchmark gates.
 
 **Remaining work after the successful run:** capture and inspect two actual-cuTile Nsight Compute reports after an official profiler is approved for project-local .tools. Correctness, CLI, numerical diagnostics, and performance metrics are now available above and in the linked artifact.
 
-## 1. Executive status
+## Historical executive status before local cuTile validation
 
 | Area | Result | Meaning |
 |---|---|---|
@@ -57,15 +57,15 @@ The workflow is configured to reuse an existing environment only, not create one
 
 **Important distinction:** ordinary-CUDA correctness and performance results are useful engineering evidence, but do not satisfy the final actual-cuTile execution/profiling requirement.
 
-## 1A. Continuation review: routing and current evidence access
+## Historical continuation review before the native Windows run
 
 - At the start of this continuation, `main` was verified at `e87d8b9352fdf6783347d5c1e1945172011ebeb9`, matching the handoff commit.
 - The existing A100 runner's verified driver is R550.90.07, below NVIDIA's documented R580+ cuTile Python runtime minimum. The actual-cuTile route moves to the user's local GPU after inventory, or another explicitly authorized supported environment. Retain the A100 for ordinary-CUDA surrogate controls only; do not assume local hardware or repeat the failed compatibility path.
 - NVIDIA's [current cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) lists Linux x86_64/Linux aarch64/Windows x86_64, compute capability 8.x–12.x, driver R580+, and Python 3.10–3.14. The `[tileiras]` path provides compiler components in the venv with matching major.minor package versions; system CUDA Toolkit 13.1+ is an alternative. Detailed profiling requires Linux R580.126.09+ or Windows R582.16+.
-- **Actions evidence access note (2026-10-18 continuation):** the connected Actions run list returned zero visible runs; direct run-detail, job and artifact requests for handoff IDs (including #343, #52, #340, benchmark #4 and Nsight Systems #2) returned 404; the current handoff commit had no visible combined status. This does not prove historical runs are absent. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
-- The local GPU inventory was not supplied in this continuation, so no Windows-native/WSL2 decision, runner registration, isolation claim or actual GPU test has been made.
+- **Historical Actions access note (2026-10-18):** the connected API did not expose several handoff IDs at that time. That earlier API limitation was resolved; the current run #39160827910 and its logs/artifact have been verified.
+- At that earlier point, the local GPU inventory had not yet been supplied, so no Windows-native/WSL2 decision, runner registration, isolation claim or actual GPU test had been made.
 
-## 2. Hardware and software constraints
+## 2. Historical A100/R550 hardware and software constraints
 
 Verified self-hosted runner:
 - Two visible NVIDIA A100-SXM4-40GB GPUs; SM80 / compute capability 8.0; MIG disabled.
@@ -224,14 +224,14 @@ Each trace contains the initial call (which triggers JIT/compile), five warmups,
 - Native CUDA profiling driver/workflow: `benchmarks/profile_shared_tile.py`, `.github/workflows/a100-native-nsight.yml`.
 - Existing target cuTile path/profiler: `src/cutile_attention.py`, `benchmarks/benchmark_attention.py`, `benchmarks/profile_fused.py`.
 
-## 8. Decisions and next work
+## 8. Historical decisions before actual RTX 4060 attention validation
 
 1. Keep the main shared-tile implementation as the correctness baseline for the A100/R550 phase.
 2. Keep v1-v5 preserved; do not promote v4 or v5 without repeatable gains across representative cases.
 3. The first order-alternating current/v5 retest is complete; do not promote v5 unless further independent sessions confirm a robust gain without meaningful regressions.
 4. Test a genuinely different SM80 optimization next (e.g. WMMA/tensor-core QK path), only after benchmark controls are trustworthy.
 5. Obtain Nsight Compute counter access through the cluster's existing policy/process; do not attempt privileged changes through the runner. The current [actual-cuTile workflow](../.github/workflows/a100-nsight.yml) now runs the correctness suite before attempting two profiles, but it has not been run successfully because the current runner fails the R580+ gate.
-6. On the planned RTX 4060 with updated driver, execute **actual cuTile**: correctness across frozen cases, at least two tile configurations, full benchmark matrix, JIT separation, and at least two successful profiles.
+6. This historical task is now partly complete: RTX 4060 correctness and controlled benchmarks passed in run #39160827910. The only remaining hard course gate is to obtain approval for the official profiler under project-local .tools and capture two inspectable actual-cuTile profiles, as described in the current results section above.
 7. Final report must keep native CUDA surrogate, ordinary CUDA baselines, and actual cuTile results in separate columns/sections.
 
 ## 1B. Local hardware inventory received after the initial continuation audit
