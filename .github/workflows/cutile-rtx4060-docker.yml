@@ -180,29 +180,66 @@ jobs:
           & $Py scripts/summarize_benchmark_repeats.py --inputs results/cutile-benchmark-session1.json results/cutile-benchmark-session2.json results/cutile-benchmark-session3.json --json-output results/cutile-benchmark-summary.json --csv-output results/cutile-benchmark-summary.csv 2>&1 | Tee-Object -FilePath cutile-benchmark-summary.log
           if ($LASTEXITCODE -ne 0) { throw 'Benchmark repeat aggregation failed.' }
 
-      - name: Attempt two genuine cuTile Nsight Compute captures if already installed
+      - name: Locate Nsight Compute and capture two genuine cuTile kernels
         continue-on-error: true
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
-          $NcuCandidates = @(
-            (Join-Path $ProjectRoot 'ncu.exe'),
-            (Join-Path $ProjectRoot '.tools\ncu.exe')
-          )
-          $NcuPath = $NcuCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $NcuPath = $null
+
+          # Prefer PATH, then inspect the standard NVIDIA installation folders,
+          # and finally the explicitly approved project-local locations.
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          if ($NcuCommand) { $NcuPath = $NcuCommand.Source }
           if (-not $NcuPath) {
-            'NCU_NOT_PRESENT_IN_PROJECT_DIRECTORY: not searched outside the project and no download/install attempted.' | Tee-Object -FilePath cutile-profile-status.log
+            $SearchRoots = @()
+            if ($env:ProgramFiles) { $SearchRoots += (Join-Path $env:ProgramFiles 'NVIDIA Corporation') }
+            if (${env:ProgramFiles(x86)}) { $SearchRoots += (Join-Path ${env:ProgramFiles(x86)} 'NVIDIA Corporation') }
+            if ($env:LOCALAPPDATA) { $SearchRoots += (Join-Path $env:LOCALAPPDATA 'NVIDIA Corporation') }
+            foreach ($SearchRoot in $SearchRoots) {
+              if (-not (Test-Path $SearchRoot)) { continue }
+              $InstallDirs = Get-ChildItem -Path $SearchRoot -Directory -Filter 'Nsight Compute*' -ErrorAction SilentlyContinue
+              foreach ($InstallDir in $InstallDirs) {
+                $Found = Get-ChildItem -Path $InstallDir.FullName -Filter 'ncu.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($Found) { $NcuPath = $Found.FullName; break }
+              }
+              if ($NcuPath) { break }
+            }
+          }
+          if (-not $NcuPath) {
+            $NcuCandidates = @(
+              (Join-Path $ProjectRoot 'ncu.exe'),
+              (Join-Path $ProjectRoot '.tools\ncu.exe')
+            )
+            $NcuPath = $NcuCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $NcuPath) {
+            'NCU_NOT_FOUND: checked PATH, standard NVIDIA Nsight Compute install folders, project root, and project .tools.' | Tee-Object -FilePath cutile-profile-status.log
             exit 0
           }
+
+          "NCU_PATH=$NcuPath" | Tee-Object -FilePath cutile-profile-status.log
+          & $NcuPath --version 2>&1 | Tee-Object -FilePath cutile-profile-status.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute CLI was found but --version failed.' }
           $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
           $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
           New-Item -ItemType Directory -Force -Path results | Out-Null
-          & $NcuPath --set basic --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
+
+          # profile_fused.py performs one cold launch + five warmups + one
+          # steady-state launch; collect just that final launch.
+          & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
           $MediumExit = $LASTEXITCODE
-          & $NcuPath --set basic --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 32 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
+          if ($MediumExit -ne 0) { "MEDIUM_PROFILE_EXIT=$MediumExit" | Tee-Object -FilePath cutile-profile-status.log -Append }
+
+          & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
           $LongExit = $LASTEXITCODE
-          if ($MediumExit -ne 0 -or $LongExit -ne 0) { throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect counter permission errors." }
+          if ($LongExit -ne 0) { "LONG_BATCHED_PROFILE_EXIT=$LongExit" | Tee-Object -FilePath cutile-profile-status.log -Append }
+
+          if ($MediumExit -ne 0 -or $LongExit -ne 0) {
+            throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect profile logs for counter-permission errors."
+          }
+          "PROFILE_REPORTS_CREATED=$((Test-Path results/cutile-profile-medium.ncu-rep) -and (Test-Path results/cutile-profile-long-batched.ncu-rep))" | Tee-Object -FilePath cutile-profile-status.log -Append
 
       - name: Upload complete run record
         if: always()
