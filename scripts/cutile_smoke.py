@@ -61,6 +61,8 @@ def main() -> int:
 
     # Import only after printing the environment so missing runtime pieces are
     # distinguishable from a compiler/launch failure in the captured log.
+    # The kernel decorator resolves ct.Constant[int] through module globals.
+    global ct
     import cupy as cp
     import cuda.tile as ct
 
