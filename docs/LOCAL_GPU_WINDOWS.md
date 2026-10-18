@@ -31,7 +31,7 @@ The setup script deliberately avoids system-wide CUDA Toolkit and driver changes
 ## 3. Bootstrap sequence
 
 1. Install **64-bit CPython 3.12** for the current Windows user from [Python for Windows](https://www.python.org/downloads/windows/). Enable the Python Launcher, then open a new PowerShell and check `py -3.12 --version`. Use a supported 3.10–3.14 CPython build; 3.12 aligns with the repository's existing CI version.
-2. Check out the private `xemptynothing/gpu-nvidia` repository into a project-only working directory. Do not include personal documents or credentials in that directory.
+2. Check out the private `xemptynothing/gpu-nvidia` repository into a project-only working directory. If Git for Windows is available, run `git clone https://github.com/xemptynothing/gpu-nvidia.git` and then `cd gpu-nvidia`; otherwise use GitHub Desktop or install Git for Windows. Authenticate through your normal browser/Git Credential Manager flow; do not paste a PAT or any credential into chat. Do not put personal documents or credentials in the project directory.
 3. From the repository root, run:
    
        .\scripts\setup_cutile_windows.ps1
