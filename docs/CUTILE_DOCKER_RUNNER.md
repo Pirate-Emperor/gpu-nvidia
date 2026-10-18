@@ -1,46 +1,64 @@
-# Ephemeral Docker GitHub Actions runner — RTX 4060
+# Persistent Docker GitHub Actions runner — RTX 4060
 
-This is the intended remote Actions path for the local RTX 4060. It is separate from the existing A100/R550 runner, which remains an ordinary-CUDA control.
+This is the local Actions path for actual cuTile attention tests on the inventoried RTX 4060. The A100/R550 machine remains an ordinary-CUDA control; it is not the actual-cuTile route.
 
 ## Host prerequisites
 
-The observed Windows host currently has **no WSL2 and no Docker**, so the runner cannot start yet. Install/start Docker Desktop using its WSL2 backend and install GitHub CLI (gh). A Windows reboot/admin approval may be required to enable WSL2. Do not disable Windows security features to work around setup problems.
-
-Before registration, the launcher requires a successful Linux-container GPU probe that prints the RTX 4060. If that probe fails, it stops before requesting a runner registration token.
+- Docker Desktop with its WSL2 backend is running.
+- GitHub CLI is not required by the launcher.
+- The probe image `nvidia/cuda:12.4.1-base-ubuntu22.04` must already be present locally. The launcher does not pull it automatically.
+- The user must create a repository self-hosted runner registration token locally from **Settings > Actions > Runners > New self-hosted runner** (Linux, x64). Never paste the token into chat or commit it.
 
 ## Start the runner
 
-Authenticate the GitHub CLI once using its browser-based flow (gh auth login). The authenticated account must have repository-admin permission to create a self-hosted runner registration token.
+First pull the repository's latest `main` and confirm you are at the project root:
 
-Then run this **single project command** in PowerShell from the repository root:
+    git pull --ff-only origin main
+    git status --short --branch
 
-    .\scripts\start_cutile_docker_runner.ps1
+The script accepts the owner-supplied token, checks Docker Compose and RTX 4060 GPU passthrough, builds the runner image from this repository's Dockerfile, then starts a **persistent** runner. It does not request a token through GitHub CLI, dispatch a workflow, wait three minutes for GitHub API registration polling, or tear down the container automatically.
 
-The launcher:
-1. verifies Docker Engine, Compose v2, GitHub CLI authentication, and RTX 4060 GPU passthrough;
-2. requests a short-lived repository runner registration token just in time;
-3. builds the local runner image and starts an **ephemeral one-job runner**;
-4. waits until that exact runner is online, dispatches the workflow on `main`, and watches the result;
-5. removes the token from its process environment before executing jobs, tears down the container, and cleans up a leftover runner registration if dispatch fails.
+Avoid putting the token literally in the PowerShell command line, because commands may be retained in shell history. This prompt keeps the token out of the typed command history while still passing it as the script parameter:
 
-Do not paste the registration token or any GitHub credential into chat, files, or workflow logs.
+    $secureToken = Read-Host "Paste the repository runner registration token" -AsSecureString
+    $tokenPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+    try {
+        $plainToken = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPtr)
+        .\scripts\start_cutile_docker_runner.ps1 -RunnerToken $plainToken
+    } finally {
+        if ($tokenPtr -ne [IntPtr]::Zero) {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPtr)
+        }
+        Remove-Variable plainToken,secureToken,tokenPtr -ErrorAction SilentlyContinue
+    }
 
-## Isolation design
+The script generates and prints a unique runner name, starts detached, then returns to PowerShell. Check **Settings > Actions > Runners** and wait for that exact name to show **Online**. If it does not come online, inspect the container logs before retrying:
 
-The runner container is non-root, drops Linux capabilities, sets no-new-privileges, has process/memory limits, and has no host bind mounts, no Docker socket, no privileged mode, no exposed ports, and no persistent workspace. It is registered as ephemeral and intended to execute one trusted job only. Workflow permissions are read-only for repository contents and the workflow is manual-dispatch-only with an explicit main-branch guard.
+    docker ps -a --filter "name=cutile-runner-runner-1"
+    docker logs --tail 120 cutile-runner-runner-1
 
-This materially reduces host exposure, but **a container is not a perfect security boundary**: Docker Desktop/WSL2 and the host kernel remain part of the trust boundary. Run only code you trust from main; do not dispatch untrusted PR/fork code to this runner. Do not add repository secrets to the workflow. The job's GitHub token is limited by the workflow's contents: read permission.
+When the runner is online, manually launch **RTX 4060 Docker cuTile validation** from the Actions tab on branch `main`. This workflow is limited to `workflow_dispatch`, read-only contents permission, and the main branch. The job installs the project test dependencies in the container, runs the genuine cuTile smoke test, then runs the attention correctness matrix with `REQUIRE_CUTILE=1`.
 
-## Workflow
+## Stop and remove the runner
 
-The launcher automatically dispatches the RTX 4060 Docker cuTile validation workflow on `main` and waits for its result; no separate Actions UI step is needed. The job checks GPU visibility, installs project test/cuTile dependencies inside the disposable runner, executes the genuine cuTile smoke test, then runs the actual attention correctness matrix with `REQUIRE_CUTILE=1`. It uploads the smoke log and test cache even on failure.
+When finished, first delete the runner under **Settings > Actions > Runners**. Then, from the repository root, stop and remove the container/network:
 
-A successful smoke test is not enough to declare attention complete. The correctness job must pass. Benchmarking and at least two real cuTile profiler captures remain separate completion gates.
+    docker compose -f docker/cutile-runner/compose.yml down --remove-orphans
+
+The Compose file now uses safe defaults for `RUNNER_TOKEN` and `RUNNER_NAME` interpolation during cleanup, so stopping the container does not require retaining the registration token in the PowerShell environment.
+
+## Isolation and security notes
+
+The runner container runs as a non-root user, drops Linux capabilities, sets `no-new-privileges`, has process/memory limits, and has no host bind mounts, Docker socket, privileged mode, exposed ports, or persisted workspace. It has the `gpu` and `cutile-rtx4060` labels.
+
+This is a risk reduction, **not a perfect security boundary**. Docker Desktop/WSL2 and the host kernel remain part of the trust boundary. The runner executes commands from repository workflows with the permissions available in the container. Only run reviewed code from `main`; never route fork/untrusted pull-request code or jobs containing personal secrets to this runner. The current persistent runner can accept more than one job until it is removed; do not leave it registered longer than necessary.
+
+The registration token stays local, is short-lived, and must not be pasted into ChatGPT or logged. Compose injects it into the container environment for runner configuration; users with access to the local Docker daemon can inspect container configuration, so protect the host account and revoke/remove the runner when finished. The entrypoint unsets the token before starting the runner process.
 
 ## Files
 
-- docker/cutile-runner/Dockerfile — non-root runner image.
-- docker/cutile-runner/entrypoint.sh — short-lived registration and one-job execution.
-- docker/cutile-runner/compose.yml — GPU access and container restrictions.
-- scripts/start_cutile_docker_runner.ps1 — preflight, just-in-time token, lifecycle.
-- .github/workflows/cutile-rtx4060-docker.yml — manual GPU smoke/correctness workflow.
+- `docker/cutile-runner/Dockerfile` — non-root runner image.
+- `docker/cutile-runner/entrypoint.sh` — persistent runner registration and execution.
+- `docker/cutile-runner/compose.yml` — GPU access and container restrictions.
+- `scripts/start_cutile_docker_runner.ps1` — owner-supplied token, preflight, launch.
+- `.github/workflows/cutile-rtx4060-docker.yml` — manual GPU smoke/correctness workflow.
