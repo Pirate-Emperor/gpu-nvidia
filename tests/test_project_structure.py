@@ -121,9 +121,10 @@ def test_supported_cutile_profile_workflow_gates_profiles_on_correctness():
     assert "longer_batched_d128_t64x32" in workflow
 
 
-def test_docker_cutile_runner_is_ephemeral_and_unprivileged():
+def test_docker_cutile_runner_is_persistent_and_unprivileged():
     compose = (ROOT / "docker/cutile-runner/compose.yml").read_text()
     entrypoint = (ROOT / "docker/cutile-runner/entrypoint.sh").read_text()
+    launcher = (ROOT / "scripts/start_cutile_docker_runner.ps1").read_text()
     workflow = (ROOT / ".github/workflows/cutile-rtx4060-docker.yml").read_text()
     smoke = (ROOT / "scripts/cutile_smoke.py").read_text()
     assert "gpus: all" in compose
@@ -131,8 +132,15 @@ def test_docker_cutile_runner_is_ephemeral_and_unprivileged():
     assert "cap_drop:" in compose and "ALL" in compose
     assert "/var/run/docker.sock" not in compose
     assert "privileged: true" not in compose
-    assert "--ephemeral" in entrypoint
+    assert "--ephemeral" not in entrypoint
+    assert "--disableupdate" in entrypoint
     assert "unset RUNNER_TOKEN" in entrypoint
+    assert "${RUNNER_TOKEN-}" in compose
+    assert "${RUNNER_NAME:-cutile-rtx4060-runner}" in compose
+    assert "[string]$RunnerToken" in launcher
+    assert "registration-token" not in launcher
+    assert "gh workflow run" not in launcher
+    assert "docker image inspect $GpuProbeImage" in launcher
     assert "workflow_dispatch:" in workflow
     assert "github.ref == 'refs/heads/main'" in workflow
     assert "contents: read" in workflow
