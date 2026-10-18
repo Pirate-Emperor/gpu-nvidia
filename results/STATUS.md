@@ -26,14 +26,14 @@ Run-by-run details, including the earlier pwsh shell failure and Python path att
 
 
 
-## Continuation status — 2026-10-18
+## Historical continuation status — 2026-10-18 (before actual attention validation)
 
 - Main was `e87d8b9352fdf6783347d5c1e1945172011ebeb9` at the start of the handoff audit; this runner repair advanced main through `bfa8e95bcbc40cff9bc42367f0476cbe222943cc` before this status refresh.
 - Move actual-cuTile execution away from the R550.90.07 A100. After inventory, use the user's real local GPU if the NVIDIA support prerequisites are met, otherwise choose another explicitly authorized supported environment. The A100 remains for ordinary-CUDA surrogate testing only.
 - Local inventory: RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64 build 26300, WDDM; 8,188 MiB VRAM. CPython 3.12.10 and cuTile 1.6.0 are installed in the project venv; the genuine vector-add smoke passed. System NVCC remains absent. Docker Desktop with WSL2 backend now reports a working Linux Engine and Compose. The first launcher reached container start but did not confirm runner Online; the old cleanup error masked the original failure.
 - **Actions evidence access:** workflow run details and job logs are currently available through the repository connection. CPU/reference run [#75](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39147796099) passed 764 tests / 68 skipped / 0 failed on commit `bfa8e95`; hosted-CPU GPU skips do not count as local cuTile validation.
 
-## Local actual-cuTile candidate — RTX 4060 (inventory supplied 2026-10-18)
+## Historical pre-validation RTX 4060 inventory — 2026-10-18
 
 | Item | Result |
 |---|---|
@@ -79,7 +79,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 - DCGM: installed; sees all 8 physical GPUs and 6 NVSwitches
 - Runner account: non-root; sudo is not passwordless
 
-## Validation state
+## Historical validation state before the actual attention run
 
 | Area | Result |
 |---|---|
@@ -103,7 +103,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 | Actual cuTile benchmark/profiler artifacts | NOT AVAILABLE; only the vector-add smoke has executed, not the attention kernel |
 | Fabric Manager | PRESENT and ACTIVE |
 
-## Interpretation
+## Historical A100 interpretation
 
 The A100 hardware itself is suitable for the project. The runner is attached to a
 larger HGX/NVSwitch host but currently exposes two full, non-MIG A100s.
@@ -117,7 +117,7 @@ For the full approach matrix, test counts, timing evidence, and next decisions, 
 [docs/EXPERIMENT_REPORT.md](../docs/EXPERIMENT_REPORT.md). Ordinary-CUDA timings
 must not be reported as cuTile timings.
 
-## Runner repair update — 2026-10-18
+## Historical runner repair update — 2026-10-18 (before the successful run)
 
 - Launcher/token flow and persistent runner changes are committed in main; the latest CPU/reference structural CI for the contract update passed 764 / 68 skipped / 0 failed.
 - No statement is made that the persistent local runner is Online or that the cuTile GitHub Actions workflow passed. Re-run with an owner-created registration token and inspect the container logs / GitHub runner list.
