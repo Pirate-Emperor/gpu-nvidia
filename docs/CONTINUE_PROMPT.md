@@ -22,15 +22,16 @@ The user's actual local inventory has been supplied:
 
 - NVIDIA GeForce RTX 4060, compute capability 8.9, driver 616.92, reported CUDA UMD 13.4, 8,188 MiB total / 7,925 MiB free VRAM at capture.
 - Windows 10 Pro x64, build 26300, WDDM.
-- `nvcc` and Python are unavailable; WSL2 and Docker are not installed.
+- System `nvcc` remains unavailable; CPython 3.12.10 and cuTile 1.6.0 are installed in the project venv. WSL2 and Docker Desktop are not installed yet.
 
-NVIDIA's current cuTile Python Quickstart lists Windows x86_64, CC 8.x–12.x, driver R580+ and Python 3.10–3.14. The local GPU/driver/OS therefore pass the public support gates on paper. Initial path: native Windows with per-user CPython 3.12, then the project venv and genuine smoke test in [docs/LOCAL_GPU_WINDOWS.md](LOCAL_GPU_WINDOWS.md). The existing `gpu-project` A100/R550 runner is only an ordinary-CUDA control; do not use it as the actual-cuTile route.
+NVIDIA's current cuTile Python Quickstart lists Windows x86_64, CC 8.x–12.x, driver R580+ and Python 3.10–3.14. The genuine cuTile vector-add smoke now passes locally (`GPU_SYNCHRONIZE=PASS`, `OUTPUT_CHECK=PASS`, `CUTILE_SMOKE=PASS`). The actual attention kernel remains unvalidated. The existing `gpu-project` A100/R550 runner is only an ordinary-CUDA control; do not use it as the actual-cuTile route.
 
 New repository tooling:
 - `scripts/setup_cutile_windows.ps1` creates `.venv-cutile-windows` and installs `cuda-tile[tileiras]` + `cupy-cuda13x[ctk]` without driver/system-Toolkit changes.
-- `scripts/cutile_smoke.py` compiles, launches, synchronizes and verifies a genuine cuTile vector-add kernel.
-- Run the smoke first and require `CUTILE_SMOKE=PASS`. Only then set `$env:REQUIRE_CUTILE = "1"` and run the strict actual attention correctness/edge tests. Do not interpret missing imports or skipped tests as success.
-- Do not register a GitHub Actions runner on the personal Windows host until smoke/correctness pass and a separate OS-enforced least-privilege boundary has been tested. A runner executes workflow code with its account's OS permissions. Runner registration credentials must stay local and never be exposed to job steps or pasted into chat.
+- `scripts/cutile_smoke.py` compiles, launches, synchronizes and verifies a genuine cuTile vector-add kernel; this has passed locally.
+- Docker runner setup is now implemented: `docker/cutile-runner/`, `.github/workflows/cutile-rtx4060-docker.yml`, and `scripts/start_cutile_docker_runner.ps1`. The launcher checks GPU passthrough before requesting a short-lived token, registers an ephemeral one-job container, dispatches the workflow on main, watches its result, and cleans up.
+- Next local prerequisite: install/enable WSL2, install Docker Desktop and GitHub CLI, authenticate `gh`, then run `scripts/start_cutile_docker_runner.ps1` once. The workflow itself runs the strict actual attention correctness/edge tests with `REQUIRE_CUTILE=1`.
+- Container isolation reduces host exposure but is not a perfect security boundary. The runner has no host mounts or Docker socket, runs non-root with dropped capabilities, and only the trusted main-branch workflow is eligible. Runner registration credentials must stay local and never be exposed to job steps or pasted into chat.
 
 ## Known technical state — do not lose this
 
@@ -59,4 +60,4 @@ End technical updates with:
     ACTUAL:
     DECISION/NEXT:
 
-**Start now** by reading the handoff and inspecting the current repository head/workflows; then determine whether the safe local GPU runner can be configured from the actual machine inventory. Current next gate: real `CUTILE_SMOKE=PASS`; then strict actual-cuTile correctness tests with `REQUIRE_CUTILE=1`. No runner registration or attention benchmark before those gates.
+**Start now** by inspecting the current main HEAD and the new Docker runner files. The local smoke gate has passed. The immediate next gate is the one-time host prerequisite installation (WSL2 + Docker Desktop + GitHub CLI), then run `scripts/start_cutile_docker_runner.ps1` to automatically launch the ephemeral runner and dispatch/watch the real attention correctness workflow. Do not claim attention correctness, benchmark success, or profiler completion until those runs actually produce evidence.
