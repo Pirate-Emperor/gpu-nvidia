@@ -104,7 +104,7 @@ Native-CUDA surrogate timings have been collected on the A100 using CUDA events,
 Actual cuTile performance remains blocked until the kernel executes on a supported driver/runtime. Nsight Compute hardware profiling is additionally blocked by `ERR_NVGPUCTRPERM`; current profiling claims are therefore limited to successful compiler/PTXAS resource reports, not hardware-counter data.
 
 Still required for final course submission:
-- Actual cuTile execution and correctness on the user's actual local GPU after GPU/OS/driver/toolchain inventory; do not assume a particular model. The current R550 A100 is not the actual-cuTile route.
+- Actual cuTile execution and correctness on the inventoried local RTX 4060 after CPython 3.12 and the real cuTile smoke test pass. The current R550 A100 is not the actual-cuTile route.
 - Final representative benchmark matrix and cuTile-vs-unfused/framework comparison.
 - At least two successful hardware profiles with counter access.
 - Final deliverable/report after those runs.
