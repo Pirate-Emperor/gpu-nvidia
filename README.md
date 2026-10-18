@@ -21,6 +21,7 @@ Use this order to understand the project and decide what to do next.
 | Dated experiment history | [Progress log](docs/PROGRESS.md) |
 | How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
 | Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
+| Actual-cuTile Nsight Compute profiling results | [Profiler analysis](docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) |
 | Local RTX 4060/Windows cuTile bring-up and smoke evidence | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
 | Native Windows RTX 4060 Actions runner setup | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
 | Full handoff for a new chat: runs, benchmarks, environment, security plan, and next steps | [Chat handoff](docs/CHAT_HANDOFF_2026-10-18.md) |
@@ -38,7 +39,7 @@ NVIDIA cuTile Python is a tile-based GPU programming model. This project impleme
 
 **Current optimization:** the fused kernel skips wholly-future K/V tiles in the causal loop and uses FP16 probability operands for P×V with FP32 accumulation and FP32 online-softmax state. The 64×64 tile is the default; 64×128 was the fastest configuration observed for the longer batched D=128 case, pending another independent repeat before calling it a general winner.
 
-**Not complete yet:** two actual-cuTile Nsight Compute profiles are a hard remaining course gate. The workflow did not find the profiler executable in the project subtree and intentionally did not download it. No administrator rights or system-wide installation have been used. The CUDA-enabled PyTorch SDPA comparison is also not yet included; current performance comparisons use the deliberately unfused FP32 CuPy baseline.
+**Core required gates are complete:** the RTX 4060 actual-cuTile correctness matrix, CLI/reference verification, three controlled benchmark sessions, and two actual-cuTile Nsight Compute profiles all passed. The profile analysis documents 231/255 registers per thread, shared-memory-limited occupancy around 8.3%, and scheduler/warp-state diagnostics. The optional CUDA-enabled PyTorch SDPA comparison remains unrun; current speedups are against the deliberately unfused FP32 CuPy baseline.
 
 See the [detailed RTX 4060 results and full tile matrix](docs/CUTILE_RTX4060_RESULTS_2026-10-19.md), [experiment report](docs/EXPERIMENT_REPORT.md), [test matrix](docs/TEST_MATRIX.md), and [TODO checklist](docs/TODO_CHECKLIST.md).
 
@@ -197,16 +198,15 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 - **Numerical diagnostics:** PASS for 29 case/tile configurations; maximum absolute error 0.0009765625, zero violations of the frozen mixed tolerance.
 - **CLI / independent oracle:** PASS; output is FP16 and passed shape, dtype, finite-value, and reference checks.
 - **Controlled performance:** three alternating-order sessions over five tile configurations. The long D=128 case measured 0.267059 ms / 16.53× vs unfused CuPy on 64×64; longer batched D=128 measured 0.923034 ms / 18.54× on 64×128. Short cases show large Windows/WDDM timing noise and are not headline speedup claims.
-- **Remaining hard gate:** two genuine cuTile Nsight Compute reports. No ncu executable was found under the project root or .tools; no download or profile attempt was made.
+- **Nsight Compute profiling:** PASS. Two actual-cuTile kernel configurations (medium D=128 at 64×64 and longer-batched D=128 at 64×128) were captured and inspected. [Profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039); [analysis](docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 
 The raw logs and JSON/CSV are in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465). The course deliverable remains open until two actual-cuTile profiles are captured and inspected.
 
-## Next objectives
+## Follow-up opportunities (not blockers for the validated core scope)
 
-1. Obtain explicit approval for a project-local download of the official NVIDIA Nsight Compute Windows x64 package into .tools. Do not install system-wide or use administrator privileges.
-2. Profile medium D=128 at 64×64 and longer batched D=128 at 64×128. Preserve and inspect both report files and logs; report any counter access error honestly.
-3. If profiling reveals a specific optimization opportunity, make a focused change and rerun correctness plus the controlled benchmark before accepting it.
-4. Optionally install/use a CUDA-enabled PyTorch build only if approved within the project venv and compatible with the existing CUDA 13.4 CuPy/cuTile stack; compare SDPA only after verifying it runs on the same GPU.
+1. Consider a focused shared-memory/register-pressure experiment: the profiles show one CTA per SM and roughly 8.3% occupancy for the two sampled configurations. Keep the current kernel unless a new version passes correctness and controlled benchmarking.
+2. Optionally add a CUDA-enabled PyTorch SDPA comparison if a compatible build can be installed safely in the project venv. Do not confuse the existing speedup versus unfused CuPy with a speedup versus vendor-optimized attention.
+3. Keep the raw profiler artifact and [profile analysis](docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) alongside the benchmark evidence. Nsight’s more detailed stall-sampling metric was unavailable, so do not overinterpret its estimated local-speedup heuristics.
 
 ## Course-scope boundary
 
