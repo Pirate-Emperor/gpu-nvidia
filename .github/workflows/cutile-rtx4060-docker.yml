@@ -8,6 +8,7 @@ permissions:
 
 jobs:
   cutile-validation:
+    if: github.ref == 'refs/heads/main'
     # Use the normal Windows self-hosted runner on the actual RTX 4060 host.
     # No Docker/WSL layer is needed: native Windows cuTile smoke already passed.
     runs-on: [self-hosted, windows, x64]
