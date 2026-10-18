@@ -11,7 +11,7 @@ This file records test coverage and the latest known execution state. For the co
 | Independent numerical diagnostics | PASS: 29 case/tile configurations | Zero mixed-tolerance violations; maximum absolute error 0.0009765625. |
 | CLI / reference | PASS | FP16 output verified against independent NumPy oracle. |
 | Controlled benchmark | PASS with noise caveats | Three sessions, five tile configs, 10 warmups, 30 CUDA-event samples × five launches/sample. |
-| Nsight Compute profiling | OPEN / BLOCKED | ncu not present inside project subtree; no download or profile captured. |
+| Nsight Compute profiling | PASS: two basic reports + two scheduler/warp-state reports | [Profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066); [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). Reports captured on RTX 4060; no counter-permission error. |
 
 Full numerical results and all three raw benchmark sessions: [detailed result report](CUTILE_RTX4060_RESULTS_2026-10-19.md), [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465).
 
@@ -116,9 +116,9 @@ Native-CUDA surrogate timings have been collected on the A100 using CUDA events,
 
 **Current actual-cuTile performance status (2026-10-19): PASS with caveats.** Run #39160827910 executed three benchmark sessions over five tile configurations. Long D=128 at 64×64 measured 0.267059 ms (16.53× vs unfused CuPy, 2.0% session spread); longer batched D=128 at 64×128 measured 0.923034 ms (18.54×, 0.9% spread). See [full results](CUTILE_RTX4060_RESULTS_2026-10-19.md). **Profiling remains open:** ncu was not present under the project root or .tools, so no actual-cuTile hardware profile was captured. The old ERR_NVGPUCTRPERM refers to the historical A100 profiler attempt, not the RTX 4060.
 
-Remaining hard gate for final course submission:
-- Obtain owner approval for a project-local official NVIDIA Nsight Compute download, then capture and inspect two cuTile reports: medium D=128 at 64×64 and longer batched D=128 at 64×128.
-- Optional, not a substitute for profiling: add CUDA-enabled PyTorch SDPA as a performance reference if it can be installed safely in the project venv.
+Required actual-cuTile profiling gate is now **PASS**. Two genuine kernel configurations were captured, and basic resource/occupancy/throughput metrics plus scheduler/warp-state findings were inspected and documented in [the profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). See [profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
+
+Optional follow-up: add a CUDA-enabled PyTorch SDPA comparison if a compatible build can be approved and installed safely in the project venv. The currently reported speedups are versus the deliberately unfused FP32 CuPy baseline, not a vendor-optimized attention kernel.
 
 ## 5. Environment gate
 
