@@ -200,7 +200,7 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 - **Controlled performance:** three alternating-order sessions over five tile configurations. The long D=128 case measured 0.267059 ms / 16.53× vs unfused CuPy on 64×64; longer batched D=128 measured 0.923034 ms / 18.54× on 64×128. Short cases show large Windows/WDDM timing noise and are not headline speedup claims.
 - **Nsight Compute profiling:** PASS. Two actual-cuTile kernel configurations (medium D=128 at 64×64 and longer-batched D=128 at 64×128) were captured and inspected. [Profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039); [analysis](docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 
-The raw logs and JSON/CSV are in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465). The course deliverable remains open until two actual-cuTile profiles are captured and inspected.
+The raw benchmark logs and JSON/CSV are in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465). The two actual-cuTile profiler configurations are preserved in [profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039), with the interpretation in [the profile analysis](docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). The core correctness, performance, and profiling gates are complete; the CUDA-enabled PyTorch SDPA comparison remains an optional follow-up.
 
 ## Follow-up opportunities (not blockers for the validated core scope)
 
