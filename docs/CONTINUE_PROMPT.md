@@ -1,6 +1,6 @@
 # Prompt for the next ChatGPT conversation
 
-Continue the ongoing project in the private GitHub repository **SpryzenHell/gpu-nvidia**.
+Continue the ongoing project in the private GitHub repository **xemptynothing/gpu-nvidia**.
 
 **Before doing anything else, read these repository documents from main:**
 1. docs/CHAT_HANDOFF_2026-10-18.md
@@ -18,7 +18,7 @@ Complete the actual NVIDIA cuTile fused causal attention implementation—not ju
 
 ## Immediate local-GPU/runner task
 
-I am planning to provide my local GPU inventory. The commands are:
+The immediate next task is to provide the actual local GPU inventory. Do not assume the GPU model, driver, OS or toolkit. Run these commands in Windows PowerShell, or the equivalent terminal on Linux/WSL2:
 
     nvidia-smi
     nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv
@@ -37,15 +37,16 @@ The GitHub runner must authenticate to receive jobs, but registration/connection
 ## Known technical state — do not lose this
 
 - Available project runner: gpu-project on scn21-mn; two full visible A100-SXM4-40GB GPUs (SM80/CC 8.0), R550.90.07, CUDA Toolkit 12.4.131, GCC 11.4.0, Nsight Compute 2024.1.1.0, Nsight Systems 2023.4.4.54, Fabric Manager active, non-root, no passwordless sudo.
-- Actual cuTile target src/cutile_attention.py has not completed a verified compile + launch + correctness run. The current cuTile gate needs R580+; R580.126.09+ is noted for detailed cuTile Nsight Compute stats.
+- Actual cuTile target src/cutile_attention.py has not completed a verified compile + launch + correctness run. NVIDIA's current Quickstart requires R580+; detailed profiling requires R580.126.09+ on Linux or R582.16+ on Windows. Stop using the R550.90.07 A100 as the actual-cuTile route, but keep it for ordinary-CUDA surrogate tests. Use the inventoried local GPU or another explicitly authorized supported environment.
 - CUDA 13.4 compatibility attempt failed with insufficient-driver and then system-driver-mismatch/error 803; CUDA 13.0 attempt produced no verified actual-cuTile run; the cuTile 1.2.0 package wasn't reachable in the configured package index. Do not repeat these without a materially different supported environment.
-- Latest broad A100 ordinary-CUDA/non-cuTile regression: **907 passed / 52 skipped / 0 failed**, [run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082).
-- Latest CPU/reference suite on pre-handoff main SHA afe530bc090c779ebe5d741dcf7ae544985570d1: **763 passed / 68 skipped / 0 failed**, [run #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931).
-- Native CUDA earlier: **133 passed / 1 skipped**, [run #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415).
+- Latest broad A100 ordinary-CUDA/non-cuTile regression: **907 passed / 52 skipped / 0 failed**, [run #52](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38056264082).
+- Latest CPU/reference suite on pre-handoff main SHA afe530bc090c779ebe5d741dcf7ae544985570d1: **763 passed / 68 skipped / 0 failed**, [run #340](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38056390931).
+- Native CUDA earlier: **133 passed / 1 skipped**, [run #44](https://github.com/xemptynothing/gpu-nvidia/actions/runs/37756646415).
 - Shared-tile v4 and v5 each passed 30 targeted tests but remain unpromoted. The paired current-vs-v5 benchmark shows mixed short-case results and only ~0.3–0.6% long/batched gains. Keep the 21-combination result table from the handoff and do not claim a general speedup.
 - PTXAS compiled v1/v2/v3/current/v4/v5 for SM80 with zero reported spills; v5 cubin 15,520 B vs current 15,136 B. This is compile-time evidence only.
-- Nsight Systems successfully captured two **ordinary-CUDA surrogate** traces and summaries: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950), [artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954). Trace durations include JIT/profiling overhead and are not steady-state benchmark latencies.
+- Nsight Systems successfully captured two **ordinary-CUDA surrogate** traces and summaries: [run #2](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38055834950), [artifact](https://github.com/xemptynothing/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954). Trace durations include JIT/profiling overhead and are not steady-state benchmark latencies.
 - Nsight Compute hardware counter collection is blocked by ERR_NVGPUCTRPERM; no useful profile was captured. Do not use privileged workarounds.
+- During the 2026-10-18 continuation, repository contents were readable but Actions run-list returned zero visible runs and historical run-detail/jobs/artifacts returned 404. Prior CI counts remain historical handoff records, not newly reverified evidence.
 - Relevant files and detailed historical benchmark values are in docs/CHAT_HANDOFF_2026-10-18.md.
 
 ## Work style and acceptance requirements
