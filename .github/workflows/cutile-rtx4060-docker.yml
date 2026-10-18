@@ -41,6 +41,18 @@ jobs:
           $env:CUPY_CACHE_DIR = $CupyCache
           $env:CUDA_CACHE_PATH = $CudaCache
 
+          # Persist project-local cache/temp paths to later workflow steps.
+          $EnvLines = @(
+            "TEMP=$TempRoot",
+            "TMP=$TempRoot",
+            "PIP_CACHE_DIR=$PipCache",
+            "CUPY_CACHE_DIR=$CupyCache",
+            "CUDA_CACHE_PATH=$CudaCache"
+          )
+          $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          $EnvContent = [string]::Join([Environment]::NewLine, $EnvLines) + [Environment]::NewLine
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, $EnvContent, $Utf8NoBom)
+
           $NvidiaSmi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
           if (-not $NvidiaSmi) { $NvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue }
           if (-not $NvidiaSmi) { throw 'nvidia-smi is unavailable; stopping without installing tools.' }
@@ -138,17 +150,14 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          $Ncu = Get-Command ncu.exe -ErrorAction SilentlyContinue
-          $NcuPath = if ($Ncu) { $Ncu.Source } else { $null }
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $NcuCandidates = @(
+            (Join-Path $ProjectRoot 'ncu.exe'),
+            (Join-Path $ProjectRoot '.tools\ncu.exe')
+          )
+          $NcuPath = $NcuCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $NcuPath) {
-            $InstallRoot = Join-Path $env:ProgramFiles 'NVIDIA Corporation'
-            if (Test-Path $InstallRoot) {
-              $Candidate = Get-ChildItem -Path $InstallRoot -Filter ncu.exe -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($Candidate) { $NcuPath = $Candidate.FullName }
-            }
-          }
-          if (-not $NcuPath) {
-            'NCU_NOT_INSTALLED: no profiles captured; no download/install attempted.' | Tee-Object -FilePath cutile-profile-status.log
+            'NCU_NOT_PRESENT_IN_PROJECT_DIRECTORY: not searched outside the project and no download/install attempted.' | Tee-Object -FilePath cutile-profile-status.log
             exit 0
           }
           $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
