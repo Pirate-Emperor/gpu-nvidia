@@ -7,15 +7,18 @@ from reference import causal_attention_fp32, max_abs_error, max_rel_error
 
 pytestmark = pytest.mark.gpu
 
-if os.environ.get("REQUIRE_A100") == "1":
+if (
+    os.environ.get("REQUIRE_A100") == "1"
+    or os.environ.get("REQUIRE_CUTILE") == "1"
+):
     try:
         import cupy as cp
     except ImportError as exc:
-        pytest.fail(f"CuPy is required for A100 edge tests: {exc}", pytrace=False)
+        pytest.fail(f"CuPy is required for required cuTile edge tests: {exc}", pytrace=False)
     try:
         import cuda.tile as ct  # noqa: F401
     except ImportError as exc:
-        pytest.fail(f"cuTile is required for A100 edge tests: {exc}", pytrace=False)
+        pytest.fail(f"cuTile is required for required cuTile edge tests: {exc}", pytrace=False)
 else:
     cp = pytest.importorskip("cupy")
     pytest.importorskip("cuda.tile")
