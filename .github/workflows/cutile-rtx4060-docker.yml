@@ -82,6 +82,28 @@ jobs:
             Tee-Object -FilePath cutile-benchmark.log
           if ($LASTEXITCODE -ne 0) { throw 'cuTile benchmark failed.' }
 
+      - name: Capture two actual cuTile profiles when Nsight Compute is already installed
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Ncu = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          if (-not $Ncu) {
+            'NCU_NOT_INSTALLED: profiles were not captured; no tool was installed automatically.' | Tee-Object -FilePath cutile-profile-status.log
+            exit 0
+          }
+
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+
+          & $Ncu.Source --set basic --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
+          $MediumExit = $LASTEXITCODE
+          & $Ncu.Source --set basic --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 32 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
+          $LongExit = $LASTEXITCODE
+          if ($MediumExit -ne 0 -or $LongExit -ne 0) {
+            throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect profile logs for counter permissions or unsupported options."
+          }
+
       - name: Upload actual cuTile validation and benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -91,6 +113,11 @@ jobs:
             cutile-smoke.log
             cutile-pytest.log
             cutile-benchmark.log
+            cutile-profile-status.log
+            cutile-profile-medium.log
+            cutile-profile-long-batched.log
+            results/cutile-profile-medium.ncu-rep
+            results/cutile-profile-long-batched.ncu-rep
             cutile-cli-input.npz
             cutile-cli-output.npy
             results/cutile-benchmark.json
