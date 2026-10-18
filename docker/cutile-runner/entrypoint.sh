@@ -13,7 +13,6 @@ set -euo pipefail
   --name "$RUNNER_NAME" \
   --labels "$RUNNER_LABELS" \
   --work _work \
-  --ephemeral \
   --disableupdate
 
 unset RUNNER_TOKEN
