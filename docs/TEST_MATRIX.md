@@ -2,7 +2,7 @@
 
 This file records test coverage and the latest known execution state. For the consolidated approaches, exact outcomes, and measured comparisons, see [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md).
 
-## Latest verified runs (checked 2026-10-18; successful executions listed below are dated 2026-10-10)
+## Latest historical run records (handoff checked 2026-10-18; Actions details unavailable in this continuation)
 
 | Workflow | Result | Important boundary |
 |---|---|---|
@@ -15,6 +15,8 @@ This file records test coverage and the latest known execution state. For the co
 | [PTXAS resource report #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) | v1/v2/v3/current/v4/v5 compiled; zero spills | v5 added to resource comparison; compile-time evidence only. |
 | [Nsight Systems timeline #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) | Two warmed surrogate `.nsys-rep` traces plus CUDA API/kernel summaries uploaded ([artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954)) | CUDA API/kernel timeline only; not actual-cuTile or Nsight Compute counters. |
 
+
+**Actions evidence access note (2026-10-18 continuation):** the connected Actions run-list endpoint returned zero visible runs; direct run-detail, job and artifact requests for the handoff IDs returned 404, and the current handoff commit had no visible combined status. This does not prove the historical runs do not exist. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
 
 ## 1. Reference / CPU tests
 
@@ -102,7 +104,7 @@ Native-CUDA surrogate timings have been collected on the A100 using CUDA events,
 Actual cuTile performance remains blocked until the kernel executes on a supported driver/runtime. Nsight Compute hardware profiling is additionally blocked by `ERR_NVGPUCTRPERM`; current profiling claims are therefore limited to successful compiler/PTXAS resource reports, not hardware-counter data.
 
 Still required for final course submission:
-- Actual cuTile execution and correctness on supported hardware (planned RTX 4060).
+- Actual cuTile execution and correctness on the user's actual local GPU after GPU/OS/driver/toolchain inventory; do not assume a particular model. The current R550 A100 is not the actual-cuTile route.
 - Final representative benchmark matrix and cuTile-vs-unfused/framework comparison.
 - At least two successful hardware profiles with counter access.
 - Final deliverable/report after those runs.
