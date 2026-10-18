@@ -111,9 +111,9 @@ Still required for final course submission:
 
 ## 5. Environment gate
 
-Current runner: NVIDIA A100-SXM4-40GB, SM80, driver R550.90.07.
+**Existing hosted/self-hosted control runner:** NVIDIA A100-SXM4-40GB, SM80, driver R550.90.07. This runner is below NVIDIA's R580+ cuTile Python requirement and remains for ordinary-CUDA surrogate validation only. Prior forward-compatibility attempts did not establish actual cuTile execution.
 
-Current NVIDIA cuTile Python documentation requires R580+; the current user-space forward-compatibility experiment on this node produced CUDA error 803. Therefore GPU execution remains an environment gate rather than an untested result.
+**Local actual-cuTile candidate (inventory 2026-10-18):** GeForce RTX 4060, CC 8.9, driver 616.92, Windows x64 build 26300, 8,188 MiB VRAM. These GPU/driver/OS facts fit NVIDIA's documented support matrix on paper. Python and system NVCC are not installed; native Windows venv setup and the genuine cuTile smoke test are pending. Do not convert a skipped GPU test into a pass. See [local GPU guide](LOCAL_GPU_WINDOWS.md).
 ## 6. Dual-device hardware validation
 
 The actual runner exposes two full A100-SXM4-40GB GPUs through `CUDA_VISIBLE_DEVICES=0,1`.
