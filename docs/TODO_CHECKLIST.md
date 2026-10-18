@@ -22,7 +22,7 @@ Required head dimensions are D = 32, 64, and 128. The fused kernel must not writ
 
 For this project, the important distinction is:
 
-- **Actual cuTile target:** `src/cutile_attention.py`. The fused causal-attention kernel now passes the RTX 4060 correctness matrix; the remaining hard gate is two actual-cuTile Nsight Compute profiles.
+- **Actual cuTile target:** `src/cutile_attention.py`. The fused causal-attention kernel passes the RTX 4060 correctness matrix and controlled benchmark; two actual-cuTile Nsight Compute profiles have now been captured and inspected.
 - **Ordinary-CUDA controls:** `src/custom_cuda_attention.py`, `src/warp_cuda_attention.py`, `src/shared_tile_cuda_attention.py`, and `src/variants/shared_tile_v1.py` through `shared_tile_v5.py`. These are CUDA C++/NVCC implementations that helped us validate the mathematics and compare tile strategies on the available A100.
 - **Why the distinction matters:** the ordinary-CUDA tests and speed measurements are useful engineering evidence, but they are **not actual cuTile execution**, and cannot alone satisfy the course target.
 
@@ -41,8 +41,8 @@ The current A100 runner uses driver R550.90.07, below NVIDIA's documented R580+ 
 | Numerical diagnostics | **PASS** | 29 legal case/tile combinations; zero mixed-tolerance violations. |
 | CLI and independent oracle | **PASS** | FP16 output verified by the independent NumPy oracle. |
 | Actual cuTile benchmark | **PASS WITH CAVEATS** | Three sessions cover five tiles; long cases are stable, very short cases are noisy. |
-| Nsight Compute profiles | **OPEN / BLOCKED** | ncu executable absent from allowed project directories; no download attempted. |
-| Final course deliverable | **NOT COMPLETE** | Two actual-cuTile profiler reports remain required. |
+| Nsight Compute profiles | **PASS** | Two basic reports plus two Scheduler/ Warp State reports captured and inspected; [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). |
+| Final course deliverable | **CORE SCOPE COMPLETE** | Required correctness, CLI, controlled benchmark, and two-configuration profiling gates have evidence. CUDA PyTorch SDPA remains an optional comparison follow-up. |
 
 ## 3. Done so far — brief explanations and evidence
 
@@ -94,12 +94,12 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 
 ### Priority 1 — obtain profiler evidence
 
-- [ ] **BLOCKED: make Nsight Compute available inside the project directory.** The RTX 4060 workflow did not find ncu.exe in the project root or .tools and did not download it. Obtain explicit approval for the official Windows package in .tools; do not install globally or use administrator privileges. Counter permission on the RTX 4060 remains untested.
-- [ ] Profile at least two real cuTile configurations, ideally one medium shape and one long/batched shape. Preserve the `.ncu-rep` files, command line, logs and metrics.
-- [ ] Inspect the metrics actually available: register/shared-memory use, occupancy, memory throughput and relevant stalls. Tie each proposed optimization to evidence rather than guessing.
+- [x] **Make Nsight Compute available and capture actual-cuTile reports.** The official Windows Nsight Compute CLI 2026.3.1.0 is installed; counters worked on the RTX 4060 without `ERR_NVGPUCTRPERM`. [Profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066) preserves the reports and exports.
+- [x] Capture two actual cuTile configurations: `medium_d128` at 64×64 and `longer_batched_d128` at 64×128. Both compressed `.ncu-repz` reports and their command logs are preserved in [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
+- [x] Inspect register/shared-memory usage, occupancy, throughput, scheduler eligibility, and execution-pipeline-stall diagnostics. Findings and limitations are recorded in [CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 - [x] Capture Nsight Systems timelines and CUDA API/kernel summaries for the warmed ordinary-CUDA surrogate at `medium_d128, tile_k=64` and `longer_batched_d128, tile_k=32`: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950), [uploaded trace + summary artifacts](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954). This is supplementary surrogate evidence; actual-cuTile timelines remain to be captured after cuTile runs on supported hardware.
 
-**Profiler completion means at least two successful, inspectable profiles of the actual cuTile kernel—not merely a working Nsight Compute executable.**
+**Profiler gate complete:** two successful, inspectable actual-cuTile reports were captured and interpreted. Scheduler/warp-state analysis is directional because the optional `smsp__pcsamp_sample_count` metric was unavailable; do not overinterpret Nsight's estimated local-speedup heuristics.
 
 ### Priority 1 — complete a reliable performance comparison
 
@@ -115,16 +115,16 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 - [x] Add v5 to the PTXAS resource report and record registers, shared-memory use, spills and cubin size; see [run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187).
 - [x] Retest current-vs-v5 with three paired sessions and alternating measurement order across all seven cases and tile_k=16/32/64: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163). Result: v5 is not promoted; gains are mixed/noisy on short cases and about 0.3–0.6% on long/batched cases, although medium D=64 improves modestly.
 - [ ] Re-measure the current ordinary-CUDA surrogate under controlled conditions when a decision depends on its absolute latency.
-- [ ] Use actual-cuTile profiler evidence to choose the next tile or memory optimization. Save each materially different approach as a new version and record both wins and regressions.
+- [x] Use actual-cuTile profiler evidence to identify the next optimization target: shared-memory/register pressure and instruction scheduling. Keep the validated 64×64 default and 64×128 longer-batched specialization; the profile alone does not prove an untested change will win.
 - [ ] For each change, run targeted correctness first, then the broad regression suite before accepting the change.
 
 ## 5. Final submission and definition of done
 
 - [x] Update the root README, experiment report, test matrix, progress log, and results snapshot with current evidence.
-- [ ] Verify required deliverables: actual fused cuTile implementation, independent correctness tests, at least two tile configurations, comparison against an unfused baseline and an appropriate framework/vendor reference where available, at least 30 timed iterations, separate JIT timing, and profiler evidence for at least two configurations.
-- [x] Reproduced through native Windows workflow checkout and preserved raw output in artifact 12148414465.
+- [x] Verify core deliverables: fused cuTile implementation, independent correctness tests, multiple tiles, unfused FP32 CuPy comparison, at least 30 measured iterations, separate first-call/JIT-associated timing, and two actual-cuTile profiler configurations. A CUDA-enabled PyTorch SDPA comparison was not available in the existing project venv and remains optional follow-up; current speedups are explicitly against the unfused CuPy baseline.
+- [x] Reproduced through native Windows workflow checkout and preserved benchmark output in artifact 12148414465 and profiler output in [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
 - [x] Keep ordinary-CUDA metrics labelled as controls; actual cuTile data are tabulated separately.
-- [ ] Mark the project complete only after actual-cuTile correctness, performance and profiling gates have supporting evidence.
+- [x] Mark the core project scope complete after correctness, performance, and two-configuration profiling gates all have supporting evidence.
 
 ## Decision rules
 
