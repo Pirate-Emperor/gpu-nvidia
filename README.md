@@ -32,15 +32,15 @@ Use this order to understand the project and decide what to do next.
 
 ## What cuTile is — and where this project stands
 
-[NVIDIA cuTile Python](https://docs.nvidia.com/cuda/cutile-python/) is a tile-based GPU programming model: we describe operations on blocks of array data, while the cuTile compiler/runtime maps those tile operations to GPU execution. Our assignment is to use this model to write a fused causal-attention forward kernel.
+NVIDIA cuTile Python is a tile-based GPU programming model. This project implements fused causal scaled dot-product self-attention as one cuTile kernel, keeping the complete score/probability matrix out of global memory.
 
-**What is already done:** independent mathematical references, broad ordinary-CUDA correctness coverage, several CUDA comparison kernels, preserved v1–v5 experiments, a paired benchmark ladder, PTXAS summaries, Nsight Systems traces for the surrogate, and a consolidated experiment report. Latest hosted CPU/reference structural suite: run #75, 764 passed / 68 skipped / 0 failed. Historical broad A100 non-cuTile run #52 recorded 907 passed / 52 skipped. CPU-hosted GPU skips and A100 ordinary-CUDA results are not actual cuTile attention results.
+**Validated on the actual GPU:** [native Windows RTX 4060 workflow #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), commit 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428, passed the genuine cuTile smoke test, **48 required attention tests**, **29 independent-reference accuracy configurations with zero tolerance violations**, and CLI output verification. Three order-alternating benchmark sessions covered five legal tile configurations with ten warmups and 30 CUDA-event samples per configuration. Raw reports are preserved in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465).
 
-**What is not done yet:** actual `src/cutile_attention.py` execution and full correctness on a supported GPU/runtime, controlled actual-cuTile performance comparisons, and successful Nsight Compute profiles. The available A100 runner uses driver R550.90.07, and the project's current cuTile environment gate requires R580+; its profiler also reports `ERR_NVGPUCTRPERM`. Do not count the ordinary-CUDA surrogate results as completed cuTile results.
+**Current optimization:** the fused kernel skips wholly-future K/V tiles in the causal loop and uses FP16 probability operands for P×V with FP32 accumulation and FP32 online-softmax state. The 64×64 tile is the default; 64×128 was the fastest configuration observed for the longer batched D=128 case, pending another independent repeat before calling it a general winner.
 
-**Execution decision (2026-10-18):** stop using the existing A100 runner as the actual-cuTile route; its R550.90.07 driver is below NVIDIA's documented R580 minimum. The user's local RTX 4060 is now inventoried at compute capability 8.9 and driver 616.92 on 64-bit Windows. That GPU/driver/OS combination meets the documented cuTile prerequisites on paper. Native Windows cuTile smoke now passes on the RTX 4060: cuTile 1.6.0 with matching CUDA 13.4 TileIRAS/NVCC/NVVM components compiled and launched a genuine vector-add kernel, synchronized, and exactly validated 4,096 outputs. This is a runtime smoke pass only; actual causal attention remains unvalidated. The simplest execution route is now a normal native-Windows self-hosted Actions runner on this same RTX 4060. Docker/WSL are not required: native Windows cuTile smoke already passed. The validation workflow has been changed to target the default Windows runner labels, then run actual attention correctness, CLI-reference validation, and the benchmark only after correctness passes.
+**Not complete yet:** two actual-cuTile Nsight Compute profiles are a hard remaining course gate. The workflow did not find the profiler executable in the project subtree and intentionally did not download it. No administrator rights or system-wide installation have been used. The CUDA-enabled PyTorch SDPA comparison is also not yet included; current performance comparisons use the deliberately unfused FP32 CuPy baseline.
 
-**Immediate next action:** create a standard Windows x64 self-hosted runner for this repository using GitHub's setup instructions. Once it shows Online, manually dispatch **RTX 4060 native Windows cuTile validation** on `main`. Keep registration tokens local. Attention is not complete until actual correctness passes, controlled benchmarks are recorded, and two actual cuTile profiles are captured.
+See the [detailed RTX 4060 results and full tile matrix](docs/CUTILE_RTX4060_RESULTS_2026-10-19.md), [experiment report](docs/EXPERIMENT_REPORT.md), [test matrix](docs/TEST_MATRIX.md), and [TODO checklist](docs/TODO_CHECKLIST.md).
 
 ## Goal
 
@@ -191,33 +191,23 @@ Steady-state measurements use GPU events, warm-up iterations, >=30 measured iter
 
 Profiler runs use a dedicated single-kernel target so Nsight Compute measurements are not polluted by the entire benchmark harness.
 
-## Current status (last checked 2026-10-18; most recent successful runs are dated 2026-10-10)
+## Current status (verified 2026-10-19)
 
-- Latest broad non-cuTile regression: **907 passed, 52 skipped, 0 failed** ([run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082)).
-- Latest CPU/reference suite: **764 passed, 68 skipped, 0 failed** ([run #75 on runner-contract commit bfa8e95](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39147796099)); GPU tests are skipped because this is a hosted CPU runner. The earlier run #340 remains historical.
-- Dedicated shared-tile v4 and v5 A100 correctness: **30/30 passed each**; neither experiment is promoted as a guaranteed performance win.
-- Repeated current-vs-v5 benchmark: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163), three paired/order-alternating trials for every case/tile; v5 remains unpromoted due to mixed results and sub-1% long/batched gains.
-- Updated PTXAS comparison: [run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) compiled v1–v5 plus current with zero reported spills; v5 cubin is 384 B larger than current.
-- Nsight Systems timeline: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) captured two warmed ordinary-CUDA surrogate traces and CUDA API/kernel summaries ([artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954)); actual-cuTile profiling remains open.
-- Actual cuTile on the A100 runner remains blocked by R550.90.07. The local RTX 4060 (CC 8.9, driver 616.92, Windows x64) has passed the genuine vector-add cuTile smoke test; actual causal-attention correctness, benchmarks, and profiler captures remain pending. The validation workflow now targets a normal native-Windows self-hosted runner, avoiding the Docker/WSL path.
-- Nsight Compute is installed, but the runner lacks performance-counter permission (`ERR_NVGPUCTRPERM`), so no real counter profile was captured.
+- **Actual cuTile correctness:** PASS on RTX 4060. Workflow #39160827910, commit 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428: 48 passed, 0 failed with REQUIRE_CUTILE=1.
+- **Numerical diagnostics:** PASS for 29 case/tile configurations; maximum absolute error 0.0009765625, zero violations of the frozen mixed tolerance.
+- **CLI / independent oracle:** PASS; output is FP16 and passed shape, dtype, finite-value, and reference checks.
+- **Controlled performance:** three alternating-order sessions over five tile configurations. The long D=128 case measured 0.267059 ms / 16.53× vs unfused CuPy on 64×64; longer batched D=128 measured 0.923034 ms / 18.54× on 64×128. Short cases show large Windows/WDDM timing noise and are not headline speedup claims.
+- **Remaining hard gate:** two genuine cuTile Nsight Compute reports. No ncu executable was found under the project root or .tools; no download or profile attempt was made.
 
-**Actions evidence checked during runner repair (2026-10-18):** the connected GitHub API returned current main/commit data and workflow job logs. Latest CPU/reference run #75 passed 764 / skipped 68 / failed 0, including the revised persistent-runner structural contract; its GPU tests were skipped on the hosted CPU runner. Historical GPU results below remain evidence from their linked runs and are not substituted for local cuTile validation.
+The raw logs and JSON/CSV are in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465). The course deliverable remains open until two actual-cuTile profiles are captured and inspected.
 
-**Do not confuse the native-CUDA/cuTile-like surrogate with actual NVIDIA cuTile.** The detailed evidence, approach comparison, test results, benchmarks and limitations are in [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md). See [docs/README.md](docs/README.md) for the documentation map.
+## Next objectives
 
+1. Obtain explicit approval for a project-local download of the official NVIDIA Nsight Compute Windows x64 package into .tools. Do not install system-wide or use administrator privileges.
+2. Profile medium D=128 at 64×64 and longer batched D=128 at 64×128. Preserve and inspect both report files and logs; report any counter access error honestly.
+3. If profiling reveals a specific optimization opportunity, make a focused change and rerun correctness plus the controlled benchmark before accepting it.
+4. Optionally install/use a CUDA-enabled PyTorch build only if approved within the project venv and compatible with the existing CUDA 13.4 CuPy/cuTile stack; compare SDPA only after verifying it runs on the same GPU.
 
-## Next objectives (do these in order)
-
-1. **Set up a normal Windows self-hosted runner.** The local genuine cuTile smoke test already passed. Follow GitHub's repository Settings > Actions > Runners setup instructions on the Windows RTX 4060 host. No Docker, WSL, or GitHub CLI is required. When the runner is Online, manually dispatch the native-Windows cuTile validation workflow on `main`.
-2. **Pass the actual cuTile attention correctness matrix.** The Docker workflow sets `REQUIRE_CUTILE=1`, so missing dependencies cannot silently skip tests. Fix collection/runtime failures in the repository and rerun the workflow; record its artifact/log and exact commit. Do not set `REQUIRE_A100` on the RTX 4060.
-3. **Validate CLI I/O end-to-end.** Run `python run_attention.py --input INPUT.npz --output OUTPUT.npy --backend cutile`; verify output shape, FP16 dtype, finite values and independent-reference tolerance.
-4. **Benchmark only after correctness passes.** Cover D=32/64/128, at least two legal tiles and frozen cases; compare with unfused CuPy and a suitable framework baseline where available. Use at least 10 warmups and at least 30 CUDA-event samples, separately report cold/JIT, per-case median/P90, throughput, speedup, and raw JSON/CSV.
-5. **Profile on supported tooling.** Confirm Nsight Compute is installed and its counters are available without privileged workarounds. The current driver exceeds the documented Windows detailed-profiling minimum, but the profiler installation/access itself is not yet verified. Preserve at least two actual-cuTile profile files and logs.
-6. **Run the native Windows Actions workflow.** Use the standard repository-scoped self-hosted runner and manually dispatch the workflow from `main`. Review workflow code before running it because self-hosted runners execute repository workflow commands on the host. Keep registration credentials local.
-
-The [handoff document](docs/CHAT_HANDOFF_2026-10-18.md) contains historical benchmark data and the remaining course completion gates.
- 
 ## Course-scope boundary
 
 The following are exploratory only and should be postponed until the required path is correct, benchmarked, and profiled:
