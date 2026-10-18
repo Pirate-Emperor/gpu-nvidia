@@ -3,6 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = (
+    ".gitignore",
     "README.md",
     "docs/README.md",
     "docs/TODO_CHECKLIST.md",
