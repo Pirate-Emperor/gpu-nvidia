@@ -1,14 +1,12 @@
 name: RTX 4060 native Windows cuTile validation
 
-on:
-  workflow_dispatch:
+on: [workflow_dispatch]
 
 permissions:
   contents: read
 
 jobs:
   cutile-validation:
-    if: github.ref == 'refs/heads/main'
     # Use the normal Windows self-hosted runner on the actual RTX 4060 host.
     # No Docker/WSL layer is needed: native Windows cuTile smoke already passed.
     runs-on: [self-hosted, windows, x64]
@@ -71,21 +69,7 @@ jobs:
           & $Py run_attention.py --input cutile-cli-input.npz --output cutile-cli-output.npy --backend cutile --tile-q 64 --tile-k 64
           if ($LASTEXITCODE -ne 0) { throw 'Required CLI execution failed.' }
 
-          $env:PYTHONPATH = "$PWD\src;$PWD\tests"
-          $code = @'
-          import numpy as np
-          from attention_io import load_attention_npz
-          from reference import causal_attention_fp32, passes_mixed_tolerance
-          q, k, v = load_attention_npz("cutile-cli-input.npz")
-          actual = np.load("cutile-cli-output.npy")
-          expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
-          assert actual.shape == expected.shape, (actual.shape, expected.shape)
-          assert actual.dtype == np.float16, actual.dtype
-          assert np.isfinite(actual).all(), "CLI output contains NaN/Inf"
-          assert passes_mixed_tolerance(actual, expected, abs_scale=2e-2, rel_scale=2e-2), "CLI output mismatches independent reference"
-          print("CLI_REFERENCE_CHECK=PASS")
-'@
-          $code | & $Py -
+          & $Py scripts/verify_cli_output.py --input cutile-cli-input.npz --output cutile-cli-output.npy
           if ($LASTEXITCODE -ne 0) { throw 'CLI output/reference validation failed.' }
 
       - name: Benchmark fused cuTile against unfused CuPy
