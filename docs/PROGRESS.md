@@ -240,3 +240,30 @@ No kernel source or benchmark algorithm was changed in this documentation-focuse
 - Added `REQUIRE_CUTILE=1` test mode to `tests/test_gpu_correctness.py` and `tests/test_gpu_edge_cases.py` so missing CuPy/cuTile imports fail rather than silently skip for local acceptance runs. Registered the new files in the structural guard.
 - This is build-up/tooling work only. The smoke script has **not** run on the user's computer; no claim of actual-cuTile compilation, attention correctness, benchmark, or profile is made. The next gate is an explicit `CUTILE_SMOKE=PASS` result, followed by targeted correctness tests.
 - Do not register an Actions runner on the personal Windows host yet. First pass the manual smoke/correctness gates and then test an OS-enforced least-privilege boundary if Actions execution is still needed.
+
+
+## 2026-10-18 — Local cuTile smoke passed; Docker runner prepared
+
+### Actual local cuTile runtime
+- Installed project-local CPython 3.12.10, CuPy 14.2.0, cuTile 1.6.0, and matching CUDA 13.4 TileIRAS/NVCC/NVVM Python packages on the Windows RTX 4060 (SM89, driver 616.92).
+- Ran `scripts/cutile_smoke.py` locally. Evidence: `GPU_SYNCHRONIZE=PASS`, `OUTPUT_CHECK=PASS`, `CUTILE_SMOKE=PASS` for 4,096 vector-add elements.
+- This proves a genuine cuTile kernel can compile/launch on the local GPU. It does **not** validate `src/cutile_attention.py`, causal masking, attention numerical correctness, performance, or profiling.
+
+### Test collection fixes
+- Fixed `tests/test_gpu_correctness.py` so pytest receives one explicit ID per complete parameter set instead of attempting to unpack an individual `AttentionCase`.
+- Fixed the exploratory tile IDs in the same file to use one ID per tile pair.
+- Fixed lazy runtime import scope in `src/cutile_attention.py`: `ct` is made visible in module globals before the cuTile decorator resolves `ct.Constant[int]` annotations.
+- The user's prior attention test run stopped at collection before any attention kernel executed. The full GPU tests have not yet been rerun after these changes.
+
+### Dockerized GitHub Actions runner
+- Added a non-root Linux runner image, Docker Compose GPU configuration, ephemeral one-job entrypoint, and PowerShell launcher.
+- Added `.github/workflows/cutile-rtx4060-docker.yml`, limited to manual dispatch on `main`, read-only contents permission, genuine smoke gate, and strict correctness/edge tests with `REQUIRE_CUTILE=1`.
+- The launcher checks that Docker GPU passthrough sees the RTX 4060 before requesting a short-lived runner token, starts the runner, dispatches the workflow, watches the run, and tears down the container.
+- Isolation controls: no host bind mounts, no Docker socket, no privileged mode, non-root user, dropped Linux capabilities, `no-new-privileges`, resource limits, ephemeral runner. Docker/WSL2 and host-kernel trust remain part of the security boundary.
+- **Not yet executed:** the host inventory still has no WSL2/Docker Desktop. Install those prerequisites and GitHub CLI, authenticate locally with `gh`, then run `scripts/start_cutile_docker_runner.ps1`. No registration token or personal credential was written to the repository.
+
+### Next gates
+1. Launch the Docker workflow and resolve any container/build/runtime failures.
+2. Require the actual causal-attention correctness matrix to pass; do not treat the smoke as attention validation.
+3. Run the CLI/reference check and controlled benchmarks only after correctness passes.
+4. Capture at least two successful actual-cuTile profiler runs and preserve raw artifacts.
