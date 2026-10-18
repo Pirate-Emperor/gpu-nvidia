@@ -142,7 +142,7 @@ jobs:
           $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
           $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
           New-Item -ItemType Directory -Force -Path results | Out-Null
-          & $Py benchmarks/benchmark_attention.py --output results/cutile-benchmark.json --warmup 10 --iterations 30 --tiles 32x64 64x64 2>&1 | Tee-Object -FilePath cutile-benchmark.log
+          & $Py benchmarks/benchmark_attention.py --output results/cutile-benchmark.json --warmup 10 --iterations 30 --tiles 32x64 64x64 64x128 128x64 128x128 2>&1 | Tee-Object -FilePath cutile-benchmark.log
           if ($LASTEXITCODE -ne 0) { throw 'Controlled cuTile benchmark failed.' }
 
       - name: Attempt two genuine cuTile Nsight Compute captures if already installed
