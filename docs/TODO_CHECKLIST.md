@@ -82,7 +82,7 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 
 ### Priority 0 — get actual cuTile running
 
-- [x] **Validate the native Windows cuTile stack with a real kernel.** `scripts/cutile_smoke.py` passed on the RTX 4060 with Python 3.12.10, cuTile 1.6.0, and matched CUDA 13.4 TileIR compiler packages. This is smoke evidence only, not attention correctness. Keep the existing R550 A100 for ordinary-CUDA surrogate validation only.
+- [x] **Validate the native Windows cuTile stack with a real kernel.** `scripts/cutile_smoke.py` passed on the RTX 4060 with Python 3.12.10, cuTile 1.6.0, and matched CUDA 13.4 TileIR compiler packages. The follow-on actual attention suite also passed (run #39160827910). Keep the existing R550 A100 for ordinary-CUDA surrogate validation only.
 - [x] **Record the environment before changing code.** Save GPU model/compute capability, driver, CUDA toolkit/runtime, Python, cuTile package version, and exact commands to the progress log or a dated run record.
 - [x] **Run a minimal actual-cuTile smoke test.** The real kernel compiled, launched, synchronized, and matched the expected output for all 4,096 elements. Preserve the console log; this separates environment readiness from attention-kernel bugs.
 - [x] **Validate `src/cutile_attention.py` on a supported GPU.** Run #39160827910 passed the frozen attention matrix after the causal K/V bound and FP16 P×V optimizations.
