@@ -11,15 +11,18 @@ from reference import (
     passes_mixed_tolerance,
 )
 
-if os.environ.get("REQUIRE_A100") == "1":
+if (
+    os.environ.get("REQUIRE_A100") == "1"
+    or os.environ.get("REQUIRE_CUTILE") == "1"
+):
     try:
         import cupy as cp
     except ImportError as exc:
-        pytest.fail(f"CuPy is required for A100 tests: {exc}", pytrace=False)
+        pytest.fail(f"CuPy is required for required cuTile GPU tests: {exc}", pytrace=False)
     try:
         import cuda.tile as ct
     except ImportError as exc:
-        pytest.fail(f"cuTile is required for A100 tests: {exc}", pytrace=False)
+        pytest.fail(f"cuTile is required for required cuTile GPU tests: {exc}", pytrace=False)
 else:
     cp = pytest.importorskip("cupy")
     ct = pytest.importorskip("cuda.tile")
