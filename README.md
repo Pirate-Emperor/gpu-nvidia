@@ -22,7 +22,6 @@ Use this order to understand the project and decide what to do next.
 | How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
 | Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
 | Local RTX 4060/Windows cuTile bring-up and first smoke test | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
-| Local RTX 4060/Windows cuTile bring-up and first smoke test | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
 | Full handoff for a new chat: runs, benchmarks, environment, security plan, and next steps | [Chat handoff](docs/CHAT_HANDOFF_2026-10-18.md) |
 | Copy-paste prompt to continue in a new chat | [Continuation prompt](docs/CONTINUE_PROMPT.md) |
 
