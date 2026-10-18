@@ -1,5 +1,10 @@
 # GPU Environment Contract
 
+## Current actual-cuTile execution — 2026-10-19
+
+The successful native Windows GPU run [#39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), commit 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428, confirms RTX 4060 attention execution. Environment: CPython 3.12.10, NumPy 2.5.4, CuPy 14.2.0, cuda-tile 1.6.0, pytest 8.4.2, and TileIRAS/NVCC/NVVM 13.4.92. CuPy reports driver API 13040 and runtime API 13020. The virtual environment, pip temp/cache, CuPy cache and CUDA cache were contained under the project root. The run passed 48 tests, 29 accuracy configurations and CLI/reference validation; its three-session benchmark outputs are archived in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465). Nsight Compute remains absent from the project subtree; no actual-cuTile NCU profile has yet been captured.
+
+
 ## User's local GPU inventory — 2026-10-18
 
 The user supplied the following command output in this conversation:
