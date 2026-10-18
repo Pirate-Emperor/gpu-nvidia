@@ -20,4 +20,4 @@ Start here for the project's current state and evidence.
 
 ## One-line status
 
-**Actual cuTile causal attention is validated and benchmarked on the RTX 4060.** The latest run passed 48 required tests, 29 accuracy diagnostics, and CLI/reference validation; three five-tile sessions are archived. Two actual-cuTile Nsight Compute profile reports remain outstanding because the CLI was absent from the project subtree and no download has been authorized.
+**Actual cuTile causal attention is validated, benchmarked, and profiled on the RTX 4060.** The native run passed 48 required tests, 29 accuracy diagnostics, CLI/reference validation, and three five-tile benchmark sessions. Two actual-cuTile Nsight Compute configurations were captured and inspected; see [the profiler analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) and [profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
