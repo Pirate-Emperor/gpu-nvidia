@@ -80,13 +80,13 @@ def _build_kernel(
         q_pos = ct.reshape(ct.arange(TQ, dtype=ct.int32), (TQ, 1))
         q_pos = q_pos + query_block * TQ
 
-        num_k_tiles = ct.num_tiles(
-            K,
-            2,
-            shape=(1, 1, TK, D),
-        )
+        # Causality means this query tile can never use keys past its
+        # final query position. Limit the reduction loop to those K/V tiles
+        # instead of loading and multiplying wholly-future tiles for every
+        # output block. The input contract guarantees full, divisible tiles.
+        num_k_tiles_for_query = ct.cdiv((query_block + 1) * TQ, TK)
 
-        for key_block in range(num_k_tiles):
+        for key_block in range(num_k_tiles_for_query):
             k4 = ct.load(
                 K,
                 index=(batch_id, head_id, key_block, 0),
@@ -133,12 +133,14 @@ def _build_kernel(
                 keepdims=True,
             )
 
-            # The probabilities are FP32 after stable softmax. Cast V to
-            # FP32 so the MMA operands have a common dtype and retain FP32
-            # accumulation.
-            v32 = v.astype(ct.float32)
+            # Keep online softmax and its running normalization in FP32.
+            # For P @ V, round the probabilities to FP16 so cuTile can use
+            # the FP16 matrix-multiply path; ct.mma still accumulates into the
+            # FP32 running_out tile. Numerical impact is gated by the independent
+            # FP32 reference tests and their fixed mixed absolute/relative tolerance.
+            probabilities16 = probabilities.astype(ct.float16)
             previous_out = rescale * running_out
-            running_out = ct.mma(probabilities, v32, previous_out)
+            running_out = ct.mma(probabilities16, v, previous_out)
             running_norm = new_norm
             running_max = new_max
 
