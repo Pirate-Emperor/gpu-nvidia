@@ -1,5 +1,24 @@
 # GPU Environment Contract
 
+## User's local GPU inventory — 2026-10-18
+
+The user supplied the following command output in this conversation:
+
+- GPU: NVIDIA GeForce RTX 4060, compute capability 8.9, PCI bus 00000000:01:00.0
+- Driver: 616.92; NVIDIA-SMI reports CUDA UMD 13.4
+- VRAM: 8,188 MiB total, 7,925 MiB free at capture
+- OS: Windows 10 Pro, WindowsVersion 2009, build 26300, x64; driver model WDDM
+- `nvcc`: not found
+- Python: not available from `python`; Windows Microsoft Store alias responded
+- WSL2: not installed
+- Docker: not installed
+
+**Assessment:** the GPU compute capability, driver, and Windows x86_64 OS meet the current [NVIDIA cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) prerequisites on paper (CC 8.x–12.x, R580+, Windows x86_64, Python 3.10–3.14 once installed). Driver 616.92 also exceeds the Quickstart's Windows R582.16+ threshold for detailed cuTile profiles. The system CUDA Toolkit is not present via `nvcc`, but the Quickstart allows compiler dependencies through the `cuda-tile[tileiras]` Python extra. The first path is therefore native Windows, with CPython 3.12 installed per-user and an isolated project venv. WSL2 and Docker are not necessary for the first smoke test.
+
+There is a reported Windows cuTile/CuPy NVRTC builtins DLL failure in [NVIDIA issue #57](https://github.com/NVIDIA/cutile-python/issues/57), so compatibility remains conditional until `scripts/cutile_smoke.py` compiles, launches, synchronizes and verifies a real cuTile kernel. The project uses `cupy-cuda13x[ctk]` to let CuPy install matching CUDA component wheels inside the venv. No host driver/toolkit changes or GitHub runner registration are authorized by this inventory.
+
+Follow [docs/LOCAL_GPU_WINDOWS.md](LOCAL_GPU_WINDOWS.md) for the exact setup and smoke-test procedure.
+
 ## Host versus user-space
 
 The NVIDIA kernel-mode driver is a host property. CUDA Toolkit components and some compatibility libraries can be installed in user space, but a host driver upgrade is a system-level operation.
