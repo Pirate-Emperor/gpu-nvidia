@@ -4,8 +4,27 @@
 
 - At the start of this continuation, `main` was `e87d8b9352fdf6783347d5c1e1945172011ebeb9`, matching the handoff SHA.
 - Move actual-cuTile execution away from the R550.90.07 A100. After inventory, use the user's real local GPU if the NVIDIA support prerequisites are met, otherwise choose another explicitly authorized supported environment. The A100 remains for ordinary-CUDA surrogate testing only.
-- Local GPU inventory and runner setup are pending. Do not select Windows-native versus WSL2/Linux, register a runner, or claim OS isolation before the actual GPU/OS/driver/toolchain is known and the boundary is tested.
+- Local inventory is now available: RTX 4060 / compute capability 8.9 / driver 616.92 / Windows x64 build 26300, WDDM; 8,188 MiB VRAM. Python and system NVCC are absent; WSL2 and Docker are not installed. Native Windows is selected for the first local venv/smoke attempt because it is explicitly listed by NVIDIA as supported. No runner has been registered and no isolation boundary is claimed.
 - **Actions evidence access note (2026-10-18 continuation):** the connected Actions run list returned zero visible runs; direct run-detail, job and artifact requests for handoff IDs (including #343, #52, #340, benchmark #4 and Nsight Systems #2) returned 404; the current handoff commit had no visible combined status. This does not prove historical runs are absent. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
+
+## Local actual-cuTile candidate — RTX 4060 (inventory supplied 2026-10-18)
+
+| Item | Result |
+|---|---|
+| GPU | NVIDIA GeForce RTX 4060 |
+| Compute capability | 8.9 |
+| Driver | 616.92 |
+| NVIDIA-SMI CUDA UMD | 13.4 (driver-reported support level, not Toolkit proof) |
+| VRAM | 8,188 MiB total; 7,925 MiB free at capture |
+| OS | Windows 10 Pro x64, build 26300; WDDM |
+| Python | Not installed/available from `python` command yet |
+| System NVCC/Toolkit | `nvcc` not found |
+| WSL2 / Docker | Not installed |
+| Initial route | Native Windows x64 venv; see [local GPU guide](../docs/LOCAL_GPU_WINDOWS.md) |
+| Actual cuTile smoke | **NOT RUN YET** |
+| Attention correctness / performance / profiler | **NOT RUN YET** |
+
+The GPU/driver/OS meet NVIDIA's current Quickstart prerequisites on paper (Windows x86_64, CC 8.x–12.x, R580+); Python and a real compile/launch smoke remain gates. Do not register a self-hosted runner on the personal Windows host until smoke/correctness and OS-enforced isolation are verified.
 
 ## Actual self-hosted A100 runner inventory
 
