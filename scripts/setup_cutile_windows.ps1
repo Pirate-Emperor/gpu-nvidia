@@ -53,6 +53,16 @@ $LogPath = Join-Path $LogDirectory "cutile-smoke-$Stamp.log"
 
 "DATE_LOCAL=$(Get-Date -Format o)" | Set-Content -Encoding utf8 -Path $LogPath
 "VENV=$VenvPath" | Add-Content -Encoding utf8 -Path $LogPath
+try {
+    $GitHead = & git -C $RepoRoot rev-parse HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and $GitHead) {
+        "GIT_HEAD=$GitHead" | Add-Content -Encoding utf8 -Path $LogPath
+    } else {
+        "GIT_HEAD=<unavailable; record manually from git rev-parse HEAD>" | Add-Content -Encoding utf8 -Path $LogPath
+    }
+} catch {
+    "GIT_HEAD=<unavailable; record manually from git rev-parse HEAD>" | Add-Content -Encoding utf8 -Path $LogPath
+}
 & $PythonPath --version 2>&1 | Add-Content -Encoding utf8 -Path $LogPath
 "=== pip freeze ===" | Add-Content -Encoding utf8 -Path $LogPath
 & $PythonPath -m pip freeze 2>&1 | Add-Content -Encoding utf8 -Path $LogPath
