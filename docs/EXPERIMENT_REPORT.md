@@ -1,6 +1,6 @@
 # Fused Attention with cuTile — Experiment Report
 
-**Updated:** 2026-10-19 (local runner audit; historical benchmark numbers unchanged)  
+**Updated:** 2026-10-19 (actual-cuTile Nsight Compute reports captured and inspected; historical benchmark numbers unchanged)  
 **Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
 **Core kernel snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585`; the paired v5 benchmark uses code at `caeb6e79e4237222d021782a3a9bdb72d6c4ca7f` (documentation updates are committed afterward)
 
@@ -16,13 +16,13 @@ The previous runner-discovery table below documents failures before the project 
 | Numerical diagnostics | PASS | 29 legal case/tile configurations, zero tolerance violations. |
 | CLI / NumPy oracle | PASS | FP16 output contract and independent reference check passed. |
 | Performance comparison | PASS with caveats | Three repeat sessions, five tile configurations, 10 warmups and 30 CUDA-event samples with five launches/sample; raw JSON/CSV archived. |
-| Actual-cuTile NCU profiles | OPEN / BLOCKED | No ncu executable under project root or .tools; no download or profile attempted. |
+| Actual-cuTile NCU profiles | PASS | Two configurations captured, with throughput/resource and Scheduler/ Warp State metrics; [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). |
 
 All evidence is in [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465) and the [detailed current results](CUTILE_RTX4060_RESULTS_2026-10-19.md).
 
 The current fused kernel skips wholly-future K/V tiles and uses FP16 probability operands for P×V with FP32 accumulation and online-softmax state. Use 64×64 as the general default; 64×128 measured best for the longer batched D=128 case. The 128×128 tile loses on long D=128 cases. Short sequence timings are extremely noisy on Windows/WDDM and should not be used as headline speedup claims.
 
-The remaining hard gate is two actual cuTile Nsight Compute report files, medium D=128 at 64×64 and longer batched D=128 at 64×128. Tool download needs owner approval for project-local .tools. The CUDA-enabled PyTorch SDPA comparison remains unrun; this benchmark uses the deliberately unfused FP32 CuPy baseline.
+The required profiler gate is now complete: medium D=128 at 64×64 and longer batched D=128 at 64×128 were captured and inspected. See [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) and [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). The CUDA-enabled PyTorch SDPA comparison remains an optional follow-up; reported speedups use the deliberately unfused FP32 CuPy baseline.
 
 
 ## Historical runner setup failures — before local venv creation (superseded by the successful run above)
@@ -38,7 +38,7 @@ These first attempts happened before the project-local venv existed. They are re
 
 At that historical point, the workflow only searched for an existing environment and no install was attempted. After the user created the project-local venv and allowed packages to be installed there, the workflow was updated to install dependencies inside that venv, and run #39160827910 completed the attention, CLI, accuracy, and benchmark gates.
 
-**Remaining work after the successful run:** capture and inspect two actual-cuTile Nsight Compute reports after an official profiler is approved for project-local .tools. Correctness, CLI, numerical diagnostics, and performance metrics are now available above and in the linked artifact.
+**Current status:** correctness, CLI, numerical diagnostics, three-session benchmark, and two-configuration actual-cuTile Nsight Compute profiling are complete. The current reports show shared-memory-limited occupancy (about 8.3%) and low scheduler eligibility; interpretation and stall-sampling limitations are documented in [the profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). The optional CUDA-enabled PyTorch SDPA comparison remains unrun.
 
 ## Historical executive status before local cuTile validation
 
