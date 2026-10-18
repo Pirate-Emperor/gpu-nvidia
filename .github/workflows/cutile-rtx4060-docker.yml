@@ -1,6 +1,7 @@
 name: RTX 4060 native Windows cuTile validation
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -88,7 +89,15 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $Ncu = Get-Command ncu.exe -ErrorAction SilentlyContinue
-          if (-not $Ncu) {
+          $NcuPath = if ($Ncu) { $Ncu.Source } else { $null }
+          if (-not $NcuPath) {
+            $InstallRoot = Join-Path $env:ProgramFiles 'NVIDIA Corporation'
+            if (Test-Path $InstallRoot) {
+              $Candidate = Get-ChildItem -Path $InstallRoot -Filter ncu.exe -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($Candidate) { $NcuPath = $Candidate.FullName }
+            }
+          }
+          if (-not $NcuPath) {
             'NCU_NOT_INSTALLED: profiles were not captured; no tool was installed automatically.' | Tee-Object -FilePath cutile-profile-status.log
             exit 0
           }
@@ -96,9 +105,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path results | Out-Null
           $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
 
-          & $Ncu.Source --set basic --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
+          & $NcuPath --set basic --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
           $MediumExit = $LASTEXITCODE
-          & $Ncu.Source --set basic --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 32 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
+          & $NcuPath --set basic --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 32 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
           $LongExit = $LASTEXITCODE
           if ($MediumExit -ne 0 -or $LongExit -ne 0) {
             throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect profile logs for counter permissions or unsupported options."
