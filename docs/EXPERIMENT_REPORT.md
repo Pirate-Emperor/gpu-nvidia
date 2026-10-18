@@ -197,3 +197,12 @@ Each trace contains the initial call (which triggers JIT/compile), five warmups,
 5. Obtain Nsight Compute counter access through the cluster's existing policy/process; do not attempt privileged changes through the runner. The current [actual-cuTile workflow](../.github/workflows/a100-nsight.yml) now runs the correctness suite before attempting two profiles, but it has not been run successfully because the current runner fails the R580+ gate.
 6. On the planned RTX 4060 with updated driver, execute **actual cuTile**: correctness across frozen cases, at least two tile configurations, full benchmark matrix, JIT separation, and at least two successful profiles.
 7. Final report must keep native CUDA surrogate, ordinary CUDA baselines, and actual cuTile results in separate columns/sections.
+
+## 1B. Local hardware inventory received after the initial continuation audit
+
+- GPU: NVIDIA GeForce RTX 4060, compute capability 8.9, 8,188 MiB VRAM (7,925 MiB free at capture).
+- OS and driver: Windows 10 Pro x64, build 26300, WDDM; driver 616.92; NVIDIA-SMI reports CUDA UMD 13.4.
+- Missing components: `nvcc` and Python are not available; WSL2 and Docker are not installed. This does not require a system Toolkit by itself, because the documented `cuda-tile[tileiras]` and modern CuPy component-wheel route can supply compiler/runtime libraries in a project virtual environment.
+- Decision: use native Windows as the first path, install per-user CPython 3.12, then run `scripts/setup_cutile_windows.ps1` and require `CUTILE_SMOKE=PASS`. No real GPU execution was performed by this documentation update.
+- A Windows CuPy/NVRTC builtins DLL issue is documented in [NVIDIA cuTile Python issue #57](https://github.com/NVIDIA/cutile-python/issues/57), so installation success and import success are insufficient; the actual vector-add compile/launch/output verification remains the first gate. Detailed profiling can be attempted only after confirming the Nsight Compute binary and counter access.
+- New project tooling: `scripts/cutile_smoke.py`, `scripts/setup_cutile_windows.ps1`, `docs/LOCAL_GPU_WINDOWS.md`, and strict `REQUIRE_CUTILE=1` import gates in the two primary cuTile test modules.
