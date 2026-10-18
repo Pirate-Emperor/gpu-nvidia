@@ -1,0 +1,23 @@
+# Python bytecode and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project-local virtual environments
+.venv/
+.venv*/
+.venv-*/
+
+# CUDA/cuTile compiler and profiler caches
+.cutile_cache/
+.cuda_cache/
+*.ncu-rep
+*.nsys-rep
+
+# Generated benchmark/profile outputs (tracked reports are unaffected)
+results/runs/
+results/nsight/
+results/nsys/
+results/ncu-access/
