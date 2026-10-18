@@ -121,7 +121,7 @@ def test_supported_cutile_profile_workflow_gates_profiles_on_correctness():
     assert "longer_batched_d128_t64x32" in workflow
 
 
-def test_docker_cutile_runner_is_persistent_and_unprivileged():
+def test_cutile_runner_and_native_windows_workflow_contract():
     compose = (ROOT / "docker/cutile-runner/compose.yml").read_text()
     entrypoint = (ROOT / "docker/cutile-runner/entrypoint.sh").read_text()
     launcher = (ROOT / "scripts/start_cutile_docker_runner.ps1").read_text()
@@ -142,6 +142,11 @@ def test_docker_cutile_runner_is_persistent_and_unprivileged():
     assert "gh workflow run" not in launcher
     assert "docker image inspect $GpuProbeImage" in launcher
     assert "workflow_dispatch:" in workflow
-    assert "github.ref == 'refs/heads/main'" in workflow
+    assert "self-hosted, windows, x64" in workflow
     assert "contents: read" in workflow
+    assert "REQUIRE_CUTILE" in workflow
+    assert "benchmarks/benchmark_attention.py" in workflow
+    assert "scripts/verify_cli_output.py" in workflow
+    assert "sudo " not in workflow.lower()
+    assert "runasadministrator" not in workflow.lower()
     assert "global ct" in smoke, "cuTile smoke kernel annotations need module-global ct resolution"
