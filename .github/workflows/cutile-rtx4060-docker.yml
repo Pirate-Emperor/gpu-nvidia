@@ -1,0 +1,55 @@
+name: RTX 4060 Docker cuTile validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cutile-correctness:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, gpu, cutile-rtx4060]
+    timeout-minutes: 90
+    steps:
+      - name: Checkout trusted main branch
+        uses: actions/checkout@v4
+
+      - name: Verify container GPU visibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi
+          python3 --version
+          python3 -m venv .venv-runner
+          .venv-runner/bin/python -m pip install --upgrade pip
+          .venv-runner/bin/python -m pip install -r requirements-dev.txt
+          .venv-runner/bin/python -m pip install "cupy-cuda13x[ctk]" "cuda-tile[tileiras]"
+
+      - name: Genuine cuTile smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv-runner/bin/python scripts/cutile_smoke.py | tee cutile-smoke.log
+          grep -q '^OUTPUT_CHECK=PASS$' cutile-smoke.log
+          grep -q '^CUTILE_SMOKE=PASS$' cutile-smoke.log
+
+      - name: Run actual cuTile attention correctness matrix
+        env:
+          REQUIRE_CUTILE: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv-runner/bin/python -m pytest -q \
+            tests/test_gpu_correctness.py \
+            tests/test_gpu_edge_cases.py
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-rtx4060-validation-${{ github.run_id }}
+          path: |
+            cutile-smoke.log
+            .pytest_cache/
+          if-no-files-found: warn
