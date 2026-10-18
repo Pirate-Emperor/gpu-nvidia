@@ -77,8 +77,11 @@ def make_inputs(case, mode="normal"):
 
 # These two are the mandatory course comparison points.
 # 128x128 remains an exploratory/resource-stress configuration below.
-TILE_CONFIGS = ((64, 64), (32, 64))
-EXPLORATORY_TILE_CONFIGS = ((64, 32), (128, 128))
+# Candidate configurations are all checked against the FP32 oracle across
+# every frozen case for which both sequence dimensions divide the tile.
+# Keep 64x32 as the additional exploratory shape.
+TILE_CONFIGS = ((32, 64), (64, 64), (64, 128), (128, 64), (128, 128))
+EXPLORATORY_TILE_CONFIGS = ((64, 32),)
 
 GPU_CORRECTNESS_CONFIGS = tuple(
     (case, tile_q, tile_k)
