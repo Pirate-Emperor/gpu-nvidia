@@ -72,7 +72,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Required CLI execution failed.' }
 
           $env:PYTHONPATH = "$PWD\src;$PWD\tests"
-          @'
+          $code = @'
           import numpy as np
           from attention_io import load_attention_npz
           from reference import causal_attention_fp32, passes_mixed_tolerance
@@ -84,7 +84,8 @@ jobs:
           assert np.isfinite(actual).all(), "CLI output contains NaN/Inf"
           assert passes_mixed_tolerance(actual, expected, abs_scale=2e-2, rel_scale=2e-2), "CLI output mismatches independent reference"
           print("CLI_REFERENCE_CHECK=PASS")
-          '@ | & $Py -
+'@
+          $code | & $Py -
           if ($LASTEXITCODE -ne 0) { throw 'CLI output/reference validation failed.' }
 
       - name: Benchmark fused cuTile against unfused CuPy
