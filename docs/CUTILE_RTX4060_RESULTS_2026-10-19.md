@@ -1,6 +1,6 @@
 # Actual cuTile RTX 4060 results — 2026-10-19
 
-**Outcome:** fused causal-attention correctness and controlled benchmarking PASS on the native Windows RTX 4060. The project is **not fully complete yet**: two genuine Nsight Compute kernel profiles remain outstanding because the profiling CLI is not present inside the project subtree. The workflow did not download or install it.
+**Outcome:** fused causal-attention correctness, controlled benchmarking, and two-configuration Nsight Compute profiling PASS on the native Windows RTX 4060. Both basic resource/throughput reports and supplemental scheduler/warp-state reports were captured and inspected; see the [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) and [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
 
 ## Canonical workflow and preserved evidence
 
