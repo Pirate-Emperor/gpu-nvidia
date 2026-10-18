@@ -50,6 +50,7 @@ def main() -> int:
         fused_p90 = [float(r["fused_p90_ms"]) for r in rows]
         baseline = [float(r["baseline_median_ms"]) for r in rows]
         baseline_p90 = [float(r["baseline_p90_ms"]) for r in rows]
+        baseline_drift = [float(r.get("baseline_bracket_drift_pct", 0.0)) for r in rows]
         speedups = [float(r["speedup_vs_unfused"]) for r in rows]
         center = median(fused)
         spread = max(fused) - min(fused)
@@ -65,6 +66,8 @@ def main() -> int:
             "fused_range_pct_of_median": (100.0 * spread / center) if center else None,
             "median_baseline_ms": median(baseline),
             "median_baseline_p90_ms": median(baseline_p90),
+            "median_baseline_bracket_drift_pct": median(baseline_drift),
+            "max_baseline_bracket_drift_pct": max(baseline_drift),
             "median_speedup_vs_unfused": median(speedups),
             "min_speedup_vs_unfused": min(speedups),
             "max_speedup_vs_unfused": max(speedups),
@@ -98,7 +101,8 @@ def main() -> int:
         "case", "tile_q", "tile_k", "repeat_count", "median_fused_ms",
         "median_fused_p90_ms", "min_fused_ms", "max_fused_ms",
         "fused_range_pct_of_median", "median_baseline_ms",
-        "median_baseline_p90_ms", "median_speedup_vs_unfused",
+        "median_baseline_p90_ms", "median_baseline_bracket_drift_pct",
+        "max_baseline_bracket_drift_pct", "median_speedup_vs_unfused",
         "min_speedup_vs_unfused", "max_speedup_vs_unfused",
         "jit_ms_by_session", "best_median_tile_for_case",
         "is_best_median_tile_for_case", "session_inputs",

@@ -24,11 +24,12 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from cases import MANDATORY_CASES
 from cutile_attention import forward
-from reference import causal_attention_fp32, max_abs_error, max_rel_error
+from reference import causal_attention_fp32
 
 TILE_CONFIGS = ((32, 64), (64, 64), (64, 128), (128, 64), (128, 128))
 ABS_SCALE = 2e-2
 REL_SCALE = 2e-2
+RELATIVE_ERROR_REFERENCE_FLOOR = 1e-2
 
 
 def make_inputs(case):
@@ -98,6 +99,13 @@ def main() -> int:
             rmse = float(np.sqrt(np.mean(np.square(abs_diff), dtype=np.float64)))
             p99_abs = float(np.percentile(abs_diff, 99))
             max_ratio = float(ratio.max(initial=0.0))
+            relative_mask = np.abs(expected32) >= RELATIVE_ERROR_REFERENCE_FLOOR
+            relative_count = int(np.count_nonzero(relative_mask))
+            if relative_count:
+                relative_errors = abs_diff[relative_mask] / np.abs(expected32[relative_mask])
+                max_rel_nonzero = float(relative_errors.max(initial=0.0))
+            else:
+                max_rel_nonzero = None
             passed = violations == 0
 
             row = {
@@ -116,7 +124,9 @@ def main() -> int:
                 "max_abs_error": max_abs,
                 "p99_abs_error": p99_abs,
                 "rmse_abs_error": rmse,
-                "max_rel_error_to_reference": max_rel_error(actual, expected),
+                "relative_error_reference_floor": RELATIVE_ERROR_REFERENCE_FLOOR,
+                "relative_error_element_count": relative_count,
+                "max_relative_error_for_abs_reference_ge_floor": max_rel_nonzero,
                 "max_tolerance_ratio": max_ratio,
                 "tolerance_violation_count": violations,
                 "tolerance": f"abs(error) <= {ABS_SCALE} + {REL_SCALE} * abs(reference)",

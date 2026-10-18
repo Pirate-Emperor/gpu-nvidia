@@ -168,9 +168,14 @@ def run_case(
     )
     baseline_ms = (baseline_before_ms + baseline_after_ms) / 2.0
     baseline_p90 = (baseline_before_p90 + baseline_after_p90) / 2.0
+    baseline_bracket_drift_pct = (
+        100.0 * abs(baseline_after_ms - baseline_before_ms) / baseline_ms
+        if baseline_ms > 0 else 0.0
+    )
     for row in rows:
         row["baseline_after_median_ms"] = baseline_after_ms
         row["baseline_after_p90_ms"] = baseline_after_p90
+        row["baseline_bracket_drift_pct"] = baseline_bracket_drift_pct
         row["baseline_median_ms"] = baseline_ms
         row["baseline_p90_ms"] = baseline_p90
         row["speedup_vs_unfused"] = baseline_ms / row["fused_median_ms"]
