@@ -67,9 +67,9 @@ For detailed measurements, configurations, limitations and run links, read [the 
 
 ## 4. Next work — follow this order
 
-### Priority 0A — inventory and isolate the local GPU runner
+### Priority 0A — validate the local GPU, then isolate any remote runner
 
-- [ ] **Immediate user-only input: inventory the real local machine before choosing Windows-native vs Linux/WSL2.** Run `nvidia-smi`, `nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv`, and `nvcc --version`; if a query field is unsupported, use `nvidia-smi -q`. Also report Windows product/build or Linux distro/kernel, WSL2 status, Python version and Docker availability. Missing `nvcc` is useful output; `nvidia-smi`'s CUDA version is not proof the Toolkit/NVCC is installed. Keep credentials and machine secrets out of the pasted output.
+- [x] **Inventoried the actual local machine and selected the first build path.** RTX 4060 / CC 8.9 / driver 616.92 / Windows x64 build 26300; `nvcc`, Python, WSL2 and Docker are not available. NVIDIA's current cuTile prerequisites match the GPU/driver/OS on paper. Follow [the Windows GPU guide](LOCAL_GPU_WINDOWS.md); per-user CPython 3.12 plus a project-local venv and a genuine compile/launch smoke test are the next gate.
 - [ ] **Choose an OS-enforced isolation boundary.** Prefer a disposable VM or GPU-enabled container with only the project workspace mounted writable. Use a dedicated non-admin/non-root account; drop unnecessary capabilities and enable no-new-privileges where containerization is used; keep the root filesystem read-only where practical; provide only required temporary/build paths.
 - [ ] **Do not expose host capabilities.** Never run a privileged container, mount the host Docker socket, mount the user's home/SSH directory/browser profiles/cloud credentials, or grant sudo/administrator privileges to the job account. Restrict GPU access to compute needs and keep inbound remote access disabled.
 - [ ] **Restrict GitHub execution.** Register the runner only to this private repository; use ephemeral/disposable runners where practical; start with manually dispatched jobs from trusted main; do not execute untrusted pull-request code. Set job permissions to the minimum (usually contents: read) and avoid repository secrets for test jobs.
@@ -81,7 +81,7 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 
 ### Priority 0 — get actual cuTile running
 
-- [ ] **BLOCKED: establish a supported GPU environment after inventory.** Evaluate the user's actual local GPU and OS against NVIDIA's current cuTile support matrix. If unsupported, use another explicitly authorized supported GPU environment. The existing R550 A100 is only for ordinary-CUDA surrogate validation. Do not assume an RTX 4060 or retry the rejected R550 compatibility setup without a materially different supported path.
+- [ ] **Pending smoke test: validate the native Windows cuTile stack.** The RTX 4060/driver/OS meet the published support matrix, but Python and runtime/compiler packages are not yet installed and no actual cuTile kernel has run on this machine. Run `scripts/setup_cutile_windows.ps1`; only a `CUTILE_SMOKE=PASS` log advances the project. Keep the existing R550 A100 for ordinary-CUDA surrogate validation only.
 - [ ] **Record the environment before changing code.** Save GPU model/compute capability, driver, CUDA toolkit/runtime, Python, cuTile package version, and exact commands to the progress log or a dated run record.
 - [ ] **Run a minimal actual-cuTile smoke test.** Import cuTile, compile a tiny kernel, launch it on the real GPU, validate its output, and save the full log. This separates environment failures from attention-kernel bugs.
 - [ ] **Validate and debug `src/cutile_attention.py`.** Resolve real cuTile API, tile-shape, indexing, launch/grid and compiler issues that appear. Keep failures in the cuTile path separate from the known-good ordinary-CUDA controls.
