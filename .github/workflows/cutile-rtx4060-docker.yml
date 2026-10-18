@@ -65,9 +65,14 @@ jobs:
           foreach ($Candidate in ($Candidates | Select-Object -Unique)) {
             if (-not (Test-Path $Candidate)) { continue }
             "CHECK_PYTHON=$Candidate" | Tee-Object -FilePath cutile-environment.log -Append
+            $PreviousErrorPreference = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
             $Probe = & $Candidate -c "import numpy, cupy, cuda.tile, pytest; import importlib.metadata as m; print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda-tile='+m.version('cuda-tile')); print('pytest='+pytest.__version__)" 2>&1
-            $Probe | Tee-Object -FilePath cutile-environment.log -Append
-            if ($LASTEXITCODE -eq 0) { $Py = $Candidate; break }
+            $CandidateExit = $LASTEXITCODE
+            $ErrorActionPreference = $PreviousErrorPreference
+            $Probe | ForEach-Object { $_.ToString() } | Tee-Object -FilePath cutile-environment.log -Append
+            "PYTHON_PROBE_EXIT=$CandidateExit" | Tee-Object -FilePath cutile-environment.log -Append
+            if ($CandidateExit -eq 0) { $Py = $Candidate; break }
           }
           if (-not $Py) {
             throw 'No existing Python environment under the project root can import NumPy, CuPy, cuda.tile and pytest. No packages were installed or downloaded; see the recorded candidate probes.'
