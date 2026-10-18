@@ -21,3 +21,8 @@ results/runs/
 results/nsight/
 results/nsys/
 results/ncu-access/
+
+# Runtime data/cache created by the project-local Windows runner and venv
+/.cache/
+/.tmp/
+/actions-runner/
