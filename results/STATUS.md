@@ -1,15 +1,16 @@
 # Current Result Snapshot
 
-## Verified 2026-10-19 — actual cuTile attention passes; profiler outstanding
+## Verified 2026-10-19 — actual cuTile correctness, benchmark, and Nsight profiling pass
 
-**Workflow:** [RTX 4060 native Windows cuTile validation #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910)  
-**Tested commit:** 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428  
-**Artifact:** [cutile-rtx4060-experiment, artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465)  
-**Hardware:** NVIDIA GeForce RTX 4060; driver 616.92; CC 8.9; 8,188 MiB reported VRAM.  
-**Environment:** CPython 3.12.10; NumPy 2.5.4; CuPy 14.2.0; cuda-tile 1.6.0; TileIRAS/NVCC/NVVM 13.4.92.  
-**Verified gates:** genuine smoke PASS; 48 required attention tests PASS with REQUIRE_CUTILE=1; 29 accuracy configurations PASS with zero tolerance violations; CLI/reference PASS; three controlled benchmark sessions PASS.  
-**Stable performance highlights:** long D=128, tile 64×64, median 0.267059 ms / P90 0.271626 ms, 16.53× vs unfused CuPy, spread 2.0%, max baseline drift 0.5%. Longer batched D=128, tile 64×128, median 0.923034 ms / P90 0.937656 ms, 18.54×, spread 0.9%, max baseline drift 0.1%. Short-sequence timings are too noisy for headline claims.  
-**Remaining blocker:** ncu was absent under the project root and .tools; no download, launch, or profile was performed. Two actual-cuTile profile reports remain a hard completion gate. See [full results and 29-row tile matrix](../docs/CUTILE_RTX4060_RESULTS_2026-10-19.md).
+**Primary native run:** [RTX 4060 validation #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223), commit `cd1ec63b210682613ddb29dca3543f0cacc9bacf).  
+**Profiler run:** [#39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066).  
+**Profiler artifact:** [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039), containing four `.ncu-repz` files and exported details/raw CSVs.  
+**Hardware:** NVIDIA GeForce RTX 4060; driver 616.92; CC 8.9; 8,188 MiB reported VRAM; Windows x64 build 26300.  
+**Environment:** CPython 3.12.10; NumPy 2.5.4; CuPy 14.2.0; cuda-tile 1.6.0; TileIRAS/NVCC/NVVM 13.4.92; Nsight Compute CLI 2026.3.1.0.  
+**Verified gates:** genuine smoke PASS; 48 required attention tests PASS with REQUIRE_CUTILE=1; 29 accuracy configurations PASS with zero tolerance violations; CLI/reference PASS; three controlled benchmark sessions PASS; two actual-cuTile NCU profiles and scheduler/warp-state reports captured and inspected.  
+**Stable performance highlights:** long D=128, tile 64×64, median 0.267059 ms / P90 0.271626 ms, 16.53× vs unfused CuPy, spread 2.0%, max baseline drift 0.5%. Longer batched D=128, tile 64×128, median 0.923034 ms / P90 0.937656 ms, 18.54×, spread 0.9%, max baseline drift 0.1%.  
+**Profiler findings:** the two profiled kernels use 231/255 registers per thread and 65.54/81.92 KiB static shared memory per block; achieved occupancy was 8.35%/8.33%, with shared memory limiting CTA residency to one CTA per SM. Scheduler sections reported no-eligible-warp cycles of 85.83%/85.26%. See [profile analysis](../docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). The optional stall-sampling metric `smsp__pcsamp_sample_count` was unavailable, so the detailed stall source attribution is limited.  
+**Current status:** core required correctness, CLI, controlled-performance, and two-configuration profiling gates are complete. CUDA-enabled PyTorch SDPA comparison remains an optional follow-up; current comparison is against the deliberately unfused FP32 CuPy baseline.
 
 ## Historical runner-discovery failure — before the venv was created
 
