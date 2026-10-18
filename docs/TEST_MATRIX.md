@@ -2,7 +2,20 @@
 
 This file records test coverage and the latest known execution state. For the consolidated approaches, exact outcomes, and measured comparisons, see [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md).
 
-## Latest historical run records (handoff checked 2026-10-18; Actions details unavailable in this continuation)
+## Current actual-cuTile validation — 2026-10-19
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Genuine cuTile runtime smoke | PASS | Actual vector-add cuTile kernel compiled/launched and exact-checked 4,096 outputs. |
+| Required attention suite | PASS: 48 passed / 0 failed | [Run #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), REQUIRE_CUTILE=1. |
+| Independent numerical diagnostics | PASS: 29 case/tile configurations | Zero mixed-tolerance violations; maximum absolute error 0.0009765625. |
+| CLI / reference | PASS | FP16 output verified against independent NumPy oracle. |
+| Controlled benchmark | PASS with noise caveats | Three sessions, five tile configs, 10 warmups, 30 CUDA-event samples × five launches/sample. |
+| Nsight Compute profiling | OPEN / BLOCKED | ncu not present inside project subtree; no download or profile captured. |
+
+Full numerical results and all three raw benchmark sessions: [detailed result report](CUTILE_RTX4060_RESULTS_2026-10-19.md), [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465).
+
+## Historical non-cuTile and pre-validation records (retained for context)
 
 | Workflow | Result | Important boundary |
 |---|---|---|
@@ -16,7 +29,7 @@ This file records test coverage and the latest known execution state. For the co
 | [Nsight Systems timeline #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) | Two warmed surrogate `.nsys-rep` traces plus CUDA API/kernel summaries uploaded ([artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954)) | CUDA API/kernel timeline only; not actual-cuTile or Nsight Compute counters. |
 
 
-**Actions evidence access note (2026-10-18 continuation):** the connected Actions run-list endpoint returned zero visible runs; direct run-detail, job and artifact requests for the handoff IDs returned 404, and the current handoff commit had no visible combined status. This does not prove the historical runs do not exist. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
+**Historical evidence note:** these older runs predate the successful local cuTile execution documented above; do not treat their old status as the current state.
 
 ## 1. Reference / CPU tests
 
