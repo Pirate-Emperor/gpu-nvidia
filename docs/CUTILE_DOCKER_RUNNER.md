@@ -20,7 +20,8 @@ The launcher:
 1. verifies Docker Engine, Compose v2, GitHub CLI authentication, and RTX 4060 GPU passthrough;
 2. requests a short-lived repository runner registration token just in time;
 3. builds the local runner image and starts an **ephemeral one-job runner**;
-4. removes the token from its process environment before executing jobs and tears down the container after exit.
+4. waits until that exact runner is online, dispatches the workflow on `main`, and watches the result;
+5. removes the token from its process environment before executing jobs, tears down the container, and cleans up a leftover runner registration if dispatch fails.
 
 Do not paste the registration token or any GitHub credential into chat, files, or workflow logs.
 
@@ -32,7 +33,7 @@ This materially reduces host exposure, but **a container is not a perfect securi
 
 ## Workflow
 
-Once the container is online, open Actions → RTX 4060 Docker cuTile validation → Run workflow → choose main. The job checks GPU visibility, installs project test/cuTile dependencies inside the disposable runner, executes the genuine cuTile smoke test, then runs the actual attention correctness matrix with REQUIRE_CUTILE=1. It uploads the smoke log and test cache even on failure.
+The launcher automatically dispatches the RTX 4060 Docker cuTile validation workflow on `main` and waits for its result; no separate Actions UI step is needed. The job checks GPU visibility, installs project test/cuTile dependencies inside the disposable runner, executes the genuine cuTile smoke test, then runs the actual attention correctness matrix with `REQUIRE_CUTILE=1`. It uploads the smoke log and test cache even on failure.
 
 A successful smoke test is not enough to declare attention complete. The correctness job must pass. Benchmarking and at least two real cuTile profiler captures remain separate completion gates.
 
