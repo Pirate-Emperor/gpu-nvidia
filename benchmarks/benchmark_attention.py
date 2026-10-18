@@ -172,7 +172,7 @@ def main() -> int:
         "--tiles",
         nargs="+",
         type=parse_tile,
-        default=[(64, 64), (128, 128)],
+        default=[(32, 64), (64, 64)],
         metavar="QxK",
     )
     parser.add_argument(
