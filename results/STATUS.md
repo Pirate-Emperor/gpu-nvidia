@@ -1,6 +1,17 @@
 # Current Result Snapshot
 
-## 2026-10-19 local RTX 4060 Actions execution record — blocked before kernel execution
+## Verified 2026-10-19 — actual cuTile attention passes; profiler outstanding
+
+**Workflow:** [RTX 4060 native Windows cuTile validation #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910)  
+**Tested commit:** 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428  
+**Artifact:** [cutile-rtx4060-experiment, artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465)  
+**Hardware:** NVIDIA GeForce RTX 4060; driver 616.92; CC 8.9; 8,188 MiB reported VRAM.  
+**Environment:** CPython 3.12.10; NumPy 2.5.4; CuPy 14.2.0; cuda-tile 1.6.0; TileIRAS/NVCC/NVVM 13.4.92.  
+**Verified gates:** genuine smoke PASS; 48 required attention tests PASS with REQUIRE_CUTILE=1; 29 accuracy configurations PASS with zero tolerance violations; CLI/reference PASS; three controlled benchmark sessions PASS.  
+**Stable performance highlights:** long D=128, tile 64×64, median 0.267059 ms / P90 0.271626 ms, 16.53× vs unfused CuPy, spread 2.0%, max baseline drift 0.5%. Longer batched D=128, tile 64×128, median 0.923034 ms / P90 0.937656 ms, 18.54×, spread 0.9%, max baseline drift 0.1%. Short-sequence timings are too noisy for headline claims.  
+**Remaining blocker:** ncu was absent under the project root and .tools; no download, launch, or profile was performed. Two actual-cuTile profile reports remain a hard completion gate. See [full results and 29-row tile matrix](../docs/CUTILE_RTX4060_RESULTS_2026-10-19.md).
+
+## Historical runner-discovery failure — before the venv was created
 
 **Workflow:** [RTX 4060 native Windows cuTile validation](https://github.com/xemptynothing/gpu-nvidia/actions/workflows/cutile-rtx4060-docker.yml)  
 **Latest attempt:** [run #39154979187](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39154979187), commit b9189b5d8bec8666a0c22e1747639ba340e0d157.  
