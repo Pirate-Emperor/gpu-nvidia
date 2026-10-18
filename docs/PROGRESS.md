@@ -300,8 +300,35 @@ No kernel source or benchmark algorithm was changed in this documentation-focuse
 - [CPU reference suite #39153449254](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39153449254), commit 4b5b0fbc: **764 passed, 68 skipped**, including GPU modules skipped on the hosted CPU runner.
 - Earlier workflow attempts [#39152872387](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39152872387) and [#39152944500](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39152944500) created no jobs because the manual trigger was represented as a one-line array rather than the structural test's expected workflow_dispatch key. That contract was corrected later.
 
-### Current blocking dependency and next exact action
+### Historical blocking dependency before the venv was created (superseded by 2026-10-19 execution)
 
 The Windows runner is Online and sees the correct RTX 4060, but **the already-existing cuTile Python environment is not located under the repository root**. The global Python visible to the runner has no NumPy, CuPy, or cuTile. Under the no-download/no-install constraint, the workflow intentionally refuses to create a new environment or fetch Python packages.
 
 **Required before more GPU work can run:** identify the already-installed Python executable that successfully ran scripts/cutile_smoke.py with CuPy and cuda.tile (or place that existing venv within this project directory). Once the existing environment is available to the runner without installing anything, rerun the native Windows workflow. There is currently no actual-cuTile attention correctness result, benchmark result, CLI result, or Nsight Compute profile from these runs. Do not mark completion until those experiments execute and their artifacts are preserved.
+
+
+## 2026-10-19 — actual cuTile attention validated and benchmarked on RTX 4060
+
+### Canonical run and artifact
+- Successful workflow: [#39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), commit 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428.
+- Artifact: [12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465), SHA-256 c84b781635a23571139ca8734df9e9d39ddab8485bfb5875c30db2ec63361854.
+- The run logged identical WORKFLOW_SHA and CHECKOUT_GIT_HEAD. The project virtual environment contains CPython 3.12.10, NumPy 2.5.4, CuPy 14.2.0, cuda-tile 1.6.0 and matching TileIRAS/NVCC/NVVM 13.4.92. All pip/temp/CuPy/CUDA caches were project-local. No elevated privilege or system-wide toolkit change was made.
+
+### Gates passed
+1. Genuine cuTile smoke: vector-add kernel synchronized and exactly verified 4,096 outputs.
+2. Actual attention suite: **48 passed in 7.05 s**, REQUIRE_CUTILE=1, zero failures.
+3. Accuracy report: **29 legal case/tile configurations**, all matched the independent FP32 NumPy matrix oracle within the frozen mixed tolerance; zero violations. Max absolute error 0.0009765625; maximum tolerance ratio 0.0243665.
+4. CLI: [1,1,64,32] FP16 seeded input; actual cuTile output passed shape/dtype/finiteness and independent-reference verification; CLI_REFERENCE_CHECK=PASS.
+5. Performance: three sessions over seven frozen cases and five tile configurations. Ten warmups, 30 CUDA-event samples and five launches per sample. Baseline measured before/after each tile sweep; first-call latency recorded separately. All raw JSON/CSV and the aggregate summary are in the artifact.
+
+### Current benchmark decision
+- Long D=128, 64×64: median 0.267059 ms, P90 0.271626 ms, unfused CuPy 4.414310 ms, 16.53×; range 2.0%, maximum baseline drift 0.5%.
+- Longer batched D=128, 64×128: median 0.923034 ms, P90 0.937656 ms, unfused CuPy 17.131469 ms, 18.54×; range 0.9%, maximum baseline drift 0.1%.
+- Use 64×64 as the general default. The 64×128 specialization is promising for the longer batched D=128 case but should be independently rechecked before claiming a universal win. The 128×128 tile loses on long D=128. Short-case timing is highly noisy and not suitable for headline speedup claims.
+- Optimizations retained in the fused kernel: skip wholly-future K/V tiles; use FP16 probabilities as P×V operands while retaining FP32 QK accumulation, softmax state, and output accumulator. The frozen correctness suite and numerical report passed afterward.
+
+### Outstanding course gate: profiler reports
+- Profiling status was NCU_NOT_PRESENT_IN_PROJECT_DIRECTORY: not searched outside the project and no download/install attempted. No .ncu-rep files were captured.
+- The prior A100 ERR_NVGPUCTRPERM event is a distinct historical ordinary-CUDA issue; RTX 4060 counter access remains untested because ncu was not found.
+- To finish: after owner approval for a project-local official NVIDIA Nsight Compute download, capture medium D=128 tile 64×64 and longer-batched D=128 tile 64×128, inspect reports, and preserve both reports/logs. No system-wide install, admin rights, or download has been performed.
+- CUDA-enabled PyTorch SDPA comparison remains optional/unrun; the measured baseline is the intentionally unfused FP32 CuPy implementation.
