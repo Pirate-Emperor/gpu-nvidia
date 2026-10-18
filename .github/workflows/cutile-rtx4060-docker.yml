@@ -1,4 +1,4 @@
-name: RTX 4060 Docker cuTile validation
+name: RTX 4060 native Windows cuTile validation
 
 on:
   workflow_dispatch:
@@ -7,49 +7,107 @@ permissions:
   contents: read
 
 jobs:
-  cutile-correctness:
+  cutile-validation:
     if: github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, linux, x64, gpu, cutile-rtx4060]
-    timeout-minutes: 90
+    # Use the normal Windows self-hosted runner on the actual RTX 4060 host.
+    # No Docker/WSL layer is needed: native Windows cuTile smoke already passed.
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 180
     steps:
       - name: Checkout trusted main branch
         uses: actions/checkout@v4
 
-      - name: Verify container GPU visibility
-        shell: bash
+      - name: Create isolated Python environment and install cuTile dependencies
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = 'Stop'
+          python --version
           nvidia-smi
-          python3 --version
-          python3 -m venv .venv-runner
-          .venv-runner/bin/python -m pip install --upgrade pip
-          .venv-runner/bin/python -m pip install -r requirements-dev.txt
-          .venv-runner/bin/python -m pip install "cupy-cuda13x[ctk]" "cuda-tile[tileiras]"
+          if ($LASTEXITCODE -ne 0) { throw 'nvidia-smi failed; GPU is not visible to the runner.' }
 
-      - name: Genuine cuTile smoke test
-        shell: bash
+          python -m venv .venv-runner
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to create Python virtual environment.' }
+          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+
+          & $Py -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { throw 'pip upgrade failed.' }
+          & $Py -m pip install -r requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Development dependency installation failed.' }
+          & $Py -m pip install 'cupy-cuda13x[ctk]' 'cuda-tile[tileiras]'
+          if ($LASTEXITCODE -ne 0) { throw 'cuTile/CuPy installation failed.' }
+
+      - name: Genuine cuTile compiler/runtime smoke test
+        shell: pwsh
         run: |
-          set -euo pipefail
-          .venv-runner/bin/python scripts/cutile_smoke.py | tee cutile-smoke.log
-          grep -q '^OUTPUT_CHECK=PASS$' cutile-smoke.log
-          grep -q '^CUTILE_SMOKE=PASS$' cutile-smoke.log
+          $ErrorActionPreference = 'Stop'
+          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          & $Py scripts/cutile_smoke.py 2>&1 | Tee-Object -FilePath cutile-smoke.log
+          if ($LASTEXITCODE -ne 0) { throw 'Genuine cuTile smoke test failed.' }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'OUTPUT_CHECK=PASS' -Quiet)) {
+            throw 'Smoke log does not contain OUTPUT_CHECK=PASS.'
+          }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'CUTILE_SMOKE=PASS' -Quiet)) {
+            throw 'Smoke log does not contain CUTILE_SMOKE=PASS.'
+          }
 
       - name: Run actual cuTile attention correctness matrix
+        shell: pwsh
         env:
-          REQUIRE_CUTILE: "1"
-        shell: bash
+          REQUIRE_CUTILE: '1'
         run: |
-          set -euo pipefail
-          .venv-runner/bin/python -m pytest -q \
-            tests/test_gpu_correctness.py \
-            tests/test_gpu_edge_cases.py
+          $ErrorActionPreference = 'Stop'
+          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          & $Py -m pytest -q tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 |
+            Tee-Object -FilePath cutile-pytest.log
+          if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness tests failed.' }
 
-      - name: Upload validation logs
+      - name: Verify required CLI input/output against independent reference
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          & $Py scripts/generate_inputs.py --output cutile-cli-input.npz --seq 64 --head-dim 32 --seed 20261018
+          if ($LASTEXITCODE -ne 0) { throw 'CLI input generation failed.' }
+          & $Py run_attention.py --input cutile-cli-input.npz --output cutile-cli-output.npy --backend cutile --tile-q 64 --tile-k 64
+          if ($LASTEXITCODE -ne 0) { throw 'Required CLI execution failed.' }
+
+          $env:PYTHONPATH = "$PWD\src;$PWD\tests"
+          @'
+          import numpy as np
+          from attention_io import load_attention_npz
+          from reference import causal_attention_fp32, passes_mixed_tolerance
+          q, k, v = load_attention_npz("cutile-cli-input.npz")
+          actual = np.load("cutile-cli-output.npy")
+          expected = causal_attention_fp32(q, k, v, output_dtype=np.float16)
+          assert actual.shape == expected.shape, (actual.shape, expected.shape)
+          assert actual.dtype == np.float16, actual.dtype
+          assert np.isfinite(actual).all(), "CLI output contains NaN/Inf"
+          assert passes_mixed_tolerance(actual, expected, abs_scale=2e-2, rel_scale=2e-2), "CLI output mismatches independent reference"
+          print("CLI_REFERENCE_CHECK=PASS")
+          '@ | & $Py -
+          if ($LASTEXITCODE -ne 0) { throw 'CLI output/reference validation failed.' }
+
+      - name: Benchmark fused cuTile against unfused CuPy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Py = Join-Path $PWD '.venv-runner\Scripts\python.exe'
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py benchmarks/benchmark_attention.py --output results/cutile-benchmark.json --warmup 10 --iterations 30 --tiles 32x64 64x64 2>&1 |
+            Tee-Object -FilePath cutile-benchmark.log
+          if ($LASTEXITCODE -ne 0) { throw 'cuTile benchmark failed.' }
+
+      - name: Upload actual cuTile validation and benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cutile-rtx4060-validation-${{ github.run_id }}
+          name: cutile-rtx4060-native-validation-${{ github.run_id }}
           path: |
             cutile-smoke.log
-            .pytest_cache/
+            cutile-pytest.log
+            cutile-benchmark.log
+            cutile-cli-input.npz
+            cutile-cli-output.npy
+            results/cutile-benchmark.json
+            results/cutile-benchmark.csv
           if-no-files-found: warn
