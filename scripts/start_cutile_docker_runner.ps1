@@ -89,9 +89,20 @@ try {
     $workflowExit = $LASTEXITCODE
 }
 finally {
-    Remove-Item Env:RUNNER_TOKEN -ErrorAction SilentlyContinue
-    Remove-Item Env:RUNNER_NAME -ErrorAction SilentlyContinue
-    & docker compose -f $ComposeFile down --remove-orphans *> $null
+    # Compose interpolates RUNNER_TOKEN and RUNNER_NAME even for "down".
+    # Keep them defined until cleanup has completed; otherwise "down" itself
+    # fails before it can stop/remove the container and network.
+    try {
+        & docker compose -f $ComposeFile down --remove-orphans *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Docker Compose cleanup exited with code $LASTEXITCODE. Inspect 'docker ps -a' and the runner logs."
+        }
+    } catch {
+        Write-Warning "Docker Compose cleanup raised an error: $_. Inspect 'docker ps -a' and the runner logs."
+    } finally {
+        Remove-Item Env:RUNNER_TOKEN -ErrorAction SilentlyContinue
+        Remove-Item Env:RUNNER_NAME -ErrorAction SilentlyContinue
+    }
 
     # If dispatch failed before the ephemeral job consumed the runner, remove
     # its offline registration so the repository does not accumulate stale runners.
