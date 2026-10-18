@@ -2,7 +2,7 @@
 
 ## Current state — 2026-10-19
 
-The setup and validation path is no longer pending: [workflow #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910) passed the genuine cuTile smoke, 48 actual attention tests, 29 accuracy configurations, CLI/reference verification, and three five-tile benchmark sessions. See [detailed result report](CUTILE_RTX4060_RESULTS_2026-10-19.md) and [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465). The only hard gate still open is two actual-cuTile Nsight Compute profiles. The profiler CLI was not present in the permitted project subtree, and no download/install was attempted.
+The core setup, validation, and profiling path is complete: [native RTX 4060 workflow #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223) passed the genuine cuTile smoke, 48 actual attention tests, 29 numerical configurations, CLI/reference verification, and three controlled benchmark sessions. Two actual-cuTile Nsight Compute configurations were captured and inspected in [profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066); the raw reports and metric exports are in [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). The optional CUDA-enabled PyTorch SDPA comparison remains unrun; the core correctness/performance/profiling gates have evidence. See [detailed benchmark results](CUTILE_RTX4060_RESULTS_2026-10-19.md) and [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 
 **Inventory received:** 2026-10-18  
 **Purpose:** actual cuTile bring-up on the user's local GPU. This is separate from the existing A100 ordinary-CUDA surrogate evidence.
@@ -22,7 +22,7 @@ The setup and validation path is no longer pending: [workflow #39160827910](http
 | Python | CPython 3.12.10, 64-bit, in `.venv-cutile-windows` | cuTile packages installed; genuine smoke test passed |
 | WSL2 | Not installed | Not needed for the first attempt |
 | Docker | Not installed | Not needed for the first attempt |
-| Nsight Compute CLI | Not present in project root or .tools | Owner approval needed for official project-local download; no tool install attempted |
+| Nsight Compute CLI | Installed under standard NVIDIA Program Files location | CLI 2026.3.1.0 found by workflow; two actual-cuTile reports plus scheduler/warp-state diagnostics captured and inspected |
 
 ## 2. Execution decision
 
