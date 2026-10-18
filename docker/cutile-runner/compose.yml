@@ -1,0 +1,23 @@
+services:
+  runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gpu-nvidia-cutile-runner:local
+    gpus: all
+    init: true
+    restart: "no"
+    environment:
+      RUNNER_REPO: https://github.com/xemptynothing/gpu-nvidia
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?Set RUNNER_TOKEN in the launching process}
+      RUNNER_NAME: ${RUNNER_NAME:?Set a unique RUNNER_NAME in the launching process}
+      RUNNER_LABELS: gpu,cutile-rtx4060
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    mem_limit: 6g
+    shm_size: 1g
+    stop_grace_period: 30s
+    # No host bind mounts, Docker socket, privileged mode, ports, or persisted workspace.
