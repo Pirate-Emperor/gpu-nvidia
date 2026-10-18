@@ -122,6 +122,16 @@ jobs:
           & $Py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 | Tee-Object -FilePath cutile-pytest.log -Append
           if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness matrix failed.' }
 
+      - name: Record numerical error metrics for every mandatory case and tile
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py scripts/cutile_accuracy_report.py --output results/cutile-accuracy.json 2>&1 | Tee-Object -FilePath cutile-accuracy.log
+          if ($LASTEXITCODE -ne 0) { throw 'Independent-reference numerical error report failed.' }
+
       - name: Exercise CLI and verify output against independent NumPy oracle
         shell: powershell
         run: |
@@ -135,15 +145,33 @@ jobs:
           & $Py scripts/verify_cli_output.py --input cutile-cli-input.npz --output cutile-cli-output.npy 2>&1 | Tee-Object -FilePath cutile-cli-reference.log
           if ($LASTEXITCODE -ne 0) { throw 'CLI output mismatches the independent NumPy reference.' }
 
-      - name: Benchmark fused cuTile versus unfused CuPy
+      - name: Run three controlled benchmark sessions with alternating tile order
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
           $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
           New-Item -ItemType Directory -Force -Path results | Out-Null
-          & $Py benchmarks/benchmark_attention.py --output results/cutile-benchmark.json --warmup 10 --iterations 30 --tiles 32x64 64x64 64x128 128x64 128x128 2>&1 | Tee-Object -FilePath cutile-benchmark.log
-          if ($LASTEXITCODE -ne 0) { throw 'Controlled cuTile benchmark failed.' }
+
+          # Reverse/rotate tile order between sessions to reduce systematic order bias.
+          $TileOrders = @(
+            ,@('32x64','64x64','64x128','128x64','128x128')
+            ,@('128x128','128x64','64x128','64x64','32x64')
+            ,@('64x64','32x64','128x64','64x128','128x128')
+          )
+          $Session = 1
+          foreach ($TileOrder in $TileOrders) {
+            $Output = "results/cutile-benchmark-session$Session.json"
+            $Log = "cutile-benchmark-session$Session.log"
+            $BenchmarkArgs = @('benchmarks/benchmark_attention.py','--output',$Output,'--warmup','10','--iterations','30','--tiles') + @($TileOrder)
+            "SESSION=$Session TILE_ORDER=$($TileOrder -join ',')" | Tee-Object -FilePath $Log
+            & $Py @BenchmarkArgs 2>&1 | Tee-Object -FilePath $Log -Append
+            if ($LASTEXITCODE -ne 0) { throw "Controlled benchmark session $Session failed." }
+            $Session++
+          }
+
+          & $Py scripts/summarize_benchmark_repeats.py --inputs results/cutile-benchmark-session1.json results/cutile-benchmark-session2.json results/cutile-benchmark-session3.json --json-output results/cutile-benchmark-summary.json --csv-output results/cutile-benchmark-summary.csv 2>&1 | Tee-Object -FilePath cutile-benchmark-summary.log
+          if ($LASTEXITCODE -ne 0) { throw 'Benchmark repeat aggregation failed.' }
 
       - name: Attempt two genuine cuTile Nsight Compute captures if already installed
         continue-on-error: true
@@ -181,16 +209,30 @@ jobs:
             cutile-pip-freeze.txt
             cutile-smoke.log
             cutile-pytest.log
+            cutile-accuracy.log
             cutile-cli.log
             cutile-cli-reference.log
             cutile-benchmark.log
+            cutile-benchmark-session1.log
+            cutile-benchmark-session2.log
+            cutile-benchmark-session3.log
+            cutile-benchmark-summary.log
             cutile-profile-status.log
             cutile-profile-medium.log
             cutile-profile-long-batched.log
             cutile-cli-input.npz
             cutile-cli-output.npy
+            results/cutile-accuracy.json
             results/cutile-benchmark.json
             results/cutile-benchmark.csv
+            results/cutile-benchmark-session1.json
+            results/cutile-benchmark-session1.csv
+            results/cutile-benchmark-session2.json
+            results/cutile-benchmark-session2.csv
+            results/cutile-benchmark-session3.json
+            results/cutile-benchmark-session3.csv
+            results/cutile-benchmark-summary.json
+            results/cutile-benchmark-summary.csv
             results/cutile-profile-medium.ncu-rep
             results/cutile-profile-long-batched.ncu-rep
           if-no-files-found: warn

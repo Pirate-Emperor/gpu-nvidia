@@ -33,6 +33,8 @@ REQUIRED_FILES = (
     "src/shared_tile_cuda_attention.py",
     "scripts/cutile_sanity_check.py",
     "scripts/cutile_smoke.py",
+    "scripts/cutile_accuracy_report.py",
+    "scripts/summarize_benchmark_repeats.py",
     "scripts/setup_cutile_windows.ps1",
     "scripts/start_cutile_docker_runner.ps1",
     "docker/cutile-runner/Dockerfile",
@@ -148,6 +150,9 @@ def test_cutile_runner_and_native_windows_workflow_contract():
     assert "REQUIRE_CUTILE" in workflow
     assert "benchmarks/benchmark_attention.py" in workflow
     assert "scripts/verify_cli_output.py" in workflow
+    assert "scripts/cutile_accuracy_report.py" in workflow
+    assert "scripts/summarize_benchmark_repeats.py" in workflow
+    assert "session1.json" in workflow and "session2.json" in workflow and "session3.json" in workflow
     assert "sudo " not in workflow.lower()
     assert "runasadministrator" not in workflow.lower()
     assert "global ct" in smoke, "cuTile smoke kernel annotations need module-global ct resolution"
