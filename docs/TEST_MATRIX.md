@@ -2,13 +2,13 @@
 
 This file records test coverage and the latest known execution state. For the consolidated approaches, exact outcomes, and measured comparisons, see [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md).
 
-## Latest verified runs (reviewed 2026-10-10)
+## Latest verified runs (checked 2026-10-18; successful executions listed below are dated 2026-10-10)
 
 | Workflow | Result | Important boundary |
 |---|---|---|
 | [A100 native CUDA #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415) | 133 passed, 1 skipped | Actual ordinary CUDA kernels on A100/R550; no cuTile claim. |
 | [A100 full non-cuTile #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082) | 907 passed, 52 skipped | Broad non-cuTile regression. |
-| [CPU/reference #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023) | 763 passed, 68 skipped | GPU-only tests skip in hosted CPU environment. |
+| [CPU/reference #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931) | 763 passed, 68 skipped | Latest successful CPU/reference suite, on pre-handoff main SHA afe530b; GPU-only tests skip in hosted CPU environment. |
 | [v4 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) | 30 passed | Experimental variant; not promoted. |
 | [v5 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) | 30 passed | Experimental half2 variant; performance inconclusive. |
 | [v5 paired benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) | Correctness 30/30 + 3 paired repeats/case/tile | Order alternated; v5 remains unpromoted after mixed/noisy results. |
@@ -73,7 +73,7 @@ The A100 GPU suite is intentionally broader than the minimum course matrix.
 | Custom block-row CUDA | D=32/64/128 + causal/edge/stability cases | PASS; A100 native run #44 |
 | Custom warp-row CUDA | D=32/64/128 + causal/edge/stability cases | PASS; A100 native run #44 |
 | Cross-implementation agreement | block-row vs warp-row | PASS; native CUDA suite |
-| Shared-memory tiled CUDA (current) | tile_k=16/32/64, D=32/64/128, causality/stability/long sequences | PASS; native run #44 and broad run #51 |
+| Shared-memory tiled CUDA (current) | tile_k=16/32/64, D=32/64/128, causality/stability/long sequences | PASS; native run #44 and broad run #52 |
 | Shared-tile v4 experimental | differential tests, future-K/V invariance, long-sequence smoke | PASS; 30/30 in dedicated workflow |
 | Shared-tile v5 experimental | differential tests, future-K/V invariance, long-sequence smoke, tile_k=16/32/64 | PASS; 30/30 in dedicated workflow; performance inconclusive |
 

@@ -21,6 +21,8 @@ Use this order to understand the project and decide what to do next.
 | Dated experiment history | [Progress log](docs/PROGRESS.md) |
 | How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
 | Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
+| Full handoff for a new chat: runs, benchmarks, environment, security plan, and next steps | [Chat handoff](docs/CHAT_HANDOFF_2026-10-18.md) |
+| Copy-paste prompt to continue in a new chat | [Continuation prompt](docs/CONTINUE_PROMPT.md) |
 
 **Main code and experiment entry points:** [actual cuTile target](src/cutile_attention.py) · [current shared-tile CUDA surrogate](src/shared_tile_cuda_attention.py) · [unfused CuPy baseline](src/baseline.py) · [primary correctness tests](tests/) · [benchmark directory](benchmarks/) · [GitHub Actions workflows](.github/workflows/).
 
@@ -30,11 +32,11 @@ Use this order to understand the project and decide what to do next.
 
 [NVIDIA cuTile Python](https://docs.nvidia.com/cuda/cutile-python/) is a tile-based GPU programming model: we describe operations on blocks of array data, while the cuTile compiler/runtime maps those tile operations to GPU execution. Our assignment is to use this model to write a fused causal-attention forward kernel.
 
-**What is already done:** independent mathematical references, broad correctness coverage, several ordinary-CUDA comparison kernels, preserved v1–v5 experiments, a benchmark ladder, PTXAS summaries, and a consolidated experiment report. The latest recorded broad non-cuTile regression is 905 passed / 52 skipped; the CPU/reference suite is 761 passed / 68 skipped.
+**What is already done:** independent mathematical references, broad ordinary-CUDA correctness coverage, several CUDA comparison kernels, preserved v1–v5 experiments, a paired benchmark ladder, PTXAS summaries, Nsight Systems traces for the surrogate, and a consolidated experiment report. Latest verified: broad A100 non-cuTile run #52, 907 passed / 52 skipped; CPU/reference run #340, 763 passed / 68 skipped. These are not actual cuTile results.
 
 **What is not done yet:** actual `src/cutile_attention.py` execution and full correctness on a supported GPU/runtime, controlled actual-cuTile performance comparisons, and successful Nsight Compute profiles. The available A100 runner uses driver R550.90.07, and the project's current cuTile environment gate requires R580+; its profiler also reports `ERR_NVGPUCTRPERM`. Do not count the ordinary-CUDA surrogate results as completed cuTile results.
 
-**Next action:** open [the TODO checklist](docs/TODO_CHECKLIST.md) and work through Priority 0 first. The checklist explains each completed work area and defines the evidence needed to close every remaining gate.
+**Next action:** read the [dated handoff](docs/CHAT_HANDOFF_2026-10-18.md), then follow the [TODO checklist](docs/TODO_CHECKLIST.md). The handoff contains previous run results, benchmark data, GPU environment limits, and the least-privilege local-runner design.
 
 ## Goal
 
@@ -185,10 +187,10 @@ Steady-state measurements use GPU events, warm-up iterations, >=30 measured iter
 
 Profiler runs use a dedicated single-kernel target so Nsight Compute measurements are not polluted by the entire benchmark harness.
 
-## Current status (2026-10-10)
+## Current status (last checked 2026-10-18; most recent successful runs are dated 2026-10-10)
 
 - Latest broad non-cuTile regression: **907 passed, 52 skipped, 0 failed** ([run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082)).
-- Latest CPU/reference suite: **763 passed, 68 skipped, 0 failed** ([run #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023)).
+- Latest CPU/reference suite: **763 passed, 68 skipped, 0 failed** ([run #340 on pre-handoff main SHA afe530b](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931)).
 - Dedicated shared-tile v4 and v5 A100 correctness: **30/30 passed each**; neither experiment is promoted as a guaranteed performance win.
 - Repeated current-vs-v5 benchmark: [run #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163), three paired/order-alternating trials for every case/tile; v5 remains unpromoted due to mixed results and sub-1% long/batched gains.
 - Updated PTXAS comparison: [run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) compiled v1–v5 plus current with zero reported spills; v5 cubin is 384 B larger than current.
@@ -197,6 +199,24 @@ Profiler runs use a dedicated single-kernel target so Nsight Compute measurement
 - Nsight Compute is installed, but the runner lacks performance-counter permission (`ERR_NVGPUCTRPERM`), so no real counter profile was captured.
 
 **Do not confuse the native-CUDA/cuTile-like surrogate with actual NVIDIA cuTile.** The detailed evidence, approach comparison, test results, benchmarks and limitations are in [docs/EXPERIMENT_REPORT.md](docs/EXPERIMENT_REPORT.md). See [docs/README.md](docs/README.md) for the documentation map.
+
+
+## Next objectives (do these in order)
+
+1. **Inventory the local GPU before configuring a runner.** On Windows PowerShell, run:
+
+       nvidia-smi
+       nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv
+       nvcc --version
+
+   If a query field is unsupported, use nvidia-smi -q. Save the output locally; do not share credentials or machine secrets.
+2. **Create a least-privilege, project-only GPU runner.** Prefer a disposable Linux VM or a tightly isolated GPU-enabled container. Use a dedicated unprivileged account, one writable project workspace, no sudo/administrator role, no personal home-directory mounts, no host Docker socket, no privileged container, no personal tokens/SSH keys/cloud credentials, minimal outbound network, and an ephemeral runner when feasible. Restrict it to this private repository and trusted/manual workflows; do not run untrusted pull-request code on it. The runner itself must authenticate to GitHub, but its registration/connection credentials must stay local and never be pasted into chat or exposed to job steps. ChatGPT does not gain interactive shell access merely because a runner is registered; Actions workflows run commands on the runner.
+3. **Prove the environment first.** Check driver, GPU visibility, toolkit/compiler and Python environment, then compile and launch a tiny actual cuTile smoke kernel and compare its output. Do not count imports or skipped tests as successful GPU execution.
+4. **Run actual-cuTile correctness, then benchmark.** Exercise src/cutile_attention.py, D=32/64/128, causal/stability/edge invariants, two or more legal tile configurations, and the CLI. Only after correctness passes, capture cold/JIT time separately and run CUDA-event timing with at least 10 warmups and at least 30 timed iterations.
+5. **Complete hardware profiling.** Obtain explicitly authorized Nsight Compute counter access, then save at least two real actual-cuTile profiles (medium and long/batched). The existing Nsight Systems traces cover only ordinary CUDA.
+6. **Optimize based on evidence and update all result docs.** Keep current/v5 performance claims conservative, preserve regressions and artifacts, and update the experiment report, test matrix, progress log, and status snapshot after each meaningful run.
+
+The [handoff document](docs/CHAT_HANDOFF_2026-10-18.md) contains exact prior results, benchmark numbers, runner details, the secure setup checklist, and a ready-to-paste continuation prompt.
 
 ## Course-scope boundary
 

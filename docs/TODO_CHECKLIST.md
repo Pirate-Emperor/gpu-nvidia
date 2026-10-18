@@ -1,6 +1,6 @@
 # Project TODO Checklist — Fused Causal Attention with NVIDIA cuTile
 
-**Last reviewed:** 2026-10-10  
+**Last reviewed:** 2026-10-18  
 **Start here:** this file explains the goal, what has already been done, what remains, and the evidence required before the course project can be marked complete. The [root README](../README.md) is the entry point; the [experiment report](EXPERIMENT_REPORT.md) contains the more detailed measurements and history.
 
 **Status key:** `[x]` done and backed by evidence · `[ ]` still to do · **BLOCKED** needs a suitable environment or permission. A task is not complete merely because code exists.
@@ -50,19 +50,31 @@ The current A100 runner uses driver R550.90.07, while the project's cuTile envir
 - [x] **Preserved the optimization experiments instead of overwriting history.** Shared-tile v1 through v5 remain separate files: a simple two-pass version, warp-row online softmax, a four-score loop, a persistent-Q-register experiment, and a `half2` QK experiment.
 - [x] **Fixed a test-input issue.** An affine-V test used unsupported `tile_k=2`; it was changed to a legal tile size. The failure was in the test setup, not evidence of a kernel defect.
 - [x] **Validated the native CUDA path on the A100.** [Run #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415): 133 passed, 1 skipped.
-- [x] **Ran the broad non-cuTile regression.** [Run #51](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761576578): 905 passed, 52 skipped, 0 failed.
-- [x] **Ran CPU/reference validation.** [Run #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023): 763 passed, 68 skipped. GPU-only skips are expected on a CPU-only hosted runner.
+- [x] **Ran the broad non-cuTile regression.** [Run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082): 907 passed, 52 skipped, 0 failed. This is ordinary CUDA/reference/project-contract coverage, not actual cuTile execution.
+- [x] **Ran CPU/reference validation.** [Run #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931): 763 passed, 68 skipped on pre-handoff main SHA afe530bc090c779ebe5d741dcf7ae544985570d1. GPU-only skips are expected on a CPU-only hosted runner.
 - [x] **Checked v4 and v5 independently.** [v4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) and [v5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) each passed 30 targeted GPU tests. v4 was not promoted because its PTXAS/cubin summary matched the current version and it regressed on a longer batched case. the repeated paired [benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) showed a modest medium-D=64 gain but mixed short cases and only ~0.3–0.6% on long/batched inputs; it remains unpromoted.
 - [x] **Added a reproducible preliminary benchmark ladder.** CUDA-event timing uses warmups and 30 measured iterations, reporting medians/P90; the tile ladder measures first compilation separately and preserves artifacts. The ladder shows the later tiled variants generally improve many short/medium cases over v1, but timing variability across runs is high; the measurements are preliminary, not final performance claims.
 - [x] **Captured compiler resource summaries for v1–v5 and current.** [PTXAS run #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) compiled all six variants for SM80 with zero reported spills. v5 uses 32 registers and 33,792 B shared memory like current, but has a 15,520 B cubin vs 15,136 B for current.
 - [x] **Recorded environment and profiling blockers honestly.** The current driver/package gate and failed compatibility attempts are documented. Nsight Compute is installed, but the existing counter-profile attempt failed with `ERR_NVGPUCTRPERM` and captured no kernel.
 - [x] **Prepared the supported-driver actual-cuTile workflow.** [`.github/workflows/a100-nsight.yml`](../.github/workflows/a100-nsight.yml) now runs actual cuTile correctness tests before collecting Nsight Compute profiles for both a medium and a long/batched configuration. It remains unexecuted successfully on this R550 node because its R580+ gate correctly blocks it.
 - [x] **Organized the project documentation.** Root README, this checklist, experiment report, testing contract, test matrix, variant notes, environment/admin notes, progress log and result snapshot link together. Start from the [documentation index](README.md).
-- [x] **Added regression checks for project tracking and the future cuTile profiling workflow.** The CPU suite now verifies key documentation paths and that the supported-driver profiling workflow gates two profiles on actual-cuTile correctness. [CPU run #334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023): 763 passed, 68 skipped; [A100 full run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082): 907 passed, 52 skipped.
+- [x] **Added regression checks for project tracking and the future cuTile profiling workflow.** The CPU suite now verifies key documentation paths and that the supported-driver profiling workflow gates two profiles on actual-cuTile correctness. [CPU run #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931): 763 passed, 68 skipped; [A100 full run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082): 907 passed, 52 skipped.
 
 For detailed measurements, configurations, limitations and run links, read [the experiment report](EXPERIMENT_REPORT.md). The [test matrix](TEST_MATRIX.md) lists coverage and status by test family.
 
 ## 4. Next work — follow this order
+
+### Priority 0A — inventory and isolate the local GPU runner
+
+- [ ] **Inventory the user's GPU before choosing Windows-native vs WSL2/Linux.** In PowerShell run nvidia-smi, the detailed GPU query, and nvcc --version; if a query field is unsupported, use nvidia-smi -q. Keep credentials and machine secrets out of the pasted output.
+- [ ] **Choose an OS-enforced isolation boundary.** Prefer a disposable VM or GPU-enabled container with only the project workspace mounted writable. Use a dedicated non-admin/non-root account; drop unnecessary capabilities and enable no-new-privileges where containerization is used; keep the root filesystem read-only where practical; provide only required temporary/build paths.
+- [ ] **Do not expose host capabilities.** Never run a privileged container, mount the host Docker socket, mount the user's home/SSH directory/browser profiles/cloud credentials, or grant sudo/administrator privileges to the job account. Restrict GPU access to compute needs and keep inbound remote access disabled.
+- [ ] **Restrict GitHub execution.** Register the runner only to this private repository; use ephemeral/disposable runners where practical; start with manually dispatched jobs from trusted main; do not execute untrusted pull-request code. Set job permissions to the minimum (usually contents: read) and avoid repository secrets for test jobs.
+- [ ] **Keep the runner's required GitHub authentication local.** GitHub Actions runner registration/connection authentication cannot be eliminated, but no personal PAT, SSH key, or admin credentials should be available to job code. Never paste runner registration tokens, config credentials, or secrets into ChatGPT or commit them.
+- [ ] **Test the boundary deliberately.** From a test job verify nvidia-smi and the CUDA compiler/runtime work, only the intended workspace is writable, outside host paths and credentials are not mounted, sudo is unavailable, and the job cannot access the host container daemon.
+- [ ] **Record the exact runner boundary before using it for experiments.** Document host OS/WSL status, GPU model, driver, CUDA toolchain, isolation model, mounts, account/UID and egress policy in the handoff/status files.
+
+Note: a self-hosted runner executes repository workflow code on the machine; it does not give ChatGPT a live terminal by itself. A container alone is not a strong boundary against every kernel/container escape, so use a dedicated VM/isolated machine when the risk level warrants it.
 
 ### Priority 0 — get actual cuTile running
 

@@ -207,3 +207,16 @@ The consolidated evidence and performance tables live in [docs/EXPERIMENT_REPORT
 - CPU/reference run [#334](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264023): **763 passed, 68 skipped**.
 - Full A100 non-cuTile run [#52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082): **907 passed, 52 skipped, 0 failed**.
 - These checks validate project structure and the workflow's intended guardrails; they do not validate actual cuTile execution. That remains blocked by the current runner's R550 driver gate.
+
+
+## 2026-10-18 — Handoff, benchmark ledger, and local runner security
+
+No kernel source or benchmark algorithm was changed in this documentation-focused session. The goal was to make continuation in a new chat safe and reproducible.
+
+- Re-verified that main before the handoff documentation update was afe530bc090c779ebe5d741dcf7ae544985570d1.
+- Re-checked the broad A100 non-cuTile result: [run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082), **907 passed / 52 skipped / 0 failed**. The workflow is ordinary CUDA/reference/project-contract coverage; it is not an actual-cuTile run.
+- Re-checked the latest CPU/reference suite on the then-current main SHA: [run #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931), **763 passed / 68 skipped / 0 failed**.
+- Consolidated targeted v4/v5 correctness, the paired v5 benchmark, PTXAS resource results, Nsight Systems surrogate traces, and the blocked Nsight Compute/actual-cuTile gates into [the chat handoff](CHAT_HANDOFF_2026-10-18.md).
+- Added a continuation prompt at [CONTINUE_PROMPT.md](CONTINUE_PROMPT.md).
+- Documented local GPU inventory commands and a runner threat model: repository workflows execute on the runner; isolate by OS/container/VM, use an unprivileged ephemeral runner, mount only the project workspace, keep personal credentials out, and do not treat runner registration as a live ChatGPT shell.
+- **Next decision:** obtain the user's local GPU/driver/toolkit output before choosing the exact Windows-native vs WSL2/Linux runner implementation. Do not request runner registration tokens or sudo credentials. Actual cuTile correctness and successful Nsight Compute profiles remain unverified.

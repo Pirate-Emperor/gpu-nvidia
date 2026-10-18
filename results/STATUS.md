@@ -31,7 +31,7 @@ Verified by successful A100 driver-access audit run on the self-hosted runner:
 
 | Area | Result |
 |---|---|
-| CPU/reference CI | PASS: latest verified run #334, 763 passed / 68 skipped |
+| CPU/reference CI | PASS: latest verified run [#340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931), 763 passed / 68 skipped (pre-handoff main SHA afe530b) |
 | Self-hosted A100 runner routing | PASS |
 | Actual A100 hardware inventory | PASS; exhaustive read-only audit |
 | Basic native CUDA execution | PASS |
