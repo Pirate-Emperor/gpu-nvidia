@@ -26,9 +26,12 @@ For this project, the important distinction is:
 - **Ordinary-CUDA controls:** `src/custom_cuda_attention.py`, `src/warp_cuda_attention.py`, `src/shared_tile_cuda_attention.py`, and `src/variants/shared_tile_v1.py` through `shared_tile_v5.py`. These are CUDA C++/NVCC implementations that helped us validate the mathematics and compare tile strategies on the available A100.
 - **Why the distinction matters:** the ordinary-CUDA tests and speed measurements are useful engineering evidence, but they are **not actual cuTile execution**, and cannot alone satisfy the course target.
 
-The current A100 runner uses driver R550.90.07, while the project's cuTile environment check requires R580+. Prior CUDA-compatibility experiments did not produce a verified cuTile run. The planned alternative is an approved GPU with a supported, newer driver (for example, the intended RTX 4060 path), or another approved environment meeting the installed cuTile version's requirements. Do not assume the hardware/package combination works until a real compile and launch succeeds.
+The current A100 runner uses driver R550.90.07, below NVIDIA's documented R580+ cuTile Python runtime minimum. Prior CUDA-compatibility experiments did not produce a verified cuTile run. **Decision: stop using this R550 A100 as the actual-cuTile route.** Retain it for ordinary-CUDA surrogate tests. Move actual-cuTile bring-up to the user's local GPU after collecting its real GPU/OS/driver/toolchain inventory, or to another explicitly authorized supported environment. Do not assume an RTX 4060 or change a system driver without local owner/admin action. See NVIDIA's [cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html).
 
 ## 2. Current status at a glance
+
+**Actions evidence access note (2026-10-18 continuation):** the connected Actions run-list endpoint returned zero visible runs; direct run-detail, job and artifact requests for the handoff IDs returned 404, and the current handoff commit had no visible combined status. This does not prove the historical runs do not exist. Historical counts below remain from the prior handoff and were not independently re-audited through this connection.
+
 
 | Area | Status | Meaning |
 |---|---|---|
@@ -66,7 +69,7 @@ For detailed measurements, configurations, limitations and run links, read [the 
 
 ### Priority 0A — inventory and isolate the local GPU runner
 
-- [ ] **Inventory the user's GPU before choosing Windows-native vs WSL2/Linux.** In PowerShell run nvidia-smi, the detailed GPU query, and nvcc --version; if a query field is unsupported, use nvidia-smi -q. Keep credentials and machine secrets out of the pasted output.
+- [ ] **Immediate user-only input: inventory the real local machine before choosing Windows-native vs Linux/WSL2.** Run `nvidia-smi`, `nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv`, and `nvcc --version`; if a query field is unsupported, use `nvidia-smi -q`. Also report Windows product/build or Linux distro/kernel, WSL2 status, Python version and Docker availability. Missing `nvcc` is useful output; `nvidia-smi`'s CUDA version is not proof the Toolkit/NVCC is installed. Keep credentials and machine secrets out of the pasted output.
 - [ ] **Choose an OS-enforced isolation boundary.** Prefer a disposable VM or GPU-enabled container with only the project workspace mounted writable. Use a dedicated non-admin/non-root account; drop unnecessary capabilities and enable no-new-privileges where containerization is used; keep the root filesystem read-only where practical; provide only required temporary/build paths.
 - [ ] **Do not expose host capabilities.** Never run a privileged container, mount the host Docker socket, mount the user's home/SSH directory/browser profiles/cloud credentials, or grant sudo/administrator privileges to the job account. Restrict GPU access to compute needs and keep inbound remote access disabled.
 - [ ] **Restrict GitHub execution.** Register the runner only to this private repository; use ephemeral/disposable runners where practical; start with manually dispatched jobs from trusted main; do not execute untrusted pull-request code. Set job permissions to the minimum (usually contents: read) and avoid repository secrets for test jobs.
@@ -78,7 +81,7 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 
 ### Priority 0 — get actual cuTile running
 
-- [ ] **BLOCKED: establish a supported GPU environment.** Use an approved newer-driver GPU (the planned RTX 4060 path, if available and compatible) or an approved A100 environment meeting the installed cuTile requirements. Do not retry the previously rejected R550 compatibility setup unless the underlying runtime path materially changes.
+- [ ] **BLOCKED: establish a supported GPU environment after inventory.** Evaluate the user's actual local GPU and OS against NVIDIA's current cuTile support matrix. If unsupported, use another explicitly authorized supported GPU environment. The existing R550 A100 is only for ordinary-CUDA surrogate validation. Do not assume an RTX 4060 or retry the rejected R550 compatibility setup without a materially different supported path.
 - [ ] **Record the environment before changing code.** Save GPU model/compute capability, driver, CUDA toolkit/runtime, Python, cuTile package version, and exact commands to the progress log or a dated run record.
 - [ ] **Run a minimal actual-cuTile smoke test.** Import cuTile, compile a tiny kernel, launch it on the real GPU, validate its output, and save the full log. This separates environment failures from attention-kernel bugs.
 - [ ] **Validate and debug `src/cutile_attention.py`.** Resolve real cuTile API, tile-shape, indexing, launch/grid and compiler issues that appear. Keep failures in the cuTile path separate from the known-good ordinary-CUDA controls.
