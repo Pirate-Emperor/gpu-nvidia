@@ -282,3 +282,18 @@ ChatGPT does not receive a remote shell or direct filesystem access simply becau
 - Official Quickstart check: https://docs.nvidia.com/cuda/cutile-python/quickstart.html states Linux x86_64, Linux aarch64 and Windows x86_64 support; compute capability 8.x–12.x; driver R580+; and Python 3.10–3.14. The optional [tileiras] packages require matching major.minor versions. Detailed profiling requires R580.126.09+ on Linux or R582.16+ on Windows.
 - Actions re-audit limitation: The connected GitHub Actions run-list endpoint returned zero visible runs; direct run-detail/job/artifact requests for the prior handoff run IDs returned 404. The current handoff commit also had no visible combined status. This is an access/visibility limitation, not proof historical runs do not exist; previous pass/skip counts are retained as handoff records and were not independently re-audited in this continuation.
 - The continuation updated routing and evidence notes in README, TODO checklist, test matrix, experiment report, environment/admin notes, progress log and current result status. No test execution or profiler capture was claimed. Actual-cuTile correctness, benchmark and profile gates remain open.
+
+## 13. New local GPU inventory and native Windows build-up
+
+The user supplied the actual local machine output after the prior handoff was written:
+
+- NVIDIA GeForce RTX 4060, compute capability 8.9, driver 616.92, CUDA UMD 13.4.
+- 8,188 MiB total VRAM; 7,925 MiB free at inventory capture.
+- Windows 10 Pro x64, build 26300, WDDM.
+- `nvcc` unavailable; Python is not installed/available through the `python` command; WSL2 and Docker are not installed.
+
+NVIDIA's [current cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) explicitly lists Windows x86_64, compute capability 8.x–12.x, R580+ and Python 3.10–3.14. The reported GPU, driver and OS therefore pass those hardware gates on paper. Native Windows is the chosen first path; install per-user 64-bit CPython 3.12 and use `docs/LOCAL_GPU_WINDOWS.md`.
+
+The repository now has `scripts/cutile_smoke.py` (a real cuTile vector-add compile/launch/synchronize/output check) and `scripts/setup_cutile_windows.ps1` (project-local venv using `cuda-tile[tileiras]` and `cupy-cuda13x[ctk]`). The two primary GPU test modules recognize `REQUIRE_CUTILE=1` so a missing dependency fails instead of turning the acceptance run into a skip.
+
+**Status:** these scripts have not run on the user's Windows machine. Actual cuTile compile/launch, attention correctness, benchmark and profiles remain unverified. Do not register a GitHub runner on the personal Windows host before the manual smoke/correctness gates and a separate OS-enforced least-privilege boundary are validated. A Windows NVRTC builtins DLL issue was reported for an older stack (see [NVIDIA issue #57](https://github.com/NVIDIA/cutile-python/issues/57)); this is another reason the genuine smoke test is a hard gate rather than inferring success from the support matrix.
