@@ -175,8 +175,8 @@ jobs:
             'NCU_GUI_SNAPSHOTS=SKIPPED; no native report files found.' | Tee-Object -FilePath cutile-ncu-screenshot-status.log
             New-Item -ItemType Directory -Force -Path results/profiler-screenshots | Out-Null
           } else {
-            $Args = @('scripts/capture_ncu_screenshots.py','--ncu-exe',$NcuPath,'--output-dir','results/profiler-screenshots','--reports') + $Reports
-            & $Py @Args 2>&1 | Tee-Object -FilePath cutile-ncu-screenshot-status.log
+            $NcuCaptureArgs = @('scripts/capture_ncu_screenshots.py','--ncu-exe',$NcuPath,'--output-dir','results/profiler-screenshots','--reports') + $Reports
+            & $Py @NcuCaptureArgs 2>&1 | Tee-Object -FilePath cutile-ncu-screenshot-status.log
             if ($LASTEXITCODE -ne 0) { throw 'The screenshot helper failed.' }
           }
 
