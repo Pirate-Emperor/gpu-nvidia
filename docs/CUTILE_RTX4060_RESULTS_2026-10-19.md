@@ -28,7 +28,7 @@
 | pytest | 8.4.2 |
 | Project virtual environment | C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows |
 
-All Python dependencies were installed into the project-local virtual environment. Pip cache, temp/extraction files, CuPy cache and CUDA cache were contained under project-root .cache and .tmp. No administrator privileges, system-wide toolkit installation, profiler installation or dataset download occurred.
+All Python dependencies were installed into the project-local virtual environment. Pip cache, temp/extraction files, CuPy cache and CUDA cache were contained under project-root .cache and .tmp. The original correctness/benchmark run did not install a profiler or system-wide CUDA Toolkit. After explicit user approval, Nsight Compute 2026.3.1.0 was installed separately and then used by the focused profiling workflow; those reports are archived separately in artifact 12149902039. The profiling workflow downloaded no additional tools or datasets and used no administrator privileges.
 
 ## Correctness and command-line gates
 
