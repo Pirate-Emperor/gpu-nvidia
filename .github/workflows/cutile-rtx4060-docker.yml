@@ -1,3 +1,4 @@
+# Final validation rerun for the report/checklist handoff on 2026-10-19; behavior unchanged.
 name: RTX 4060 native Windows cuTile validation
 
 on:
