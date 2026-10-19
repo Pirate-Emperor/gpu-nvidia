@@ -1,4 +1,4 @@
-name: PyTorch SDPA venv compatibility preflight
+name: PyTorch SDPA venv benchmark
 
 on:
   push:
@@ -10,11 +10,11 @@ permissions:
   contents: read
 
 jobs:
-  sdpa-venv-preflight:
+  sdpa-venv-benchmark:
     runs-on: [self-hosted, windows, x64]
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
-      - name: Verify project venv and dry-run official CUDA PyTorch install (no package changes)
+      - name: Install approved CUDA-enabled PyTorch into the project venv and run SDPA comparison
         shell: cmd
         run: |
           set "PROJECT_ROOT=C:\Users\Public\GPU-cutile-project\gpu-nvidia"
@@ -25,18 +25,35 @@ jobs:
           if not exist "%PY%" (echo Approved venv missing: %PY% & exit /b 1)
           if not exist "%TEMP%" mkdir "%TEMP%"
           if not exist "%PIP_CACHE_DIR%" mkdir "%PIP_CACHE_DIR%"
+          cd /d "%PROJECT_ROOT%"
           echo PROJECT_ROOT=%PROJECT_ROOT%
           echo PYTHON_EXE=%PY%
           "%PY%" --version
           if errorlevel 1 exit /b 1
-          "%PY%" -m pip --version
-          if errorlevel 1 exit /b 1
           "%PY%" -m pip freeze > "%TEMP%\torch-sdpa-preflight-before.txt"
           nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total,memory.free --format=csv,noheader
           if errorlevel 1 exit /b 1
-          "%PY%" -c "import importlib.metadata as m; names=['numpy','cupy-cuda13x','cuda-tile','nvidia-cuda-tileiras','nvidia-cuda-nvcc','nvidia-nvvm','torch']; print('\\n'.join(f'{n}='+next((d.version for d in m.distributions() if d.metadata.get('Name','').lower().replace('_','-')==n),'<not installed>') for n in names))"
-          if errorlevel 1 exit /b 1
-          "%PY%" -m pip install --disable-pip-version-check --dry-run --report "%TEMP%\torch-sdpa-install-plan.json" --cache-dir "%PIP_CACHE_DIR%" --index-url "https://download.pytorch.org/whl/cu130" "torch==2.14.0"
-          if errorlevel 1 (echo PyTorch dry-run failed; no package changes were made. & exit /b 1)
-          "%PY%" -c "import json; p=json.load(open(r'%TEMP%\\torch-sdpa-install-plan.json',encoding='utf-8')); print('PLANNED_INSTALLS:'); [print(i['metadata']['name']+'=='+i['metadata']['version']) for i in p.get('install',[])]; print('INSTALL_COUNT='+str(len(p.get('install',[]))))"
-          if errorlevel 1 exit /b 1
+          echo Installing only the explicitly approved torch==2.14.0 CUDA 13.0 wheel into the project virtual environment.
+          "%PY%" -m pip install --disable-pip-version-check --cache-dir "%PIP_CACHE_DIR%" --index-url "https://download.pytorch.org/whl/cu130" "torch==2.14.0"
+          if errorlevel 1 (echo PyTorch installation failed; inspect pip output. & exit /b 1)
+          "%PY%" -m pip freeze > "%TEMP%\torch-sdpa-preflight-after.txt"
+          "%PY%" -c "import torch, cupy, cuda.tile, numpy; import importlib.metadata as m; print('torch='+torch.__version__); print('torch_cuda_build='+str(torch.version.cuda)); print('torch_cuda_available='+str(torch.cuda.is_available())); print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda_tile='+m.version('cuda-tile')); print('gpu='+str(torch.cuda.get_device_name(0) if torch.cuda.is_available() else '<unavailable>'))"
+          if errorlevel 1 (echo PyTorch/CuPy/cuTile interoperability import check failed. & exit /b 1)
+          "%PY%" scripts\benchmark_torch_sdpa.py --output results\cutile-vs-pytorch-sdpa.json --warmup 10 --iterations 30 --repeats-per-sample 5
+          if errorlevel 1 (echo PyTorch SDPA comparison/accuracy/benchmark failed; inspect error details. & exit /b 1)
+          echo PIP_FREEZE_BEFORE=%TEMP%\torch-sdpa-preflight-before.txt
+          echo PIP_FREEZE_AFTER=%TEMP%\torch-sdpa-preflight-after.txt
+          echo REPORT_JSON=%PROJECT_ROOT%\results\cutile-vs-pytorch-sdpa.json
+          echo REPORT_CSV=%PROJECT_ROOT%\results\cutile-vs-pytorch-sdpa.csv
+      - name: Upload SDPA experiment output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-pytorch-sdpa-comparison
+          path: |
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\cutile-vs-pytorch-sdpa.json
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\cutile-vs-pytorch-sdpa.csv
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\.tmp\torch-sdpa-preflight-before.txt
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\.tmp\torch-sdpa-preflight-after.txt
+          if-no-files-found: warn
+          retention-days: 30
