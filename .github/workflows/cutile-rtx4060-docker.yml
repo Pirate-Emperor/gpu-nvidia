@@ -193,6 +193,21 @@ jobs:
           & $Py scripts/summarize_benchmark_repeats.py --inputs results/cutile-benchmark-session1.json results/cutile-benchmark-session2.json results/cutile-benchmark-session3.json --json-output results/cutile-benchmark-summary.json --csv-output results/cutile-benchmark-summary.csv 2>&1 | Tee-Object -FilePath cutile-benchmark-summary.log
           if ($LASTEXITCODE -ne 0) { throw 'Benchmark repeat aggregation failed.' }
 
+      - name: Profile-guided optional load-latency-hint experiment
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py benchmarks/benchmark_load_latency_hints.py --output results/cutile-load-latency-hints.json --warmup 10 --iterations 30 --repeats-per-sample 5 --sessions 3 --minimum-gain-pct 1.0 2>&1 | Tee-Object -FilePath cutile-load-latency-hints.log
+          if ($LASTEXITCODE -ne 0) {
+            'LOAD_LATENCY_EXPERIMENT=FAIL; keep compiler-inferred default pending investigation.' | Tee-Object -FilePath cutile-load-latency-hints.log -Append
+            throw 'Optional load-latency-hint experiment failed; core correctness/benchmark evidence is retained separately.'
+          }
+          'LOAD_LATENCY_EXPERIMENT=PASS' | Tee-Object -FilePath cutile-load-latency-hints.log -Append
+
       - name: Locate Nsight Compute and capture two genuine cuTile kernels
         continue-on-error: true
         shell: powershell
@@ -292,6 +307,9 @@ jobs:
             results/cutile-benchmark-session3.csv
             results/cutile-benchmark-summary.json
             results/cutile-benchmark-summary.csv
+            cutile-load-latency-hints.log
+            results/cutile-load-latency-hints.json
+            results/cutile-load-latency-hints.csv
             results/cutile-profile-medium.ncu-rep
             results/cutile-profile-medium.ncu-repz
             results/cutile-profile-long-batched.ncu-rep
