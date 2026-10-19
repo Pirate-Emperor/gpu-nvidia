@@ -52,3 +52,13 @@ These runner errors are kept here solely for traceability and must not be descri
 - Profile interpretation: [CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 - Detailed benchmark snapshot: [CUTILE_RTX4060_RESULTS_2026-10-19.md](CUTILE_RTX4060_RESULTS_2026-10-19.md).
 - The technical report contains external citations and project-relative figures, but deliberately omits action-run URLs and file checksums.
+
+
+## Current approved rerun status — 19 October 2026
+
+- PyTorch SDPA / optional experiment: [run #39252195780](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39252195780), currently queued on the self-hosted Windows runner at the latest status check. This run is on the updated workflow that fetches exact source files via the GitHub Contents API, records the project venv before/after installation, reruns smoke/core correctness/numerical/CLI checks, and then runs SDPA, model integration, optional tests, autotuning and load-latency hints.
+- Authentic NCU screenshot / latency-hint captures: [run #39252236513](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39252236513), currently queued. The updated workflow fetches its pinned profiling and screenshot-helper source via Contents API rather than requiring a fresh git checkout. The screenshot step must create actual PNGs and a manifest; if the runner has no interactive desktop, it should record skipped captures rather than fabricate them.
+- CPU/reference CI after those workflow changes: [run #39252236625](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39252236625) completed successfully. The CI is CPU/reference-only; GPU tests skipping for missing CuPy are not counted as native GPU results.
+- The obsolete duplicate framework experiment workflow from earlier in the session was removed from main and should not be used. Its old run #39249828524 is historical/queued at an older commit; the canonical experiment is the existing PyTorch SDPA venv benchmark workflow.
+
+The native jobs being queued are **not** evidence that the new SDPA install, screenshots, or optional objectives have passed. Add the experiment’s actual logs and result artifact after it has run.
