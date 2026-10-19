@@ -327,11 +327,11 @@ The Windows runner is Online and sees the correct RTX 4060, but **the already-ex
 - Use 64×64 as the general default. The 64×128 specialization is promising for the longer batched D=128 case but should be independently rechecked before claiming a universal win. The 128×128 tile loses on long D=128. Short-case timing is highly noisy and not suitable for headline speedup claims.
 - Optimizations retained in the fused kernel: skip wholly-future K/V tiles; use FP16 probabilities as P×V operands while retaining FP32 QK accumulation, softmax state, and output accumulator. The frozen correctness suite and numerical report passed afterward.
 
-### Outstanding course gate: profiler reports
-- Profiling status was NCU_NOT_PRESENT_IN_PROJECT_DIRECTORY: not searched outside the project and no download/install attempted. No .ncu-rep files were captured.
-- The prior A100 ERR_NVGPUCTRPERM event is a distinct historical ordinary-CUDA issue; RTX 4060 counter access remains untested because ncu was not found.
-- To finish: after owner approval for a project-local official NVIDIA Nsight Compute download, capture medium D=128 tile 64×64 and longer-batched D=128 tile 64×128, inspect reports, and preserve both reports/logs. No system-wide install, admin rights, or download has been performed.
-- CUDA-enabled PyTorch SDPA comparison remains optional/unrun; the measured baseline is the intentionally unfused FP32 CuPy implementation.
+### Historical profiler blocker — superseded by the completed profiling gate below
+- At the time of this earlier run, the workflow searched only project-local paths, so it reported `NCU_NOT_PRESENT_IN_PROJECT_DIRECTORY` and had no Nsight report artifact. This is historical and no longer describes the RTX 4060 state.
+- After the user approved installing the official NVIDIA Nsight Compute Windows package, the updated native workflow found Nsight Compute 2026.3.1.0 and successfully profiled the RTX 4060. A separate follow-up workflow exported the reports and preserved them in artifact [12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039); see the completed profiling section below.
+- The older A100 `ERR_NVGPUCTRPERM` event remains a distinct historical ordinary-CUDA issue. It did **not** occur during the RTX 4060 profiles.
+- CUDA-enabled PyTorch SDPA comparison remains optional/unrun; the measured performance reference is the intentionally unfused FP32 CuPy implementation.
 
 
 ## 2026-10-19 — actual-cuTile Nsight Compute profiling completed
@@ -361,3 +361,4 @@ The occupancy section identifies shared memory as the CTA-residency limiter (one
 - Mark the hard profiling gate complete. The dedicated [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) discusses the evidence and limitations.
 - Keep the validated 64×64 general default and the promising 64×128 longer-batched tile. The evidence points to shared-memory/register footprint and instruction scheduling as possible optimization areas, but no kernel change is justified without a new version passing correctness and repeated benchmarks.
 - The optional CUDA-enabled PyTorch SDPA comparison remains outside the completed core scope. Current speedups are versus the deliberately unfused FP32 CuPy baseline, not a vendor-optimized attention kernel.
+- Final evidence audit: the end-to-end native workflow #39163083223 and dedicated profiler workflow #39163619066 both completed successfully, and every required GPU/profile step reports success. Downloaded artifact 12149902039 contains four `.ncu-repz` files, their four detail exports and raw-metric CSVs; its downloaded ZIP SHA-256 matches GitHub's recorded digest `fd947285bc52731a97127fda08a86a9e53dc9a8000c9164966165fed0fc06b1c`.
