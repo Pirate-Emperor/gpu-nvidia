@@ -1,0 +1,176 @@
+name: RTX 4060 framework reference and optional objectives
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-framework-reference.yml"
+      - "benchmarks/benchmark_framework_attention.py"
+      - "examples/torch_model_integration.py"
+      - "src/**"
+      - "tests/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  framework-reference:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 180
+    env:
+      GITHUB_TOKEN: \${{ github.token }}
+      PYTHONNOUSERSITE: "1"
+    steps:
+      - name: Use project-local venv and retrieve exact source through GitHub Contents API
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Project venv is missing: $Py" }
+          $ResolvedPy = (Resolve-Path $Py).Path
+          if (-not $ResolvedPy.Contains((Join-Path $ProjectRoot '.venv-cutile-windows'))) {
+            throw "Refusing to install packages outside the approved project-local environment: $ResolvedPy"
+          }
+
+          $ResultDir = Join-Path $ProjectRoot 'results\framework-attention'
+          $Work = Join-Path $env:GITHUB_WORKSPACE 'framework-work'
+          $CacheRoot = Join-Path $ProjectRoot '.cache'
+          $PipCache = Join-Path $CacheRoot 'pip'
+          $TempRoot = Join-Path $ProjectRoot '.tmp'
+          $CudaCache = Join-Path $CacheRoot 'cuda'
+          $CupyCache = Join-Path $CacheRoot 'cupy'
+          New-Item -ItemType Directory -Force -Path $ResultDir,$Work,$PipCache,$TempRoot,$CudaCache,$CupyCache | Out-Null
+          $env:TEMP = $TempRoot
+          $env:TMP = $TempRoot
+          $env:PIP_CACHE_DIR = $PipCache
+          $env:CUDA_CACHE_PATH = $CudaCache
+          $env:CUPY_CACHE_DIR = $CupyCache
+          $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          @("TEMP=$TempRoot","TMP=$TempRoot","PIP_CACHE_DIR=$PipCache","CUDA_CACHE_PATH=$CudaCache","CUPY_CACHE_DIR=$CupyCache") | ForEach-Object {
+            [System.IO.File]::AppendAllText($env:GITHUB_ENV, $_ + [Environment]::NewLine, $Utf8NoBom)
+          }
+
+          "PROJECT_ROOT=$ProjectRoot" | Tee-Object -FilePath (Join-Path $ResultDir 'environment.log')
+          "PYTHON_EXE=$ResolvedPy" | Tee-Object -FilePath (Join-Path $ResultDir 'environment.log') -Append
+          "SOURCE_COMMIT=$env:GITHUB_SHA" | Tee-Object -FilePath (Join-Path $ResultDir 'environment.log') -Append
+          & $ResolvedPy --version 2>&1 | Tee-Object -FilePath (Join-Path $ResultDir 'environment.log') -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Project-local Python does not run.' }
+          & $ResolvedPy -m pip freeze *> (Join-Path $ResultDir 'pip-freeze-before.txt')
+          if ($LASTEXITCODE -ne 0) { throw 'Could not capture project-local pip freeze before installation.' }
+
+          # No checkout, so this run does not rely on the runner's git/TLS route.
+          # Fetch pinned source by GitHub Contents API and run it from a temporary workspace.
+          $Paths = @(
+            'src\cutile_attention.py','src\contract.py','src\reference.py','src\baseline.py','src\extended_attention.py','src\attention_io.py',
+            'tests\cases.py','tests\test_gpu_correctness.py','tests\test_gpu_edge_cases.py','tests\test_gpu_optional_attention_objectives.py',
+            'benchmarks\benchmark_framework_attention.py','benchmarks\benchmark_load_latency_hints.py','benchmarks\benchmark_attention.py',
+            'scripts\cutile_smoke.py','scripts\cutile_accuracy_report.py','scripts\generate_inputs.py','scripts\verify_cli_output.py',
+            'examples\torch_model_integration.py','run_attention.py'
+          )
+          $Headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          foreach ($Relative in $Paths) {
+            $ApiPath = $Relative.Replace('\','/')
+            $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/$ApiPath?ref=$env:GITHUB_SHA"
+            $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
+            if ($Item.type -ne 'file' -or -not $Item.content) { throw "GitHub Contents API did not return file content for $ApiPath" }
+            $Bytes = [Convert]::FromBase64String($Item.content)
+            $Destination = Join-Path $Work $Relative
+            New-Item -ItemType Directory -Force -Path (Split-Path $Destination -Parent) | Out-Null
+            [System.IO.File]::WriteAllBytes($Destination,$Bytes)
+          }
+          "SOURCE_FILES_FETCHED=$($Paths.Count)" | Tee-Object -FilePath (Join-Path $ResultDir 'environment.log') -Append
+
+      - name: Install approved CUDA PyTorch build only into .venv-cutile-windows
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = (Resolve-Path (Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe')).Path
+          $ResultDir = Join-Path $ProjectRoot 'results\framework-attention'
+          if (-not $Py.Contains((Join-Path $ProjectRoot '.venv-cutile-windows'))) { throw "Refusing non-venv Python: $Py" }
+          & $Py -m pip install --disable-pip-version-check --cache-dir $env:PIP_CACHE_DIR torch==2.13.0 --index-url https://download.pytorch.org/whl/cu132 *> (Join-Path $ResultDir 'torch-install.log')
+          $InstallExit = $LASTEXITCODE
+          Get-Content (Join-Path $ResultDir 'torch-install.log') | Tee-Object -FilePath (Join-Path $ResultDir 'environment.log') -Append
+          if ($InstallExit -ne 0) { throw "CUDA PyTorch install into the approved venv failed (exit $InstallExit)." }
+          & $Py -m pip check 2>&1 | Tee-Object -FilePath (Join-Path $ResultDir 'pip-check.log')
+          if ($LASTEXITCODE -ne 0) { throw 'pip check reported inconsistent project-venv dependencies.' }
+          & $Py -c "import torch,cupy,cuda.tile,numpy; print('torch='+torch.__version__); print('torch_cuda='+str(torch.version.cuda)); print('torch_cuda_available='+str(torch.cuda.is_available())); print('torch_gpu='+ (torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NONE')); print('cupy='+cupy.__version__); print('numpy='+numpy.__version__)" 2>&1 | Tee-Object -FilePath (Join-Path $ResultDir 'environment.log') -Append
+          if ($LASTEXITCODE -ne 0) { throw 'PyTorch/CuPy/cuTile imports or CUDA device preflight failed.' }
+          $CudaAvailable = & $Py -c "import torch; print('YES' if torch.cuda.is_available() else 'NO')"
+          if ($CudaAvailable.Trim() -ne 'YES') { throw 'PyTorch does not expose the CUDA GPU; not substituting CPU SDPA.' }
+          & $Py -m pip freeze *> (Join-Path $ResultDir 'pip-freeze-after.txt')
+
+      - name: Re-run actual cuTile smoke and required correctness with expanded venv
+        shell: powershell
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Work = Join-Path $env:GITHUB_WORKSPACE 'framework-work'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = (Resolve-Path (Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe')).Path
+          Push-Location $Work
+          try {
+            & $Py scripts/cutile_smoke.py 2>&1 | Tee-Object -FilePath (Join-Path $ProjectRoot 'results\framework-attention\cutile-smoke.log')
+            if ($LASTEXITCODE -ne 0) { throw 'cuTile smoke failed after PyTorch installation.' }
+            & $Py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 | Tee-Object -FilePath (Join-Path $ProjectRoot 'results\framework-attention\cutile-pytest.log')
+            if ($LASTEXITCODE -ne 0) { throw 'Required cuTile correctness regressed after PyTorch installation.' }
+            & $Py -m pytest -q -ra tests/test_gpu_optional_attention_objectives.py 2>&1 | Tee-Object -FilePath (Join-Path $ProjectRoot 'results\framework-attention\optional-gqa-packed-pytest.log')
+            if ($LASTEXITCODE -ne 0) { throw 'Optional GQA/MQA/packed-varlen GPU tests failed.' }
+            & $Py scripts/cutile_accuracy_report.py --output (Join-Path $ProjectRoot 'results\framework-attention\cutile-accuracy.json') 2>&1 | Tee-Object -FilePath (Join-Path $ProjectRoot 'results\framework-attention\cutile-accuracy.log')
+            if ($LASTEXITCODE -ne 0) { throw 'Independent numerical report failed after PyTorch installation.' }
+          } finally { Pop-Location }
+
+      - name: Compare cuTile with PyTorch SDPA on all mandatory workloads
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Work = Join-Path $env:GITHUB_WORKSPACE 'framework-work'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = (Resolve-Path (Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe')).Path
+          Push-Location $Work
+          try {
+            & $Py benchmarks/benchmark_framework_attention.py --out-dir (Join-Path $ProjectRoot 'results\framework-attention') --warmup 10 --iterations 30 --repeats-per-sample 5 2>&1 | Tee-Object -FilePath (Join-Path $ProjectRoot 'results\framework-attention\framework-benchmark.log')
+            if ($LASTEXITCODE -ne 0) { throw 'cuTile vs PyTorch SDPA benchmark failed.' }
+          } finally { Pop-Location }
+
+      - name: Integrate cuTile into an inference-only PyTorch attention block
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Work = Join-Path $env:GITHUB_WORKSPACE 'framework-work'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = (Resolve-Path (Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe')).Path
+          Push-Location $Work
+          try {
+            & $Py examples/torch_model_integration.py --batch 2 --sequence 512 --heads 8 --head-dim 64 --warmup 10 --iterations 30 --repeats-per-sample 5 --output (Join-Path $ProjectRoot 'results\framework-attention\model-integration.json') 2>&1 | Tee-Object -FilePath (Join-Path $ProjectRoot 'results\framework-attention\model-integration.log')
+            if ($LASTEXITCODE -ne 0) { throw 'End-to-end PyTorch model integration failed.' }
+          } finally { Pop-Location }
+
+      - name: Run noise-aware load-latency and JIT experiments
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Work = Join-Path $env:GITHUB_WORKSPACE 'framework-work'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = (Resolve-Path (Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe')).Path
+          Push-Location $Work
+          try {
+            & $Py benchmarks/benchmark_load_latency_hints.py --output (Join-Path $ProjectRoot 'results\framework-attention\load-latency-hints.json') --warmup 10 --iterations 30 --repeats-per-sample 5 --sessions 3 --minimum-gain-pct 1.0 2>&1 | Tee-Object -FilePath (Join-Path $ProjectRoot 'results\framework-attention\load-latency-hints.log')
+            if ($LASTEXITCODE -ne 0) { throw 'Optional load latency hint experiment failed.' }
+          } finally { Pop-Location }
+
+      - name: Upload framework reference, integration and optional-objective evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-framework-reference-evidence
+          path: C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\framework-attention\
+          if-no-files-found: warn
+          retention-days: 30
