@@ -25,3 +25,13 @@ This file intentionally contains workflow links, run-specific provenance, and Gi
 ## Screenshot provenance
 
 The SVGs in docs/assets/report are derived from the exported NCU metrics; they are charts, not application screenshots. Four native profiler reports and their Details/Raw CSV exports have been preserved. Genuine Nsight Compute GUI screenshots or a desktop clip have not yet been captured; they must not be represented as done until the images/media files are generated and inspected.
+
+## Latest optional-objective implementation and validation boundary
+
+- Added isolated optional APIs, references and tests for GQA/MQA, packed variable-length sequences, PyTorch autograd/model integration, correctness-gated tile autotuning, and a cuTile DRAM-load-latency hint sweep. CPU/reference CI validates pure references, recommendation policy and script syntax; it does not validate the added GPU kernels.
+- Current NCU evidence workflow includes hint=4 and hint=8 basic captures for the medium D=128 (64×64) and longer-batched D=128 (64×128) workloads. It also invokes scripts/capture_ncu_screenshots.py for real application-window snapshots; the screenshot gate is **pending a successful capture manifest and PNG inspection**.
+- The latency-hint sweep tests 0/2/4/6/8/10 with three rotated sessions, correctness-before-timing, 10 warmups, 30 CUDA-event samples, and five launches averaged per sample. No hint is promoted unless the median advantage exceeds a noise-aware threshold.
+- The current native GPU run must validate the compile-time KV_GROUPS=1 and LOAD_LATENCY=0 default parameters as well as the GQA/MQA and packed-varlen optional gates. A previously successful core baseline does not prove these later source changes are passing.
+- The approved PyTorch job now includes: local-venv-only CUDA wheel installation, SDPA backend/numerical comparison, autograd/model-block test, end-to-end model-block latency, optional GPU correctness tests and autotuning. It is not complete until installation succeeds and the output artifacts are inspected.
+- A workflow-edit mistake temporarily produced an invalid screenshot step; it was restored and rewritten as a separate Python helper before the current screenshot workflow was queued. This is kept here because it concerns automation configuration, not project/CUDA behavior.
+
