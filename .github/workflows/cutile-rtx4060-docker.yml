@@ -130,6 +130,18 @@ jobs:
           & $Py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 | Tee-Object -FilePath cutile-pytest.log -Append
           if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness matrix failed.' }
 
+      - name: Run optional cuTile GQA/MQA and packed-varlen correctness gates
+        shell: powershell
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          "REQUIRE_CUTILE=$env:REQUIRE_CUTILE" | Tee-Object -FilePath cutile-optional-objectives.log
+          & $Py -m pytest -q tests/test_gpu_optional_attention_objectives.py 2>&1 | Tee-Object -FilePath cutile-optional-objectives.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Optional GQA/MQA/packed-varlen GPU correctness gates failed.' }
+
       - name: Record numerical error metrics for every mandatory case and tile
         shell: powershell
         run: |
@@ -255,6 +267,7 @@ jobs:
             cutile-pip-freeze.txt
             cutile-smoke.log
             cutile-pytest.log
+            cutile-optional-objectives.log
             cutile-accuracy.log
             cutile-cli.log
             cutile-cli-reference.log
