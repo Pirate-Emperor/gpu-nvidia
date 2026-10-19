@@ -3,6 +3,8 @@
 **Last reviewed:** 2026-10-19  
 **Start here:** this file explains the goal, what has already been done, what remains, and the evidence required before the course project can be marked complete. The [root README](../README.md) is the entry point; the [experiment report](EXPERIMENT_REPORT.md) contains the more detailed measurements and history.
 
+**Rubric closure addendum:** use the new [course project completion checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md) and [detailed report](COURSE_PROJECT_REPORT_2026-10-19.md); those documents distinguish completed GPU gates from remaining assignment-level milestones.
+
 **Status key:** `[x]` done and backed by evidence · `[ ]` still to do · **BLOCKED** needs a suitable environment or permission. A task is not complete merely because code exists.
 
 ## 1. Project goal, in plain English
@@ -42,7 +44,7 @@ The current A100 runner uses driver R550.90.07, below NVIDIA's documented R580+ 
 | CLI and independent oracle | **PASS** | FP16 output verified by the independent NumPy oracle. |
 | Actual cuTile benchmark | **PASS WITH CAVEATS** | Three sessions cover five tiles; long cases are stable, very short cases are noisy. |
 | Nsight Compute profiles | **PASS** | Two basic reports plus two Scheduler/ Warp State reports captured and inspected; [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). |
-| Final course deliverable | **CORE SCOPE COMPLETE** | Required correctness, CLI, controlled benchmark, and two-configuration profiling gates have evidence. CUDA PyTorch SDPA remains an optional comparison follow-up. |
+| Assignment / final course deliverable | **GPU gates PASS; rubric closure PARTIAL** | The fused kernel, correctness, CLI, controlled benchmark and four-profile NCU evidence are complete. Framework/vendor reference, clean-cache JIT for long cases, second profiler-guided improvement and author contributions remain in [the rubric checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md).
 
 ## 3. Done so far — brief explanations and evidence
 
