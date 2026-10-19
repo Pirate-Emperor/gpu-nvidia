@@ -143,6 +143,155 @@ jobs:
             "HINT_PROFILE=$($Hint.Label) REPORT=$Report BYTES=$((Get-Item $Report).Length)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
           }
 
+                    # Optional UI snapshots: open the native report in Nsight Compute and
+          # capture only that window (not the whole desktop) via PrintWindow.
+          # If no interactive UI/session is available, record the limitation and
+          # keep the exported metrics/artifact; do not create synthetic screenshots.
+          $ScreenshotDir = 'results/profiler-screenshots'
+          New-Item -ItemType Directory -Force -Path $ScreenshotDir | Out-Null
+          $UiPath = $null
+          $UiRoots = @((Split-Path -Parent $NcuPath), $env:ProgramFiles)
+          foreach ($Root in $UiRoots) {
+            if (-not $Root -or -not (Test-Path $Root)) { continue }
+            $Ui = Get-ChildItem -Path $Root -Filter 'ncu-ui.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($Ui) { $UiPath = $Ui.FullName; break }
+          }
+          if (-not $UiPath) {
+            'NCU_GUI_SNAPSHOTS=SKIPPED; ncu-ui.exe could not be located.' | Tee-Object -FilePath cutile-ncu-screenshot-status.log
+          } else {
+            "NCU_UI_PATH=$UiPath" | Tee-Object -FilePath cutile-ncu-screenshot-status.log
+            Add-Type -AssemblyName System.Drawing
+            Add-Type @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class NcuWindowCapture {
+            [StructLayout(LayoutKind.Sequential)]
+            public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+            [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+            [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+            [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
+          }
+          '@
+            $ScreenshotReports = @(
+              @{ Label='medium-basic'; Path='results/cutile-profile-medium' },
+              @{ Label='long-batched-basic'; Path='results/cutile-profile-long-batched' },
+              @{ Label='medium-scheduler'; Path='results/cutile-profile-medium-stalls' },
+              @{ Label='long-batched-scheduler'; Path='results/cutile-profile-long-batched-stalls' },
+              @{ Label='medium-latency4'; Path='results/cutile-profile-medium-latency4' },
+              @{ Label='medium-latency8'; Path='results/cutile-profile-medium-latency8' },
+              @{ Label='long-batched-latency4'; Path='results/cutile-profile-long-batched-latency4' },
+              @{ Label='long-batched-latency8'; Path='results/cutile-profile-long-batched-latency8' }
+            )
+            $Manifest = @()
+            foreach ($Entry in $ScreenshotReports) {
+              $ReportFile = @("$($Entry.Path).ncu-repz", "$($Entry.Path).ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+              if (-not $ReportFile) {
+                "SNAPSHOT_SKIPPED=$($Entry.Label); native report absent." | Tee-Object -FilePath cutile-ncu-screenshot-status.log -Append
+                continue
+              }
+              try {
+                $Arg = '"' + (Resolve-Path $ReportFile).Path + '"'
+                $Started = Start-Process -FilePath $UiPath -ArgumentList $Arg -PassThru -WindowStyle Maximized
+                Start-Sleep -Seconds 8
+                $Started.Refresh()
+                $WindowProcess = $Started
+                if ($WindowProcess.MainWindowHandle -eq [IntPtr]::Zero) {
+                  $Candidates = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^ncu-ui
+
+      - name: Upload actual-cuTile reports and metric exports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-rtx4060-ncu-profiles
+          path: |
+            cutile-ncu-profile-status.log
+            cutile-ncu-screenshot-status.log
+            results/profiler-screenshots/**
+            cutile-profile-medium.log
+            cutile-profile-long-batched.log
+            cutile-profile-medium-stalls.log
+            cutile-profile-long-batched-stalls.log
+            results/cutile-profile-medium-stalls.ncu-repz
+            results/cutile-profile-medium-stalls.ncu-rep
+            results/cutile-profile-medium-stalls-details.txt
+            results/cutile-profile-medium-stalls-raw.csv
+            results/cutile-profile-long-batched-stalls.ncu-repz
+            results/cutile-profile-long-batched-stalls.ncu-rep
+            results/cutile-profile-long-batched-stalls-details.txt
+            results/cutile-profile-long-batched-stalls-raw.csv
+            results/cutile-profile-medium.ncu-repz
+            results/cutile-profile-medium.ncu-rep
+            results/cutile-profile-medium-details.txt
+            results/cutile-profile-medium-raw.csv
+            results/cutile-profile-long-batched.ncu-repz
+            results/cutile-profile-long-batched.ncu-rep
+            results/cutile-profile-long-batched-details.txt
+            results/cutile-profile-long-batched-raw.csv
+            cutile-profile-medium-latency4.log
+            results/cutile-profile-medium-latency4.ncu-repz
+            results/cutile-profile-medium-latency4.ncu-rep
+            results/cutile-profile-medium-latency4-details.txt
+            results/cutile-profile-medium-latency4-raw.csv
+            cutile-profile-medium-latency8.log
+            results/cutile-profile-medium-latency8.ncu-repz
+            results/cutile-profile-medium-latency8.ncu-rep
+            results/cutile-profile-medium-latency8-details.txt
+            results/cutile-profile-medium-latency8-raw.csv
+            cutile-profile-long-batched-latency4.log
+            results/cutile-profile-long-batched-latency4.ncu-repz
+            results/cutile-profile-long-batched-latency4.ncu-rep
+            results/cutile-profile-long-batched-latency4-details.txt
+            results/cutile-profile-long-batched-latency4-raw.csv
+            cutile-profile-long-batched-latency8.log
+            results/cutile-profile-long-batched-latency8.ncu-repz
+            results/cutile-profile-long-batched-latency8.ncu-rep
+            results/cutile-profile-long-batched-latency8-details.txt
+            results/cutile-profile-long-batched-latency8-raw.csv
+          if-no-files-found: error
+ -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Sort-Object StartTime -Descending
+                  if ($Candidates) { $WindowProcess = $Candidates | Select-Object -First 1 }
+                }
+                if ($WindowProcess.MainWindowHandle -eq [IntPtr]::Zero) { throw 'Nsight GUI main window handle unavailable (likely no interactive desktop session).' }
+                [NcuWindowCapture]::ShowWindow($WindowProcess.MainWindowHandle, 3) | Out-Null
+                [NcuWindowCapture]::SetForegroundWindow($WindowProcess.MainWindowHandle) | Out-Null
+                Start-Sleep -Seconds 3
+                $Rect = New-Object NcuWindowCapture+RECT
+                if (-not [NcuWindowCapture]::GetWindowRect($WindowProcess.MainWindowHandle, [ref]$Rect)) { throw 'GetWindowRect failed.' }
+                $Width = $Rect.Right - $Rect.Left
+                $Height = $Rect.Bottom - $Rect.Top
+                if ($Width -lt 700 -or $Height -lt 450) { throw "Nsight window size too small: $Width x $Height." }
+                $Bitmap = New-Object System.Drawing.Bitmap($Width, $Height)
+                $Graphics = [System.Drawing.Graphics]::FromImage($Bitmap)
+                $Hdc = $Graphics.GetHdc()
+                try {
+                  $Captured = [NcuWindowCapture]::PrintWindow($WindowProcess.MainWindowHandle, $Hdc, 2)
+                } finally {
+                  $Graphics.ReleaseHdc($Hdc)
+                  $Graphics.Dispose()
+                }
+                if (-not $Captured) { $Bitmap.Dispose(); throw 'PrintWindow returned false; no screenshot file was accepted.' }
+                $UniqueColours = New-Object 'System.Collections.Generic.HashSet[string]'
+                for ($Y = 0; $Y -lt $Height; $Y += [Math]::Max(1, [int]($Height / 12))) {
+                  for ($X = 0; $X -lt $Width; $X += [Math]::Max(1, [int]($Width / 12))) {
+                    $Pixel = $Bitmap.GetPixel($X, $Y)
+                    [void]$UniqueColours.Add("$($Pixel.R),$($Pixel.G),$($Pixel.B)")
+                  }
+                }
+                if ($UniqueColours.Count -lt 20) { $Bitmap.Dispose(); throw 'Captured window was nearly uniform/blank; screenshot rejected.' }
+                $OutFile = Join-Path $ScreenshotDir "$($Entry.Label).png"
+                $Bitmap.Save($OutFile, [System.Drawing.Imaging.ImageFormat]::Png)
+                $Bitmap.Dispose()
+                $Manifest += [pscustomobject]@{ Label=$Entry.Label; Report=$ReportFile; Screenshot=$OutFile; Width=$Width; Height=$Height; SampledColours=$UniqueColours.Count; CapturedAt=(Get-Date).ToString('o') }
+                "SNAPSHOT_CAPTURED=$($Entry.Label) FILE=$OutFile SIZE=$($Width)x$($Height)" | Tee-Object -FilePath cutile-ncu-screenshot-status.log -Append
+              } catch {
+                "SNAPSHOT_FAILED=$($Entry.Label) ERROR=$($_.Exception.Message)" | Tee-Object -FilePath cutile-ncu-screenshot-status.log -Append
+              }
+            }
+            $Manifest | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $ScreenshotDir 'manifest.csv')
+            "NCU_GUI_SNAPSHOTS=$($Manifest.Count)" | Tee-Object -FilePath cutile-ncu-screenshot-status.log -Append
+          }
+
                     'PROFILE_REPORTS_CREATED=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
 
       - name: Upload actual-cuTile reports and metric exports
