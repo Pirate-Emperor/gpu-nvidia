@@ -239,7 +239,8 @@ jobs:
           if ($MediumExit -ne 0 -or $LongExit -ne 0) {
             throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect profile logs for counter-permission errors."
           }
-          "PROFILE_REPORTS_CREATED=$((Test-Path results/cutile-profile-medium.ncu-rep) -and (Test-Path results/cutile-profile-long-batched.ncu-rep))" | Tee-Object -FilePath cutile-profile-status.log -Append
+          "PROFILE_REPORTS_CREATED=$((Test-Path results/cutile-profile-medium.ncu-repz) -and (Test-Path results/cutile-profile-long-batched.ncu-repz))" | Tee-Object -FilePath cutile-profile-status.log -Append
+          Get-ChildItem results/cutile-profile-*.ncu-rep* -File -ErrorAction SilentlyContinue | ForEach-Object { "PROFILE_FILE=$($_.Name) SIZE=$($_.Length)" } | Tee-Object -FilePath cutile-profile-status.log -Append
 
       - name: Upload complete run record
         if: always()
@@ -278,5 +279,7 @@ jobs:
             results/cutile-benchmark-summary.json
             results/cutile-benchmark-summary.csv
             results/cutile-profile-medium.ncu-rep
+            results/cutile-profile-medium.ncu-repz
             results/cutile-profile-long-batched.ncu-rep
+            results/cutile-profile-long-batched.ncu-repz
           if-no-files-found: warn
