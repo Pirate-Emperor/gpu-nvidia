@@ -10,6 +10,8 @@ Use this order to understand the project and decide what to do next.
 | Purpose | Document |
 |---|---|
 | **What remains to do / completion gates** | [TODO checklist](docs/TODO_CHECKLIST.md) |
+| Rubric-mapped course checklist | [Course project checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) |
+| Detailed technical report | [Course project report](docs/COURSE_PROJECT_REPORT_2026-10-19.md) |
 | Documentation map and recommended reading order | [Documentation index](docs/README.md) |
 | Approaches, benchmark evidence, failure analysis, and decisions | [Experiment report](docs/EXPERIMENT_REPORT.md) |
 | Correctness contract, tolerances, and regression expectations | [Testing contract](docs/TESTING_CONTRACT.md) |
@@ -39,9 +41,9 @@ NVIDIA cuTile Python is a tile-based GPU programming model. This project impleme
 
 **Current optimization:** the fused kernel skips wholly-future K/V tiles in the causal loop and uses FP16 probability operands for P×V with FP32 accumulation and FP32 online-softmax state. The 64×64 tile is the default; 64×128 was the fastest configuration observed for the longer batched D=128 case, pending another independent repeat before calling it a general winner.
 
-**Core required gates are complete:** the RTX 4060 actual-cuTile correctness matrix, CLI/reference verification, three controlled benchmark sessions, and two actual-cuTile Nsight Compute profiles all passed. The profile analysis documents 231/255 registers per thread, shared-memory-limited occupancy around 8.3%, and scheduler/warp-state diagnostics. The optional CUDA-enabled PyTorch SDPA comparison remains unrun; current speedups are against the deliberately unfused FP32 CuPy baseline.
+**Core GPU gates are complete; assignment closure is partial:** the RTX 4060 actual-cuTile correctness matrix, CLI/reference verification, three controlled benchmark sessions, and two actual-cuTile Nsight Compute workload profiles plus scheduler/warp-state reports passed. The assignment-level checklist still tracks a framework/vendor attention reference, clean-cache JIT coverage for long specializations, a second explicitly profiler-guided improvement, and confirmed individual contributions. The optional framework benchmark is not a speedup-grade item in the problem PDF, but should be addressed or documented as an approved limitation. Current speedups are against the deliberately unfused FP32 CuPy baseline.
 
-See the [detailed RTX 4060 results and full tile matrix](docs/CUTILE_RTX4060_RESULTS_2026-10-19.md), [experiment report](docs/EXPERIMENT_REPORT.md), [test matrix](docs/TEST_MATRIX.md), and [TODO checklist](docs/TODO_CHECKLIST.md).
+See the [detailed RTX 4060 results and full tile matrix](docs/CUTILE_RTX4060_RESULTS_2026-10-19.md), [experiment report](docs/EXPERIMENT_REPORT.md), [test matrix](docs/TEST_MATRIX.md), and [TODO checklist](docs/TODO_CHECKLIST.md). Use the [rubric-mapped completion checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) and [detailed course project report](docs/COURSE_PROJECT_REPORT_2026-10-19.md) to track the remaining milestones.
 
 ## Goal
 
