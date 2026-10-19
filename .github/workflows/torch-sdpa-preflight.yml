@@ -5,6 +5,14 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/torch-sdpa-preflight.yml"
+      - "scripts/benchmark_torch_sdpa.py"
+      - "scripts/autotune_cutile_tiles.py"
+      - "src/torch_integration.py"
+      - "src/cutile_attention.py"
+      - "src/extended_attention.py"
+      - "tests/test_gpu_optional_attention_objectives.py"
+      - "tests/test_torch_integration.py"
+      - "benchmarks/benchmark_torch_model_integration.py"
 
 permissions:
   contents: read
@@ -46,6 +54,10 @@ jobs:
           if errorlevel 1 (echo PyTorch SDPA comparison/accuracy/benchmark failed; inspect error details. & exit /b 1)
           "%PY%" benchmarks\benchmark_torch_model_integration.py --output results\cutile-vs-sdpa-model.json --warmup 10 --iterations 30 --repeats 5 --sessions 3
           if errorlevel 1 (echo End-to-end model integration benchmark failed; inspect error details. & exit /b 1)
+          "%PY%" -m pytest -q tests\test_gpu_optional_attention_objectives.py tests\test_torch_integration.py
+          if errorlevel 1 (echo Optional attention/gradient/model tests failed. & exit /b 1)
+          "%PY%" scripts\autotune_cutile_tiles.py --output results\cutile-autotune.json --warmup 10 --iterations 30 --repeats-per-sample 5 --sessions 3 --min-gain-pct 1.0
+          if errorlevel 1 (echo Correctness-gated tile autotuning failed. & exit /b 1)
           echo PIP_FREEZE_BEFORE=%TEMP%\torch-sdpa-preflight-before.txt
           echo PIP_FREEZE_AFTER=%TEMP%\torch-sdpa-preflight-after.txt
           echo REPORT_JSON=%PROJECT_ROOT%\results\cutile-vs-pytorch-sdpa.json
@@ -59,6 +71,8 @@ jobs:
             C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\cutile-vs-pytorch-sdpa.json
             C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\cutile-vs-pytorch-sdpa.csv
             C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\cutile-vs-sdpa-model.json
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\cutile-autotune.json
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\cutile-autotune.csv
             C:\Users\Public\GPU-cutile-project\gpu-nvidia\.tmp\torch-sdpa-preflight-before.txt
             C:\Users\Public\GPU-cutile-project\gpu-nvidia\.tmp\torch-sdpa-preflight-after.txt
           if-no-files-found: warn
