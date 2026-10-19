@@ -1,0 +1,21 @@
+name: Temporary course-PDF review export
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/_temporary_export_problem_pdf.yml"
+permissions:
+  contents: read
+jobs:
+  export-source-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source PDF
+        uses: actions/checkout@v4
+      - name: Upload original problem description PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporary-course-problem-pdf
+          path: nvidia2-cutile.pdf
+          if-no-files-found: error
+          retention-days: 1
