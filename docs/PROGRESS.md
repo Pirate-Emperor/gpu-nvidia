@@ -362,3 +362,13 @@ The occupancy section identifies shared memory as the CTA-residency limiter (one
 - Keep the validated 64×64 general default and the promising 64×128 longer-batched tile. The evidence points to shared-memory/register footprint and instruction scheduling as possible optimization areas, but no kernel change is justified without a new version passing correctness and repeated benchmarks.
 - The optional CUDA-enabled PyTorch SDPA comparison remains outside the completed core scope. Current speedups are versus the deliberately unfused FP32 CuPy baseline, not a vendor-optimized attention kernel.
 - Final evidence audit: the end-to-end native workflow #39163083223 and dedicated profiler workflow #39163619066 both completed successfully, and every required GPU/profile step reports success. Downloaded artifact 12149902039 contains four `.ncu-repz` files, their four detail exports and raw-metric CSVs; its downloaded ZIP SHA-256 matches GitHub's recorded digest `fd947285bc52731a97127fda08a86a9e53dc9a8000c9164966165fed0fc06b1c`.
+
+
+## 2026-10-19 — assignment-level report and rubric closure audit
+
+- Read and reconciled the original `nvidia2-cutile.pdf` requirements against current source, run logs, benchmark JSON/CSV and the four-profile Nsight Compute artifact.
+- Prepared a seven-page, 5–8 page-compliant technical report for review outside the repository; the editable DOCX/PDF and rendered figures were inspected. Its Markdown source is [COURSE_PROJECT_REPORT_2026-10-19.md](COURSE_PROJECT_REPORT_2026-10-19.md).
+- Added a requirement-by-requirement checklist at [COURSE_PROJECT_COMPLETION_CHECKLIST.md](COURSE_PROJECT_COMPLETION_CHECKLIST.md), including Week 1–4 milestones and the optional extension backlog from the assignment.
+- The GPU technical gates remain PASS. Rubric closure remains PARTIAL: a CUDA-enabled framework/vendor attention comparison has not been measured; long-case clean-cache JIT fields are null because specializations were already compiled; a second profiler-guided optimization still requires an auditable before/after experiment; the individual contribution statement needs owner confirmation.
+- No PyTorch or other extra package was installed. A framework reference needs explicit user approval before changing the project environment. The temporary workflow used only to export the source assignment PDF was deleted after the PDF was reviewed.
+- Latest CPU/reference CI after temporary workflow cleanup: [run #39231291000](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39231291000), 764 passed, 68 skipped, 0 failed. The skips are expected in that CPU-only job and do not replace the native RTX 4060 evidence.
