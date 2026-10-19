@@ -11,6 +11,8 @@ Use this order to understand the project and decide what to do next.
 |---|---|
 | **What remains to do / completion gates** | [TODO checklist](docs/TODO_CHECKLIST.md) |
 | Rubric-mapped course checklist | [Course project checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) |
+| **Complete experiment narrative** | [Root Report.md](Report.md) |
+| Automation-only workflow provenance | [Run evidence (separate file)](RUN_EVIDENCE.md) |
 | Detailed technical report | [Course project report](docs/COURSE_PROJECT_REPORT_2026-10-19.md) |
 | Documentation map and recommended reading order | [Documentation index](docs/README.md) |
 | Approaches, benchmark evidence, failure analysis, and decisions | [Experiment report](docs/EXPERIMENT_REPORT.md) |
@@ -43,7 +45,7 @@ NVIDIA cuTile Python is a tile-based GPU programming model. This project impleme
 
 **Core GPU gates are complete; assignment closure is partial:** the RTX 4060 actual-cuTile correctness matrix, CLI/reference verification, three controlled benchmark sessions, and two actual-cuTile Nsight Compute workload profiles plus scheduler/warp-state reports passed. The assignment-level checklist still tracks a framework/vendor attention reference, clean-cache JIT coverage for long specializations, a second explicitly profiler-guided improvement, and confirmed individual contributions. The optional framework benchmark is not a speedup-grade item in the problem PDF, but should be addressed or documented as an approved limitation. Current speedups are against the deliberately unfused FP32 CuPy baseline.
 
-See the [detailed RTX 4060 results and full tile matrix](docs/CUTILE_RTX4060_RESULTS_2026-10-19.md), [experiment report](docs/EXPERIMENT_REPORT.md), [test matrix](docs/TEST_MATRIX.md), and [TODO checklist](docs/TODO_CHECKLIST.md). Use the [rubric-mapped completion checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) and [detailed course project report](docs/COURSE_PROJECT_REPORT_2026-10-19.md) to track the remaining milestones.
+See the [detailed RTX 4060 results and full tile matrix](docs/CUTILE_RTX4060_RESULTS_2026-10-19.md), [experiment report](docs/EXPERIMENT_REPORT.md), [test matrix](docs/TEST_MATRIX.md), and [TODO checklist](docs/TODO_CHECKLIST.md). Use [Report.md](Report.md) as the full experiment narrative, the [rubric-mapped checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) for milestone tracking, and [RUN_EVIDENCE.md](RUN_EVIDENCE.md) for workflow-only provenance.
 
 ## Goal
 
