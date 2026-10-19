@@ -231,7 +231,7 @@ Each trace contains the initial call (which triggers JIT/compile), five warmups,
 3. The first order-alternating current/v5 retest is complete; do not promote v5 unless further independent sessions confirm a robust gain without meaningful regressions.
 4. Test a genuinely different SM80 optimization next (e.g. WMMA/tensor-core QK path), only after benchmark controls are trustworthy.
 5. Obtain Nsight Compute counter access through the cluster's existing policy/process; do not attempt privileged changes through the runner. The current [actual-cuTile workflow](../.github/workflows/a100-nsight.yml) now runs the correctness suite before attempting two profiles, but it has not been run successfully because the current runner fails the R580+ gate.
-6. This historical task is now partly complete: RTX 4060 correctness and controlled benchmarks passed in run #39160827910. The only remaining hard course gate is to obtain approval for the official profiler under project-local .tools and capture two inspectable actual-cuTile profiles, as described in the current results section above.
+6. Historical status note (superseded on 2026-10-19): when this section was first written, approval for a profiler and two actual-cuTile captures were still outstanding. The hard profiling gate is now complete; see the current results section and [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 7. Final report must keep native CUDA surrogate, ordinary CUDA baselines, and actual cuTile results in separate columns/sections.
 
 ## 1B. Local hardware inventory received after the initial continuation audit
