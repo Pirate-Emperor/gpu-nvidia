@@ -8,6 +8,7 @@ on:
       - "src/cutile_attention.py"
       - "benchmarks/profile_fused.py"
       - "benchmarks/benchmark_load_latency_hints.py"
+      - "scripts/capture_ncu_screenshots.py"
   workflow_dispatch:
 
 permissions:
@@ -145,6 +146,40 @@ jobs:
 
                     'PROFILE_REPORTS_CREATED=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
 
+      - name: Capture genuine Nsight Compute GUI window screenshots
+        if: always()
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Project Python not found: $Py" }
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          $NcuPath = if ($NcuCommand) { $NcuCommand.Source } else { $null }
+          if (-not $NcuPath) {
+            $Roots = @()
+            if ($env:ProgramFiles) { $Roots += (Join-Path $env:ProgramFiles 'NVIDIA Corporation') }
+            foreach ($Root in $Roots) {
+              if (-not (Test-Path $Root)) { continue }
+              $Found = Get-ChildItem -Path $Root -Filter ncu.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($Found) { $NcuPath = $Found.FullName; break }
+            }
+          }
+          if (-not $NcuPath) { throw 'Could not locate ncu.exe for the screenshot helper.' }
+          $Reports = @(Get-ChildItem results -Filter 'cutile-profile-*.ncu-repz' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          if (-not $Reports) {
+            $Reports = @(Get-ChildItem results -Filter 'cutile-profile-*.ncu-rep' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          }
+          if (-not $Reports) {
+            'NCU_GUI_SNAPSHOTS=SKIPPED; no native report files found.' | Tee-Object -FilePath cutile-ncu-screenshot-status.log
+            New-Item -ItemType Directory -Force -Path results/profiler-screenshots | Out-Null
+          } else {
+            $Args = @('scripts/capture_ncu_screenshots.py','--ncu-exe',$NcuPath,'--output-dir','results/profiler-screenshots','--reports') + $Reports
+            & $Py @Args 2>&1 | Tee-Object -FilePath cutile-ncu-screenshot-status.log
+            if ($LASTEXITCODE -ne 0) { throw 'The screenshot helper failed.' }
+          }
+
       - name: Upload actual-cuTile reports and metric exports
         if: always()
         uses: actions/upload-artifact@v4
@@ -152,6 +187,8 @@ jobs:
           name: cutile-rtx4060-ncu-profiles
           path: |
             cutile-ncu-profile-status.log
+            cutile-ncu-screenshot-status.log
+            results/profiler-screenshots/**
             cutile-profile-medium.log
             cutile-profile-long-batched.log
             cutile-profile-medium-stalls.log
