@@ -1,0 +1,96 @@
+name: cuTile Nsight Compute evidence-only
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-ncu-only.yml"
+      - "benchmarks/profile_fused.py"
+      - "src/cutile_attention.py"
+      - "tests/cases.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout project source
+        uses: actions/checkout@v4
+
+      - name: Capture two actual cuTile profiles and export readable metrics
+        shell: cmd
+        run: |
+          @echo off
+          setlocal
+          set "PROJECT_ROOT=C:\Users\Public\GPU-cutile-project\gpu-nvidia"
+          set "PY=%PROJECT_ROOT%\.venv-cutile-windows\Scripts\python.exe"
+          set "NCU=C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe"
+
+          if not exist "%NCU%" (
+            echo ERROR: Nsight Compute CLI was not found at the verified installed location.
+            exit /b 2
+          )
+          if not exist "%PY%" (
+            echo ERROR: project-local cuTile virtual environment was not found.
+            exit /b 3
+          )
+          if not exist results mkdir results
+
+          echo COMMIT=%GITHUB_SHA% > results\cutile-profile-meta.txt
+          nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total --format=csv >> results\cutile-profile-meta.txt
+          "%NCU%" --version > results\cutile-ncu-version.log 2>&1
+          if errorlevel 1 exit /b 4
+
+          echo Profiling medium_d128 tile 64x64
+          "%NCU%" --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results\cutile-profile-medium "%PY%" benchmarks\profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 > results\cutile-profile-medium.log 2>&1
+          if errorlevel 1 (
+            type results\cutile-profile-medium.log
+            exit /b 11
+          )
+
+          echo Profiling longer_batched_d128 tile 64x128
+          "%NCU%" --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results\cutile-profile-long-batched "%PY%" benchmarks\profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 > results\cutile-profile-long-batched.log 2>&1
+          if errorlevel 1 (
+            type results\cutile-profile-long-batched.log
+            exit /b 12
+          )
+
+          if not exist results\cutile-profile-medium.ncu-repz exit /b 13
+          if not exist results\cutile-profile-long-batched.ncu-repz exit /b 14
+
+          echo Exporting medium profile details CSV
+          "%NCU%" --import results\cutile-profile-medium.ncu-repz --page details --csv > results\cutile-profile-medium-details.csv 2>> results\cutile-ncu-export.log
+          if errorlevel 1 exit /b 21
+          echo Exporting medium profile raw metrics CSV
+          "%NCU%" --import results\cutile-profile-medium.ncu-repz --page raw --csv > results\cutile-profile-medium-raw.csv 2>> results\cutile-ncu-export.log
+          if errorlevel 1 exit /b 22
+
+          echo Exporting longer batched profile details CSV
+          "%NCU%" --import results\cutile-profile-long-batched.ncu-repz --page details --csv > results\cutile-profile-long-batched-details.csv 2>> results\cutile-ncu-export.log
+          if errorlevel 1 exit /b 23
+          echo Exporting longer batched profile raw metrics CSV
+          "%NCU%" --import results\cutile-profile-long-batched.ncu-repz --page raw --csv > results\cutile-profile-long-batched-raw.csv 2>> results\cutile-ncu-export.log
+          if errorlevel 1 exit /b 24
+
+          echo PROFILE_REPORTS_CREATED=True
+          dir results\cutile-profile-*.ncu-repz
+          dir results\cutile-profile-*.csv
+
+      - name: Upload profile reports and exported metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-nsight-compute-reports
+          path: |
+            results/cutile-profile-*.ncu-repz
+            results/cutile-profile-*.csv
+            results/cutile-profile-*.log
+            results/cutile-profile-meta.txt
+            results/cutile-ncu-version.log
+            results/cutile-ncu-export.log
+          if-no-files-found: warn
