@@ -4,11 +4,12 @@
 
 ## Canonical workflow and preserved evidence
 
-- Workflow: [RTX 4060 native Windows cuTile validation #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910)
-- Tested commit: 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428. The environment log records matching WORKFLOW_SHA and CHECKOUT_GIT_HEAD.
-- Raw artifact: [cutile-rtx4060-experiment.zip, artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465)
-- Artifact SHA-256: c84b781635a23571139ca8734df9e9d39ddab8485bfb5875c30db2ec63361854
-- The ZIP contains environment and pip-freeze records, smoke and test logs, numerical error JSON/log, CLI input and output with oracle-verification log, three raw benchmark JSON/CSV/log sessions, the aggregate benchmark JSON/CSV/log, and a profiling status log. It contains no NCU profile reports.
+- Latest full native Windows validation: [workflow #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223), commit `cd1ec63b210682613ddb29dca3543f0cacc9bacf`. The smoke, 48-test cuTile correctness suite, numerical diagnostics, CLI/NumPy oracle, three-session benchmark, and Nsight capture step all completed successfully.
+- End-to-end run artifact: [cutile-rtx4060-experiment.zip, artifact 12149980979](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223/artifacts/12149980979). This artifact preserves the full test/benchmark evidence and profiler command/status logs. Its first upload did not include the compressed profiler report files because the workflow upload list originally expected `.ncu-rep` instead of the actual `.ncu-repz` extension.
+- Dedicated profiler export run: [workflow #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066). The follow-up successfully reused the captured reports, collected Scheduler/ Warp State reports, and exported details and raw metrics into [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
+- Earlier canonical three-session benchmark snapshot: [workflow #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), commit `12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428`; its [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465) remains the source for the performance table below. Later controlled sessions are also preserved in artifact 12149980979.
+- **Profiler artifact integrity:** the downloaded profile ZIP is 289,372 bytes and its SHA-256 `fd947285bc52731a97127fda08a86a9e53dc9a8000c9164966165fed0fc06b1c` matches GitHub's artifact digest. It contains four compressed `.ncu-repz` reports, four detail exports, four raw-metric CSVs, and status/command logs.
+- The original historical artifact above intentionally remains preserved rather than being overwritten; the report references both benchmark and profile artifacts so each claim stays tied to its own evidence.
 
 ## Environment
 
