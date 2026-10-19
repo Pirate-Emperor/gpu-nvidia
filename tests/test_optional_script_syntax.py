@@ -13,6 +13,7 @@ SCRIPTS = (
     ROOT / "benchmarks" / "benchmark_torch_model_integration.py",
     ROOT / "src" / "torch_integration.py",
     ROOT / "src" / "extended_attention.py",
+    ROOT / "scripts" / "capture_ncu_screenshots.py",
 )
 
 
