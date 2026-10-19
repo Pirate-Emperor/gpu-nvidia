@@ -47,14 +47,14 @@ jobs:
           if errorlevel 1 exit /b 4
 
           echo Profiling medium_d128 tile 64x64
-          "%NCU%" --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results\cutile-profile-medium "%PY%" benchmarks\profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 > results\cutile-profile-medium.log 2>&1
+          "%NCU%" --set basic --section SchedulerStats,WarpStateStats,MemoryWorkloadAnalysis --launch-skip 6 --launch-count 1 --force-overwrite -o results\cutile-profile-medium "%PY%" benchmarks\profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 > results\cutile-profile-medium.log 2>&1
           if errorlevel 1 (
             type results\cutile-profile-medium.log
             exit /b 11
           )
 
           echo Profiling longer_batched_d128 tile 64x128
-          "%NCU%" --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results\cutile-profile-long-batched "%PY%" benchmarks\profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 > results\cutile-profile-long-batched.log 2>&1
+          "%NCU%" --set basic --section SchedulerStats,WarpStateStats,MemoryWorkloadAnalysis --launch-skip 6 --launch-count 1 --force-overwrite -o results\cutile-profile-long-batched "%PY%" benchmarks\profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 > results\cutile-profile-long-batched.log 2>&1
           if errorlevel 1 (
             type results\cutile-profile-long-batched.log
             exit /b 12
