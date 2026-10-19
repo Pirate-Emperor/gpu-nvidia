@@ -1,0 +1,47 @@
+name: PyTorch SDPA venv compatibility preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/torch-sdpa-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sdpa-venv-preflight:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 30
+    steps:
+      - name: Verify project venv and dry-run official CUDA PyTorch install (no package changes)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          $TempRoot = Join-Path $ProjectRoot '.tmp'
+          $PipCache = Join-Path $ProjectRoot '.cache\pip'
+          New-Item -ItemType Directory -Force -Path $TempRoot,$PipCache | Out-Null
+          $env:TEMP = $TempRoot
+          $env:TMP = $TempRoot
+          $env:PIP_CACHE_DIR = $PipCache
+          if (-not (Test-Path $Py)) { throw "Approved venv not found: $Py" }
+          Set-Location $ProjectRoot
+          "PROJECT_ROOT=$ProjectRoot"
+          "PYTHON_EXE=$Py"
+          & $Py --version
+          if ($LASTEXITCODE -ne 0) { throw 'venv Python check failed' }
+          & $Py -m pip --version
+          if ($LASTEXITCODE -ne 0) { throw 'venv pip check failed' }
+          & $Py -m pip freeze | Set-Content -Encoding utf8 (Join-Path $TempRoot 'torch-sdpa-preflight-before.txt')
+          $env:GPU_INFO = (& nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total,memory.free --format=csv,noheader | Out-String).Trim()
+          "GPU_INFO=$env:GPU_INFO"
+          "C_DRIVE_FREE_BYTES=$((Get-PSDrive C).Free)"
+          & $Py -c "import importlib.metadata as m; names=['numpy','cupy-cuda13x','cuda-tile','nvidia-cuda-tileiras','nvidia-cuda-nvcc','nvidia-nvvm','torch']; print('\n'.join(f'{n}='+next((d.version for d in m.distributions() if d.metadata.get('Name','').lower().replace('_','-')==n),'<not installed>') for n in names))"
+          if ($LASTEXITCODE -ne 0) { throw 'Package inventory failed' }
+          $Plan = Join-Path $TempRoot 'torch-sdpa-install-plan.json'
+          & $Py -m pip install --disable-pip-version-check --dry-run --report $Plan --cache-dir $PipCache --index-url 'https://download.pytorch.org/whl/cu130' 'torch==2.14.0'
+          if ($LASTEXITCODE -ne 0) { throw 'PyTorch dry-run could not resolve/download the official CUDA 13.0 build; no package changes were made.' }
+          & $Py -c "import json; p=json.load(open(r'$Plan',encoding='utf-8')); print('PLANNED_INSTALLS:'); [print(i['metadata']['name']+'=='+i['metadata']['version']) for i in p.get('install',[])]; print('INSTALL_COUNT='+str(len(p.get('install',[]))))"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read PyTorch dry-run report' }
