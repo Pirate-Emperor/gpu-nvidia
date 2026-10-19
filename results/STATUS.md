@@ -12,6 +12,12 @@
 **Profiler findings:** the two profiled kernels use 231/255 registers per thread and 65.54/81.92 KiB static shared memory per block; achieved occupancy was 8.35%/8.33%, with shared memory limiting CTA residency to one CTA per SM. Scheduler sections reported no-eligible-warp cycles of 85.83%/85.26%. See [profile analysis](../docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). The optional stall-sampling metric `smsp__pcsamp_sample_count` was unavailable, so the detailed stall source attribution is limited.  
 **Current status:** core required correctness, CLI, controlled-performance, and two-configuration profiling gates are complete. CUDA-enabled PyTorch SDPA comparison remains an optional follow-up; current comparison is against the deliberately unfused FP32 CuPy baseline.
 
+## Assignment-level closure audit — 2026-10-19
+
+- Full rubric map: [course completion checklist](../docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md).
+- Detailed submission narrative: [course technical report](../docs/COURSE_PROJECT_REPORT_2026-10-19.md).
+- **Core GPU gates PASS; assignment closure PARTIAL.** The remaining items are a framework/vendor attention reference, clean-cache JIT measurements for long specializations (or an approved exception), the Week 3 second profiler-guided improvement, and owner-confirmed individual contributions. No additional Python packages were installed during this audit.
+
 ## Historical runner-discovery failure — before the venv was created
 
 **Workflow:** [RTX 4060 native Windows cuTile validation](https://github.com/xemptynothing/gpu-nvidia/actions/workflows/cutile-rtx4060-docker.yml)  
