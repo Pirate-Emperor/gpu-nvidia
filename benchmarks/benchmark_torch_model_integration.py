@@ -13,7 +13,11 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from src.torch_integration import make_attention_module
+ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(ROOT / "src"))
+
+from torch_integration import make_attention_module
 
 
 def time_model(model, x, *, warmup, iterations, repeats):
