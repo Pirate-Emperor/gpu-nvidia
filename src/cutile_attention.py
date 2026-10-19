@@ -40,6 +40,7 @@ def _build_kernel(
     tile_k: int,
     head_dim: int,
     value_dim: int,
+    kv_groups: int = 1,
 ):
     # cuTile resolves kernel annotations (including ct.Constant[int]) using
     # the function's module globals. Keep imports lazy for CPU-only users, but
@@ -57,6 +58,7 @@ def _build_kernel(
         TK: ct.Constant[int],
         D: ct.Constant[int],
         DV: ct.Constant[int],
+        KV_GROUPS: ct.Constant[int],
         SCALE: ct.Constant[float],
     ):
         # One block owns one (batch, head, query-tile) work item and streams
@@ -85,17 +87,18 @@ def _build_kernel(
         # instead of loading and multiplying wholly-future tiles for every
         # output block. The input contract guarantees full, divisible tiles.
         num_k_tiles_for_query = ct.cdiv((query_block + 1) * TQ, TK)
+        kv_head_id = head_id // KV_GROUPS
 
         for key_block in range(num_k_tiles_for_query):
             k4 = ct.load(
                 K,
-                index=(batch_id, head_id, key_block, 0),
+                index=(batch_id, kv_head_id, key_block, 0),
                 shape=(1, 1, TK, D),
                 padding_mode=ct.PaddingMode.ZERO,
             )
             v4 = ct.load(
                 V,
-                index=(batch_id, head_id, key_block, 0),
+                index=(batch_id, kv_head_id, key_block, 0),
                 shape=(1, 1, TK, DV),
                 padding_mode=ct.PaddingMode.ZERO,
             )
@@ -203,7 +206,21 @@ def launch_device(
     cp, ct = _import_runtime()
 
     batch, heads, seq_len, head_dim = q_gpu.shape
+    kv_heads = k_gpu.shape[1]
     value_dim = v_gpu.shape[-1]
+    if q_gpu.ndim != 4 or k_gpu.ndim != 4 or v_gpu.ndim != 4:
+        raise AttentionValidationError("Q/K/V device arrays must have rank 4")
+    if k_gpu.shape[0] != batch or v_gpu.shape[0] != batch:
+        raise AttentionValidationError("Q/K/V batch dimensions must match")
+    if k_gpu.shape[1] != v_gpu.shape[1] or kv_heads < 1:
+        raise AttentionValidationError("K and V must have the same positive KV-head count")
+    if k_gpu.shape[2] != seq_len or v_gpu.shape[2] != seq_len:
+        raise AttentionValidationError("Q/K/V sequence lengths must match")
+    if k_gpu.shape[-1] != head_dim:
+        raise AttentionValidationError("Q and K head dimensions must match")
+    if heads % kv_heads != 0:
+        raise AttentionValidationError("query-head count must be divisible by KV-head count for GQA/MQA")
+    kv_groups = heads // kv_heads
     if head_dim not in (32, 64, 128):
         raise AttentionValidationError(
             f"head dimension D={head_dim} is unsupported; expected one of 32, 64, 128"
@@ -235,7 +252,7 @@ def launch_device(
         dtype=cp.float16,
     )
 
-    kernel = _build_kernel(tile.query, tile.key, head_dim, value_dim)
+    kernel = _build_kernel(tile.query, tile.key, head_dim, value_dim, kv_groups)
     grid = (
         batch,
         heads,
@@ -252,6 +269,7 @@ def launch_device(
         tile.key,
         head_dim,
         value_dim,
+        kv_groups,
         float(scale),
     )
 
@@ -282,6 +300,99 @@ def launch(
         tile_q=tile.query,
         tile_k=tile.key,
     )
+
+
+def forward_gqa(
+    q: np.ndarray,
+    k: np.ndarray,
+    v: np.ndarray,
+    *,
+    tile_q: int = 64,
+    tile_k: int = 64,
+) -> np.ndarray:
+    """Optional grouped-query/multi-query causal attention.
+
+    Q has Hq heads while K/V share Hkv heads, where Hq is divisible by Hkv.
+    Each group of Hq/Hkv query heads reuses one K/V head. The core forward()
+    contract remains the stricter equal-head self-attention path.
+    """
+    for name, x in (("Q", q), ("K", k), ("V", v)):
+        if not isinstance(x, np.ndarray) or x.ndim != 4:
+            raise AttentionValidationError(f"{name} must be a rank-4 NumPy array")
+        if x.dtype != np.float16:
+            raise AttentionValidationError(f"{name} must have dtype float16")
+        if not x.flags.c_contiguous:
+            raise AttentionValidationError(f"{name} must be C-contiguous")
+        if not np.all(np.isfinite(x)):
+            raise AttentionValidationError(f"{name} contains NaN or infinity")
+    if q.shape[0] != k.shape[0] or q.shape[0] != v.shape[0]:
+        raise AttentionValidationError("Q/K/V batch dimensions must match")
+    if q.shape[2] != k.shape[2] or q.shape[2] != v.shape[2]:
+        raise AttentionValidationError("Q/K/V sequence lengths must match")
+    if k.shape[1] != v.shape[1] or k.shape[1] < 1:
+        raise AttentionValidationError("K and V must have the same positive KV-head count")
+    if q.shape[1] % k.shape[1] != 0:
+        raise AttentionValidationError("query-head count must be divisible by KV-head count")
+    if q.shape[-1] != k.shape[-1] or q.shape[-1] != v.shape[-1]:
+        raise AttentionValidationError("Q/K/V head dimensions must match")
+    if q.shape[-1] not in (32, 64, 128):
+        raise AttentionValidationError("head dimension must be one of 32, 64, 128")
+    if q.shape[-2] % tile_q or q.shape[-2] % tile_k:
+        raise AttentionValidationError(
+            f"sequence length must be divisible by query/key tiles {tile_q}/{tile_k}"
+        )
+    for name, value in (("query tile", tile_q), ("key tile", tile_k)):
+        if value <= 0 or (value & (value - 1)):
+            raise AttentionValidationError(f"{name} must be a positive power of two")
+
+    cp, _ = _import_runtime()
+    out_gpu = launch_device(
+        cp.asarray(q), cp.asarray(k), cp.asarray(v), tile_q=tile_q, tile_k=tile_k
+    )
+    cp.cuda.get_current_stream().synchronize()
+    return cp.asnumpy(out_gpu)
+
+
+def forward_packed_varlen(
+    q: np.ndarray,
+    k: np.ndarray,
+    v: np.ndarray,
+    cu_seqlens,
+    *,
+    tile_q: int = 64,
+    tile_k: int = 64,
+) -> np.ndarray:
+    """Optional packed variable-length wrapper for independent causal sequences.
+
+    Q/K/V use [1,H,total_tokens,D]; cu_seqlens is a monotone offset vector
+    starting at zero and ending at total_tokens. Each segment is processed by
+    an independent cuTile launch and copied into the packed output. This
+    establishes packed-sequence semantics; it is deliberately not advertised
+    as a one-launch fused varlen kernel.
+    """
+    offsets = np.asarray(cu_seqlens)
+    if offsets.ndim != 1 or offsets.size < 2 or offsets.dtype.kind not in "iu":
+        raise AttentionValidationError("cu_seqlens must be a 1-D integer offset array of length >= 2")
+    if int(offsets[0]) != 0 or int(offsets[-1]) != q.shape[-2]:
+        raise AttentionValidationError("cu_seqlens must start at 0 and end at total token count")
+    if np.any(offsets[1:] <= offsets[:-1]):
+        raise AttentionValidationError("cu_seqlens offsets must be strictly increasing")
+    if q.shape[0] != 1 or k.shape[0] != 1 or v.shape[0] != 1:
+        raise AttentionValidationError("packed varlen currently expects batch dimension 1")
+    if q.shape[-2] != k.shape[-2] or q.shape[-2] != v.shape[-2]:
+        raise AttentionValidationError("packed Q/K/V must have the same total token count")
+    outputs = []
+    for start_raw, end_raw in zip(offsets[:-1], offsets[1:]):
+        start, end = int(start_raw), int(end_raw)
+        if (end - start) % tile_q or (end - start) % tile_k:
+            raise AttentionValidationError(
+                f"packed segment length {end-start} must be divisible by tiles {tile_q}/{tile_k}"
+            )
+        q_seg = np.ascontiguousarray(q[..., start:end, :])
+        k_seg = np.ascontiguousarray(k[..., start:end, :])
+        v_seg = np.ascontiguousarray(v[..., start:end, :])
+        outputs.append(forward(q_seg, k_seg, v_seg, tile_q=tile_q, tile_k=tile_k))
+    return np.concatenate(outputs, axis=-2)
 
 def forward(
     q: np.ndarray,
