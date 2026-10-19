@@ -5,7 +5,7 @@
 **Target:** NVIDIA GeForce RTX 4060, native Windows x64, compute capability 8.9  
 **Report policy:** This is the technical narrative and experiment ledger. Automation-only provenance is kept in a separate file. The report includes only project, numerical, CUDA, dependency, and profiler errors; automation-service and runner failures are excluded.
 
-> **Current conclusion:** Core GPU correctness, numerical validation, CLI/oracle verification, controlled CuPy-baseline benchmarking, and two-workload Nsight Compute profiling have passed. The assignment’s complete optional-objective set is not yet complete. PyTorch SDPA installation/benchmarking is still queued after a successful no-change compatibility preflight; no results are claimed until an experiment actually runs. Backward propagation, BF16/FP8, packed variable-length inputs, GQA/MQA, automated autotuning, and architecture-hint experiments remain to be implemented and validated. CuTe DSL is an instructor-approved alternative track, not a required add-on.
+> **Current conclusion:** The previously validated core GPU baseline passed its correctness, numerical, CLI/oracle, controlled-benchmark and two-workload profiler gates. Since that baseline, isolated optional additions have been committed: GQA/MQA launch support, a packed-variable-length wrapper, independent references/tests, a correctness-gated tile-autotuner, and a PyTorch autograd/model integration bridge. CPU/reference CI passes. These optional GPU paths and the core after-change regression still require validation on the RTX 4060. The approved PyTorch installation/SDPA/model/autotune workflow is pending actual execution; no timings are invented. BF16/FP8 and load-hint variants remain unimplemented. CuTe DSL is an instructor-approved alternative track, not a required add-on.
 
 ## 1. Executive summary
 
@@ -22,11 +22,11 @@ The validated native RTX 4060 evidence establishes:
 
 The strongest repeatable benchmark is the longer batched D=128 workload with tile 64×128: **0.919347 ms fused median, 0.924795 ms P90, 18.62× versus the deliberately unfused FP32 CuPy baseline**, with 0.7% three-session range and 0.08% maximum bracketed-baseline drift. The long D=128 workload is effectively tied between 64×64 and 64×128: 0.273408 ms versus 0.273203 ms. Therefore, 64×64 remains the general default; 64×128 is only a promising workload-specific specialization.
 
-These speedups are not comparisons against FlashAttention or vendor-optimized PyTorch SDPA. The latter experiment is being added and is explicitly pending actual installation and execution.
+These speedups are not comparisons against FlashAttention or vendor-optimized PyTorch SDPA. Optional APIs and tests have since been added for GQA/MQA and packed sequences, plus an autotuning script and PyTorch autograd/model bridge. They are implementation-in-progress, not validated features, until the latest GPU gates run. The framework attention comparison and model timing are pending actual installation and execution.
 
 ## 2. Assignment contract
 
-The assignment source is nvidia2-cutile.pdf in the repository root. The main required contract is:
+The original assignment is [nvidia2-cutile.pdf](nvidia2-cutile.pdf) in the repository root. The main required contract is:
 
 - Q, K and V are contiguous FP16 tensors with logical layout [B,H,N,D].
 - Required dimensions are D ∈ {32, 64, 128}; causal self-attention forward pass only.
@@ -61,7 +61,7 @@ The assignment also identifies a framework/vendor attention reference as a usefu
 
 The environment is in .venv-cutile-windows. NVIDIA's [cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) documents Windows x86-64 support, compute capability 8.x–12.x, a current R580+ driver prerequisite, and an install route that supplies TileIR compiler components into the virtual environment. CUDA minor-version compatibility is described in NVIDIA's [CUDA Toolkit release notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html) and [CUDA Compatibility Guide](https://docs.nvidia.com/deploy/cuda-compatibility/index.html). The validated 616.92 driver meets the cuTile requirement.
 
-The PyTorch SDPA experiment is being integrated into the same virtual environment, and no global Python, system Toolkit or driver modification is authorized by the approval. A no-change pip preflight resolved the official Windows CPython 3.12 CUDA 13.0 wheel for torch 2.14.0 and its declared dependency plan. That preflight did not install the package. The actual install/benchmark run has not produced results yet; no PyTorch speed or backend claim is made in this report until there is a successful CUDA smoke, output comparison, recorded operator/backend and repeated timing output.
+The PyTorch SDPA experiment is being integrated into the same virtual environment, and no global Python, system Toolkit or driver modification is authorized by the approval. A no-change pip preflight resolved the Windows CPython 3.12 CUDA 13.0 wheel for torch 2.14.0 from the official PyTorch package index and its declared dependencies. That preflight did not install the package. The actual install/benchmark job is pending; no PyTorch speed or backend claim is made until there is a successful CUDA smoke, output comparison, recorded operator/backend and repeated timing output. The current source has added optional helpers and tests after the last successful GPU baseline; the next native full regression must validate those changes as well.
 
 ## 4. Algorithm and tile work decomposition
 
@@ -360,21 +360,23 @@ If SDPA is faster, that is a legitimate result. The report will retain both comp
 
 The optional goals should be pursued one feature at a time: implementation, reference, correctness, error analysis, timing, profiler evidence, and explicit keep/reject decision. Do not implement several untested features together.
 
-| Objective | Status at this report snapshot | Required evidence before marking done |
+| Objective | Implementation progress | Evidence still required before marking done |
 |---|---|---|
-| PyTorch SDPA attention reference | In progress; dry-run compatibility passed, actual installation/benchmark has not produced results | CUDA import/smoke; actual backend/operator; independent numerical comparison; 3-session GPU-event timings; JSON/CSV and interpretation |
-| PyTorch model integration | Not complete | An example model/block using the kernel; fixed weights/inputs; output comparison; end-to-end timing against standard model attention |
-| BF16 or FP8 | Not complete | Add supported input dtype(s), convert and accumulate correctly per API/hardware; tests vs higher-precision oracle, numerical error matrix and repeated timing |
-| Backward propagation | Not complete | Derive and test gradients against PyTorch autograd/FP64 small-case reference; document if backward remains reference/non-fused |
-| Variable-length / packed sequences | Not complete | Define packed storage plus offsets; independent per-sequence reference; prove no cross-sequence leakage; report launch policy clearly |
-| GQA/MQA | Not complete | Define Q-head/KV-head grouping; adapt head indexing; independent grouped-reference tests; check attention output and no KV-head mixing |
-| Automated tile autotuning | Manual tile sweeps completed; autotuner not complete | Enumerate only legal tiles; correctness pre-check; repeated sample collection; rank winners only when gain exceeds noise; preserve all raw measurements |
+| PyTorch SDPA reference | Benchmark script and official CUDA-wheel dry-run are ready; no install/results yet | Successful install/import; actual kernel/backend operator; NumPy/cuTile comparison; 3-session timing JSON/CSV |
+| PyTorch model integration | Added cuTile autograd bridge, QKV-projection model block, SDPA-matched reference block, GPU tests and end-to-end benchmark script | Run forward/output and gradient tests on GPU; record actual end-to-end latency and error |
+| BF16 or FP8 | Not implemented | Add true supported input-dtype path (not an FP16 conversion masquerading as BF16/FP8); oracle/error matrix, repeated benchmark and NCU evidence |
+| Backward propagation | Added torch.autograd.Function with fused cuTile forward and explicit FP32 PyTorch reference backward | GPU gradient comparison against PyTorch autograd/SDPA; document backward as reference/non-fused; check gradients and finite behavior |
+| Variable-length / packed sequences | Added forward_packed_varlen wrapper, independent NumPy reference, and no-cross-sequence tests. It launches one cuTile call per segment, not one fused packed launch | Run GPU tests, error/timing matrix, and explicitly retain the multi-launch caveat |
+| GQA/MQA | Added KV_GROUPS compile-time kernel parameter, forward_gqa API, independent per-head reference, and 4-query-head / 1-or-2-KV-head tests | Rerun base attention regression and GQA/MQA cases on RTX 4060; confirm mappings/outputs and benchmark the feature |
+| Automated tile autotuning | Added scripts/autotune_cutile_tiles.py with legal-tile filtering, pre-timing correctness gates, order-rotated sessions, raw JSON/CSV, and a CPU-tested noise-aware recommendation rule | Execute on GPU; inspect recommendation stability and all raw trials before promoting a tile |
 | CuTile vs CuTe DSL | Instructor approval gate / alternative track | Do not install or claim complete without specific instructor approval. If approved, the current CuTe DSL quick-start has Linux/Python platform constraints; establish a supported environment first. See [CuTe DSL quick start](https://docs.nvidia.com/cutlass/4.4.2/media/docs/pythonDSL/quick_start.html). |
-| Architecture-specific hints / pipelining | Not complete | Test supported load/store latency or divisibility hints on SM89; correctness first, paired repeats, NCU before/after. The [cuTile performance guide](https://docs.nvidia.com/cuda/cutile-python/performance.html) documents the supported API. TMA is architecture-specific; do not assume a Hopper TMA path applies to RTX 4060/SM89. |
-| Week 3 second profiler-guided optimization | Not complete | State hypothesis from shared-memory/register/scheduler data; isolated code change; targeted and full correctness; controlled repeated benchmarks and comparable profiles |
-| Clean-cache JIT for long workloads | Not complete | Capture deliberately cold first call for long and long-batched specializations, report cache state, keep distinct from steady-state latency |
-| Native Nsight GUI screenshots | Metric plots exist; GUI screenshots not yet captured | Open preserved native reports on Windows and capture Summary, Details, Occupancy/Launch, Memory Workload Analysis and Scheduler/Warp State pages. Do not mislabel generated plots as screenshots. |
+| Architecture-specific hints / pipelining | Not implemented | Isolated load/store latency or divisibility-hint experiment on SM89; correctness first, paired repeats, native NCU before/after. See the [cuTile performance guide](https://docs.nvidia.com/cuda/cutile-python/performance.html). Do not assume Hopper TMA applies to RTX 4060/SM89. |
+| Week 3 second profiler-guided improvement | Profile-guided hypothesis documented; no new code optimization has yet been shown to improve latency | Isolated resource/scheduling change, full regression, repeated benchmarks and comparable NCU captures |
+| Clean-cache JIT for long workloads | Still missing for long and long-batched specializations | Deliberate cold-cache first call, report cache state separately from steady-state timing |
+| Native Nsight GUI screenshots | Seven metric plots exist; no native GUI screenshot is falsely claimed | Open preserved reports on Windows and capture Summary, Launch/Occupancy, Memory Workload Analysis, Scheduler/Warp State and a side-by-side comparison |
 | Final authorship/contribution statement | Needs owner input | Confirm actual project authors and responsibilities; attribution must not be guessed |
+
+The optional code added in this snapshot is: [GQA/MQA and packed-sequence launch wrappers](src/cutile_attention.py), [independent extended references](src/extended_attention.py), [PyTorch autograd and model blocks](src/torch_integration.py), [PyTorch SDPA comparison](scripts/benchmark_torch_sdpa.py), [end-to-end model-block benchmark](benchmarks/benchmark_torch_model_integration.py), and [correctness-gated tile autotuner](scripts/autotune_cutile_tiles.py). The CPU/reference tests validate the pure reference and recommendation logic, but the new GPU paths remain pending native CUDA execution. The prior core GPU pass applies to the previously validated equal-head implementation; the current source adds the KV_GROUPS=1 path parameter and must pass a fresh full native regression before being treated as revalidated.
 
 The optional architecture-hint experiments should reference NVIDIA's [cuTile performance guide](https://docs.nvidia.com/cuda/cutile-python/performance.html). The CuTe DSL alternative is described in NVIDIA CUTLASS's [CuTe DSL quick-start](https://docs.nvidia.com/cutlass/4.4.2/media/docs/pythonDSL/quick_start.html); it is an alternative track, not a mandatory add-on to an already validated cuTile implementation.
 
