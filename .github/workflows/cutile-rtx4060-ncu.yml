@@ -20,11 +20,34 @@ jobs:
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 30
     steps:
-      # Keep reports from the prior run: its capture succeeded, but upload omitted .ncu-repz.
-      - name: Checkout source without deleting existing reports
-        uses: actions/checkout@v4
-        with:
-          clean: false
+      # Preserve existing NCU reports, but fetch the source pinned to this commit
+      # through the Contents API to avoid relying on a fresh git/TLS checkout.
+      - name: Fetch NCU capture source pinned to this commit
+        shell: powershell
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Root = $env:GITHUB_WORKSPACE
+          $Paths = @(
+            'src\contract.py','src\reference.py','src\cutile_attention.py',
+            'tests\cases.py','benchmarks\profile_fused.py',
+            'benchmarks\benchmark_load_latency_hints.py','scripts\capture_ncu_screenshots.py'
+          )
+          $Headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          foreach ($Relative in $Paths) {
+            $ApiPath = $Relative.Replace('\','/')
+            $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/$ApiPath?ref=$env:GITHUB_SHA"
+            $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
+            if ($Item.type -ne 'file' -or -not $Item.content) { throw "No source content returned for $ApiPath" }
+            $Destination = Join-Path $Root $Relative
+            New-Item -ItemType Directory -Force -Path (Split-Path $Destination -Parent) | Out-Null
+            [System.IO.File]::WriteAllBytes($Destination,[Convert]::FromBase64String($Item.content))
+          }
+          "SOURCE_COMMIT=$env:GITHUB_SHA" | Set-Content -Encoding utf8 cutile-ncu-source-fetch.log
+          "SOURCE_FILES_FETCHED=$($Paths.Count)" | Add-Content -Encoding utf8 cutile-ncu-source-fetch.log
+          # Keep this workflow's prior native .ncu-repz/.ncu-rep files in the workspace.
+
 
       - name: Recover or capture and export two cuTile Nsight Compute reports
         shell: powershell
@@ -188,6 +211,7 @@ jobs:
           path: |
             cutile-ncu-profile-status.log
             cutile-ncu-screenshot-status.log
+            cutile-ncu-source-fetch.log
             results/profiler-screenshots/**
             cutile-profile-medium.log
             cutile-profile-long-batched.log
