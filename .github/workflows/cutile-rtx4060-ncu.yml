@@ -7,6 +7,7 @@ on:
       - ".github/workflows/cutile-rtx4060-ncu.yml"
       - "src/cutile_attention.py"
       - "benchmarks/profile_fused.py"
+      - "benchmarks/benchmark_load_latency_hints.py"
   workflow_dispatch:
 
 permissions:
@@ -117,7 +118,32 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not export raw stall metrics for $($Item.Label)." }
           }
 
-          'PROFILE_REPORTS_CREATED=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          # Profile candidate latency hints on the same two workloads. These
+          # captures are a comparison, not an assumed optimization win.
+          $HintProfiles = @(
+            @{ Label = 'medium-latency4'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 4 },
+            @{ Label = 'medium-latency8'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 8 },
+            @{ Label = 'long-batched-latency4'; Case = 'longer_batched_d128'; TQ = 64; TK = 128; Latency = 4 },
+            @{ Label = 'long-batched-latency8'; Case = 'longer_batched_d128'; TQ = 64; TK = 128; Latency = 8 }
+          )
+          foreach ($Hint in $HintProfiles) {
+            $Base = "results/cutile-profile-$($Hint.Label)"
+            $Log = "cutile-profile-$($Hint.Label).log"
+            & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o $Base $Py benchmarks/profile_fused.py --case $Hint.Case --tile-q $Hint.TQ --tile-k $Hint.TK --warmup 5 --load-latency $Hint.Latency 2>&1 | Tee-Object -FilePath $Log
+            if ($LASTEXITCODE -ne 0) {
+              "HINT_PROFILE_FAILED=$($Hint.Label)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+              throw "Nsight Compute capture failed for hint profile $($Hint.Label)."
+            }
+            $Report = @("$Base.ncu-repz", "$Base.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $Report) { throw "Expected native report missing for $($Hint.Label)." }
+            & $NcuPath --import $Report --page details 2>&1 | Tee-Object -FilePath "$Base-details.txt"
+            if ($LASTEXITCODE -ne 0) { throw "Detail export failed for $($Hint.Label)." }
+            & $NcuPath --import $Report --page raw --csv 2>&1 | Tee-Object -FilePath "$Base-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Raw metric export failed for $($Hint.Label)." }
+            "HINT_PROFILE=$($Hint.Label) REPORT=$Report BYTES=$((Get-Item $Report).Length)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          }
+
+                    'PROFILE_REPORTS_CREATED=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
 
       - name: Upload actual-cuTile reports and metric exports
         if: always()
@@ -146,4 +172,24 @@ jobs:
             results/cutile-profile-long-batched.ncu-rep
             results/cutile-profile-long-batched-details.txt
             results/cutile-profile-long-batched-raw.csv
+            cutile-profile-medium-latency4.log
+            results/cutile-profile-medium-latency4.ncu-repz
+            results/cutile-profile-medium-latency4.ncu-rep
+            results/cutile-profile-medium-latency4-details.txt
+            results/cutile-profile-medium-latency4-raw.csv
+            cutile-profile-medium-latency8.log
+            results/cutile-profile-medium-latency8.ncu-repz
+            results/cutile-profile-medium-latency8.ncu-rep
+            results/cutile-profile-medium-latency8-details.txt
+            results/cutile-profile-medium-latency8-raw.csv
+            cutile-profile-long-batched-latency4.log
+            results/cutile-profile-long-batched-latency4.ncu-repz
+            results/cutile-profile-long-batched-latency4.ncu-rep
+            results/cutile-profile-long-batched-latency4-details.txt
+            results/cutile-profile-long-batched-latency4-raw.csv
+            cutile-profile-long-batched-latency8.log
+            results/cutile-profile-long-batched-latency8.ncu-repz
+            results/cutile-profile-long-batched-latency8.ncu-rep
+            results/cutile-profile-long-batched-latency8-details.txt
+            results/cutile-profile-long-batched-latency8-raw.csv
           if-no-files-found: error
