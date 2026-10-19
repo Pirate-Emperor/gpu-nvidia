@@ -3,6 +3,8 @@
 **Last reviewed:** 2026-10-19  
 **Start here:** this file explains the goal, what has already been done, what remains, and the evidence required before the course project can be marked complete. The [root README](../README.md) is the entry point; the [experiment report](EXPERIMENT_REPORT.md) contains the more detailed measurements and history.
 
+**Authoritative experiment record:** [root Report.md](../Report.md) contains the full benchmark matrix, profiler metrics/figures, all project/CUDA/library errors, external references and optional-objective tracker. [RUN_EVIDENCE.md](../RUN_EVIDENCE.md) keeps automation-only provenance separate as requested.
+
 **Rubric closure addendum:** use the new [course project completion checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md) and [detailed report](COURSE_PROJECT_REPORT_2026-10-19.md); those documents distinguish completed GPU gates from remaining assignment-level milestones.
 
 **Status key:** `[x]` done and backed by evidence · `[ ]` still to do · **BLOCKED** needs a suitable environment or permission. A task is not complete merely because code exists.
