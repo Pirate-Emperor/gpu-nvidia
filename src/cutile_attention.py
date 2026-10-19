@@ -41,6 +41,7 @@ def _build_kernel(
     head_dim: int,
     value_dim: int,
     kv_groups: int = 1,
+    load_latency: int = 0,
 ):
     # cuTile resolves kernel annotations (including ct.Constant[int]) using
     # the function's module globals. Keep imports lazy for CPU-only users, but
@@ -59,6 +60,7 @@ def _build_kernel(
         D: ct.Constant[int],
         DV: ct.Constant[int],
         KV_GROUPS: ct.Constant[int],
+        LOAD_LATENCY: ct.Constant[int],
         SCALE: ct.Constant[float],
     ):
         # One block owns one (batch, head, query-tile) work item and streams
@@ -67,12 +69,21 @@ def _build_kernel(
         head_id = ct.bid(1)
         query_block = ct.bid(2)
 
-        q4 = ct.load(
-            Q,
-            index=(batch_id, head_id, query_block, 0),
-            shape=(1, 1, TQ, D),
-            padding_mode=ct.PaddingMode.ZERO,
-        )
+        if LOAD_LATENCY == 0:
+            q4 = ct.load(
+                Q,
+                index=(batch_id, head_id, query_block, 0),
+                shape=(1, 1, TQ, D),
+                padding_mode=ct.PaddingMode.ZERO,
+            )
+        else:
+            q4 = ct.load(
+                Q,
+                index=(batch_id, head_id, query_block, 0),
+                shape=(1, 1, TQ, D),
+                padding_mode=ct.PaddingMode.ZERO,
+                latency=LOAD_LATENCY,
+            )
         q = ct.reshape(q4, (TQ, D))
 
         running_max = ct.full((TQ, 1), float("-inf"), dtype=ct.float32)
@@ -90,18 +101,34 @@ def _build_kernel(
         kv_head_id = head_id // KV_GROUPS
 
         for key_block in range(num_k_tiles_for_query):
-            k4 = ct.load(
-                K,
-                index=(batch_id, kv_head_id, key_block, 0),
-                shape=(1, 1, TK, D),
-                padding_mode=ct.PaddingMode.ZERO,
-            )
-            v4 = ct.load(
-                V,
-                index=(batch_id, kv_head_id, key_block, 0),
-                shape=(1, 1, TK, DV),
-                padding_mode=ct.PaddingMode.ZERO,
-            )
+            if LOAD_LATENCY == 0:
+                k4 = ct.load(
+                    K,
+                    index=(batch_id, kv_head_id, key_block, 0),
+                    shape=(1, 1, TK, D),
+                    padding_mode=ct.PaddingMode.ZERO,
+                )
+                v4 = ct.load(
+                    V,
+                    index=(batch_id, kv_head_id, key_block, 0),
+                    shape=(1, 1, TK, DV),
+                    padding_mode=ct.PaddingMode.ZERO,
+                )
+            else:
+                k4 = ct.load(
+                    K,
+                    index=(batch_id, kv_head_id, key_block, 0),
+                    shape=(1, 1, TK, D),
+                    padding_mode=ct.PaddingMode.ZERO,
+                    latency=LOAD_LATENCY,
+                )
+                v4 = ct.load(
+                    V,
+                    index=(batch_id, kv_head_id, key_block, 0),
+                    shape=(1, 1, TK, DV),
+                    padding_mode=ct.PaddingMode.ZERO,
+                    latency=LOAD_LATENCY,
+                )
 
             k = ct.reshape(k4, (TK, D))
             v = ct.reshape(v4, (TK, DV))
@@ -201,8 +228,14 @@ def launch_device(
     *,
     tile_q: int = 64,
     tile_k: int = 64,
+    load_latency: int = 0,
 ):
-    """Launch fused causal attention on already resident GPU arrays."""
+    """Launch fused causal attention on already resident GPU arrays.
+
+    load_latency=0 lets the compiler infer load scheduling; values 1..10 are
+    optional cuTile DRAM-traffic hints. On-device benchmarking must determine
+    whether any hint improves this specific kernel.
+    """
     cp, ct = _import_runtime()
 
     batch, heads, seq_len, head_dim = q_gpu.shape
@@ -220,6 +253,8 @@ def launch_device(
         raise AttentionValidationError("Q and K head dimensions must match")
     if heads % kv_heads != 0:
         raise AttentionValidationError("query-head count must be divisible by KV-head count for GQA/MQA")
+    if load_latency != 0 and not 1 <= load_latency <= 10:
+        raise AttentionValidationError("load_latency must be 0 (compiler default) or an integer from 1 to 10")
     kv_groups = heads // kv_heads
     if head_dim not in (32, 64, 128):
         raise AttentionValidationError(
@@ -252,7 +287,7 @@ def launch_device(
         dtype=cp.float16,
     )
 
-    kernel = _build_kernel(tile.query, tile.key, head_dim, value_dim, kv_groups)
+    kernel = _build_kernel(tile.query, tile.key, head_dim, value_dim, kv_groups, load_latency)
     grid = (
         batch,
         heads,
@@ -270,6 +305,7 @@ def launch_device(
         head_dim,
         value_dim,
         kv_groups,
+        load_latency,
         float(scale),
     )
 
@@ -285,6 +321,7 @@ def launch(
     *,
     tile_q: int = 64,
     tile_k: int = 64,
+    load_latency: int = 0,
 ):
     """Copy inputs to the GPU and launch fused causal attention."""
     cp, _ = _import_runtime()
@@ -299,6 +336,7 @@ def launch(
         v_gpu,
         tile_q=tile.query,
         tile_k=tile.key,
+        load_latency=load_latency,
     )
 
 
@@ -401,9 +439,10 @@ def forward(
     *,
     tile_q: int = 64,
     tile_k: int = 64,
+    load_latency: int = 0,
 ) -> np.ndarray:
     """Compute fused causal attention and return a NumPy FP16 output."""
     cp = _import_runtime()[0]
-    out_gpu = launch(q, k, v, tile_q=tile_q, tile_k=tile_k)
+    out_gpu = launch(q, k, v, tile_q=tile_q, tile_k=tile_k, load_latency=load_latency)
     cp.cuda.get_current_stream().synchronize()
     return cp.asnumpy(out_gpu)
