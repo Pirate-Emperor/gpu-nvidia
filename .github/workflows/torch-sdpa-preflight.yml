@@ -22,6 +22,36 @@ jobs:
     runs-on: [self-hosted, windows, x64]
     timeout-minutes: 90
     steps:
+      - name: Fetch exact source files for this commit without relying on git checkout
+        shell: powershell
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Root = $env:GITHUB_WORKSPACE
+          $Paths = @(
+            'src\attention_io.py','src\baseline.py','src\contract.py','src\cutile_attention.py',
+            'src\extended_attention.py','src\reference.py','src\torch_integration.py',
+            'tests\cases.py','tests\conftest.py','tests\test_gpu_correctness.py','tests\test_gpu_edge_cases.py',
+            'tests\test_gpu_optional_attention_objectives.py','tests\test_torch_integration.py',
+            'scripts\benchmark_torch_sdpa.py','scripts\autotune_cutile_tiles.py',
+            'scripts\cutile_smoke.py','scripts\cutile_accuracy_report.py','scripts\generate_inputs.py','scripts\verify_cli_output.py',
+            'benchmarks\benchmark_torch_model_integration.py','benchmarks\benchmark_load_latency_hints.py',
+            'run_attention.py'
+          )
+          $Headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          foreach ($Relative in $Paths) {
+            $ApiPath = $Relative.Replace('\','/')
+            $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/$ApiPath?ref=$env:GITHUB_SHA"
+            $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
+            if ($Item.type -ne 'file' -or -not $Item.content) { throw "No source content returned for $ApiPath" }
+            $Destination = Join-Path $Root $Relative
+            New-Item -ItemType Directory -Force -Path (Split-Path $Destination -Parent) | Out-Null
+            [System.IO.File]::WriteAllBytes($Destination,[Convert]::FromBase64String($Item.content))
+          }
+          "SOURCE_COMMIT=$env:GITHUB_SHA" | Set-Content -Encoding utf8 (Join-Path $Root 'pytorch-source-fetch.log')
+          "SOURCE_FILES_FETCHED=$($Paths.Count)" | Add-Content -Encoding utf8 (Join-Path $Root 'pytorch-source-fetch.log')
+
       - name: Install approved CUDA-enabled PyTorch into the project venv and run SDPA comparison
         shell: cmd
         run: |
@@ -49,6 +79,18 @@ jobs:
           "%PY%" -c "import torch, cupy, cuda.tile, numpy; import importlib.metadata as m; print('torch='+torch.__version__); print('torch_cuda_build='+str(torch.version.cuda)); print('torch_cuda_available='+str(torch.cuda.is_available())); print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda_tile='+m.version('cuda-tile')); print('gpu='+str(torch.cuda.get_device_name(0) if torch.cuda.is_available() else '<unavailable>'))"
           if errorlevel 1 (echo PyTorch/CuPy/cuTile interoperability import check failed. & exit /b 1)
           set "REQUIRE_CUTILE=1"
+          "%PY%" scripts\cutile_smoke.py
+          if errorlevel 1 (echo cuTile smoke failed after PyTorch install. & exit /b 1)
+          "%PY%" -m pytest -q tests\test_gpu_correctness.py tests\test_gpu_edge_cases.py
+          if errorlevel 1 (echo Required cuTile correctness regression failed after PyTorch install. & exit /b 1)
+          "%PY%" scripts\cutile_accuracy_report.py --output results\cutile-accuracy-after-torch.json
+          if errorlevel 1 (echo Numerical accuracy matrix failed after PyTorch install. & exit /b 1)
+          "%PY%" scripts\generate_inputs.py --output results\sdpa-cli-input.npz --seq 64 --head-dim 32 --seed 20261018
+          if errorlevel 1 (echo CLI input generation failed. & exit /b 1)
+          "%PY%" run_attention.py --input results\sdpa-cli-input.npz --output results\sdpa-cli-output.npy --backend cutile --tile-q 64 --tile-k 64
+          if errorlevel 1 (echo CLI actual-cuTile output generation failed. & exit /b 1)
+          "%PY%" scripts\verify_cli_output.py --input results\sdpa-cli-input.npz --output results\sdpa-cli-output.npy
+          if errorlevel 1 (echo CLI independent NumPy oracle failed. & exit /b 1)
           "%PY%" -m pytest -q tests\test_torch_integration.py
           if errorlevel 1 (echo PyTorch/cuTile autograd or model integration test failed; inspect pytest output. & exit /b 1)
           "%PY%" scripts\benchmark_torch_sdpa.py --output results\cutile-vs-pytorch-sdpa.json --warmup 10 --iterations 30 --repeats-per-sample 5
@@ -59,6 +101,8 @@ jobs:
           if errorlevel 1 (echo Optional attention/gradient/model tests failed. & exit /b 1)
           "%PY%" scripts\autotune_cutile_tiles.py --output results\cutile-autotune.json --warmup 10 --iterations 30 --repeats-per-sample 5 --sessions 3 --min-gain-pct 1.0
           if errorlevel 1 (echo Correctness-gated tile autotuning failed. & exit /b 1)
+          "%PY%" benchmarks\benchmark_load_latency_hints.py --output results\cutile-load-latency-hints.json --warmup 10 --iterations 30 --repeats-per-sample 5 --sessions 3 --minimum-gain-pct 1.0
+          if errorlevel 1 (echo DRAM load-latency hint experiment failed. & exit /b 1)
           echo PIP_FREEZE_BEFORE=%TEMP%\torch-sdpa-preflight-before.txt
           echo PIP_FREEZE_AFTER=%TEMP%\torch-sdpa-preflight-after.txt
           echo REPORT_JSON=%PROJECT_ROOT%\results\cutile-vs-pytorch-sdpa.json
@@ -74,6 +118,12 @@ jobs:
             results\cutile-vs-sdpa-model.json
             results\cutile-autotune.json
             results\cutile-autotune.csv
+            results\cutile-load-latency-hints.json
+            results\cutile-load-latency-hints.csv
+            results\cutile-accuracy-after-torch.json
+            results\sdpa-cli-input.npz
+            results\sdpa-cli-output.npy
+            results\pytorch-source-fetch.log
             C:\Users\Public\GPU-cutile-project\gpu-nvidia\.tmp\torch-sdpa-preflight-before.txt
             C:\Users\Public\GPU-cutile-project\gpu-nvidia\.tmp\torch-sdpa-preflight-after.txt
           if-no-files-found: warn
