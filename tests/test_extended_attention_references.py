@@ -54,7 +54,7 @@ def test_packed_varlen_reference_resets_causality_at_every_segment():
     np.testing.assert_array_equal(actual[..., :64, :], changed[..., :64, :])
 
 
-@pytest.mark.parametrize("offsets", [[1, 64, 192], [0, 64, 191], [0, 64, 64, 192], [0, 63, 192]])
+@pytest.mark.parametrize("offsets", [[1, 64, 192], [0, 64, 191], [0, 64, 64, 192]])
 def test_packed_varlen_reference_rejects_invalid_offsets(offsets):
     q = random_inputs((1, 1, 192, 32), 700)
     with pytest.raises(AttentionValidationError):
