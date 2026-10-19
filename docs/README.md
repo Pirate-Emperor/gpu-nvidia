@@ -1,8 +1,11 @@
 # Documentation index
 
-Start here for the project's current state, assignment requirements, and evidence.
+Start with [the complete experiment narrative](../Report.md) for the detailed assignment, test, benchmark, profiler, error and optional-objective record. [Run provenance](../RUN_EVIDENCE.md) is intentionally kept separate.
 
 ## Read in this order
+
+0. [Complete experiment narrative](../Report.md) — single authoritative record for the course scope, all core tests/results, all benchmark rows, profiler analysis/plots, project/CUDA/library errors, optional objectives and next actions.
+0a. [Automation/run provenance](../RUN_EVIDENCE.md) — separate workflow/runner URLs and infrastructure failures; not part of the technical report.
 
 1. [Rubric-mapped course project checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md) — requirement-by-requirement closure, status, evidence and prioritized remaining work.
 2. [Detailed course project report](COURSE_PROJECT_REPORT_2026-10-19.md) — algorithm derivation, correctness, performance, profiler interpretation, limitations and submission state.
@@ -21,4 +24,4 @@ Start here for the project's current state, assignment requirements, and evidenc
 
 **Core GPU gates PASS; assignment closure remains PARTIAL.** Native RTX 4060 run [#39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223) passed the cuTile smoke, 48 required attention tests, 29 numerical configurations, CLI/reference verification and three controlled benchmark sessions. Four actual-cuTile Nsight Compute reports and CSV/Details exports are preserved in [profile artifact #12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). Remaining rubric items are visible in the checklist: framework/vendor attention reference; clean-cache JIT times for long specializations or an approved exception; Week 3’s second profiler-guided improvement; and accurate author/team contribution details.
 
-The latest post-documentation CPU/reference CI was [run #39233514922](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39231291000): 764 passed, 68 skipped, 0 failed. GPU-specific tests skip on that CPU-only runner because CuPy is not installed; the separate native RTX 4060 run is the GPU evidence.
+The most recent completed CPU/reference CI is documented separately in [RUN_EVIDENCE.md](../RUN_EVIDENCE.md); GPU-specific tests skip on CPU-only CI because CuPy is not installed. See [Report.md](../Report.md) for the currently verified GPU results and remaining optional-objective status. GPU-specific tests skip on that CPU-only runner because CuPy is not installed; the separate native RTX 4060 run is the GPU evidence.
