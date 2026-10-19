@@ -1,0 +1,60 @@
+name: Build downloadable cuTile project guide PDF
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/CUTILE_ATTENTION_PROJECT_GUIDE.md"
+      - ".github/workflows/build-cutile-guide-pdf.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-cutile-guide-pdf
+  cancel-in-progress: false
+
+jobs:
+  build-and-commit-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install PDF toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-xetex texlive-latex-recommended texlive-fonts-recommended fonts-dejavu-core
+
+      - name: Build phone-friendly PDF
+        run: |
+          pandoc docs/CUTILE_ATTENTION_PROJECT_GUIDE.md \
+            --from=gfm+tex_math_dollars \
+            --output=docs/CUTILE_ATTENTION_PROJECT_GUIDE_PHONE.pdf \
+            --pdf-engine=xelatex \
+            --variable=papersize:a5 \
+            --variable=geometry:margin=15mm \
+            --variable=mainfont:"DejaVu Sans" \
+            --variable=monofont:"DejaVu Sans Mono" \
+            --variable=fontsize:9pt \
+            --variable=colorlinks:true \
+            --variable=linkcolor:blue \
+            --table-of-contents
+
+      - name: Commit PDF into repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/CUTILE_ATTENTION_PROJECT_GUIDE_PHONE.pdf
+          if git diff --cached --quiet; then
+            echo "PDF unchanged; nothing to commit."
+            exit 0
+          fi
+          git commit -m "Docs: add downloadable cuTile project guide PDF"
+          git push origin HEAD:main
