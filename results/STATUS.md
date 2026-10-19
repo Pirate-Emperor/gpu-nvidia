@@ -129,3 +129,7 @@ must not be reported as cuTile timings.
 - Launcher/token flow and persistent runner changes are committed in main; the latest CPU/reference structural CI for the contract update passed 764 / 68 skipped / 0 failed.
 - No statement is made that the persistent local runner is Online or that the cuTile GitHub Actions workflow passed. Re-run with an owner-created registration token and inspect the container logs / GitHub runner list.
 - The user-reported 34 local targeted GPU tests passed in 41.91 seconds, but this status does not substitute for the full workflow evidence, a verified `REQUIRE_CUTILE=1` run, the CLI contract, performance measurements, or profiles.
+
+## Optional-objective source changes — native validation pending
+
+The source now includes optional GQA/MQA and packed-varlen wrappers/references/tests, a noise-aware tile autotuner, a PyTorch autograd/model integration path and a cuTile DRAM load-latency hint sweep. CPU/reference CI validates only pure NumPy semantics, recommendation logic and Python syntax; GPU tests still need a successful run on the RTX 4060. A screenshot helper attempts real Nsight GUI captures and does not count blank captures. Do not mark any of these optional GPU features complete until reports, numerical output and repeated timing data have been inspected. The previously successful core native run applies to its original source baseline; a clean full regression is required after the added KV_GROUPS/LOAD_LATENCY compile-time parameters.
