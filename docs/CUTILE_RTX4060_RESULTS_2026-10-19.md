@@ -11,6 +11,12 @@
 - **Profiler artifact integrity:** the downloaded profile ZIP is 289,372 bytes and its SHA-256 `fd947285bc52731a97127fda08a86a9e53dc9a8000c9164966165fed0fc06b1c` matches GitHub's artifact digest. It contains four compressed `.ncu-repz` reports, four detail exports, four raw-metric CSVs, and status/command logs.
 - The original historical artifact above intentionally remains preserved rather than being overwritten; the report references both benchmark and profile artifacts so each claim stays tied to its own evidence.
 
+## Assignment-level closure and report
+
+- [Detailed technical report](COURSE_PROJECT_REPORT_2026-10-19.md) includes online-softmax derivation, benchmark table, Nsight metrics and limitations, optimization decisions and evidence links.
+- [Rubric-mapped completion checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md) tracks the original problem PDF, all required gates, the Week 2/Week 3 optimization milestones and optional extension objectives.
+- The GPU correctness/performance/profiling gates are complete, but full assignment closure is partial until the framework/vendor attention reference, clean-cache JIT coverage (or documented exception), second profiler-guided improvement, and contribution statement are addressed.
+
 ## Environment
 
 | Item | Observed value |
