@@ -13,6 +13,7 @@ on:
       - "tests/test_gpu_optional_attention_objectives.py"
       - "tests/test_torch_integration.py"
       - "benchmarks/benchmark_torch_model_integration.py"
+      - "scripts/torch_cublas_diagnostic.py"
 
 permissions:
   contents: read
@@ -37,7 +38,7 @@ jobs:
             'scripts\benchmark_torch_sdpa.py','scripts\autotune_cutile_tiles.py',
             'scripts\cutile_smoke.py','scripts\cutile_accuracy_report.py','scripts\generate_inputs.py','scripts\verify_cli_output.py',
             'benchmarks\benchmark_torch_model_integration.py','benchmarks\benchmark_load_latency_hints.py',
-            'run_attention.py'
+            'scripts\torch_cublas_diagnostic.py','run_attention.py'
           )
           $Headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
           foreach ($Relative in $Paths) {
@@ -58,6 +59,28 @@ jobs:
           }
           "SOURCE_COMMIT=$env:GITHUB_SHA" | Set-Content -Encoding utf8 (Join-Path $Root 'pytorch-source-fetch.log')
           "SOURCE_FILES_FETCHED=$($Paths.Count)" | Add-Content -Encoding utf8 (Join-Path $Root 'pytorch-source-fetch.log')
+
+      - name: Compare isolated CUDA 13.2 cuBLAS wheel without changing project venv
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $BasePy = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          $ProbeVenv = Join-Path $ProjectRoot '.venv-torch-cu132-probe'
+          $ProbePy = Join-Path $ProbeVenv 'Scripts\python.exe'
+          $PipCache = Join-Path $ProjectRoot '.cache\pip'
+          if (-not (Test-Path $BasePy)) { throw "Project-local base Python is missing: $BasePy" }
+          New-Item -ItemType Directory -Force -Path $PipCache, results | Out-Null
+          if (-not (Test-Path $ProbePy)) {
+            & $BasePy -m venv $ProbeVenv
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated CUDA 13.2 PyTorch probe venv.' }
+          }
+          "PROBE_PYTHON=$ProbePy" | Tee-Object -FilePath torch-cu132-probe-install.log
+          & $ProbePy -m pip install --disable-pip-version-check --cache-dir $PipCache --index-url 'https://download.pytorch.org/whl/cu132' 'torch==2.14.0' 2>&1 | Tee-Object -FilePath torch-cu132-probe-install.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'CUDA 13.2 PyTorch wheel probe installation failed.' }
+          & $ProbePy scripts/torch_cublas_diagnostic.py --output results/torch-cu132-gemm-diagnostic.json 2>&1 | Tee-Object -FilePath results/torch-cu132-gemm-diagnostic.log
+          if ($LASTEXITCODE -ne 0) { throw 'CUDA 13.2 PyTorch GEMM diagnostic script failed to execute.' }
+          "CUDA13_2_DIAGNOSTIC_JSON=$((Resolve-Path results/torch-cu132-gemm-diagnostic.json).Path)" | Tee-Object -FilePath torch-cu132-probe-install.log -Append
 
       - name: Install approved CUDA-enabled PyTorch into the project venv and run SDPA comparison
         shell: cmd
@@ -128,6 +151,9 @@ jobs:
             results\cutile-load-latency-hints.json
             results\cutile-load-latency-hints.csv
             results\cutile-accuracy-after-torch.json
+            results\torch-cu132-gemm-diagnostic.json
+            results\torch-cu132-gemm-diagnostic.log
+            torch-cu132-probe-install.log
             results\sdpa-cli-input.npz
             results\sdpa-cli-output.npy
             results\pytorch-source-fetch.log
