@@ -14,7 +14,7 @@ Use this order to understand the project and decide what to do next.
 | Rubric-mapped course checklist | [Course project checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) |
 | **Complete experiment narrative** | [Root Report.md](Report.md) |
 | Automation-only workflow provenance | [Run evidence (separate file)](RUN_EVIDENCE.md) |
-| Detailed technical report | [Course project report](docs/COURSE_PROJECT_REPORT_2026-10-19.md) |
+| Current course project technical report (Markdown source and PDF) | [20 October report](docs/COURSE_PROJECT_REPORT_2026-10-20.md) · [downloadable PDF](docs/COURSE_PROJECT_REPORT_2026-10-20.pdf) |
 | Documentation map and recommended reading order | [Documentation index](docs/README.md) |
 | Approaches, benchmark evidence, failure analysis, and decisions | [Experiment report](docs/EXPERIMENT_REPORT.md) |
 | Correctness contract, tolerances, and regression expectations | [Testing contract](docs/TESTING_CONTRACT.md) |
