@@ -2,7 +2,7 @@
 ## Implementation, mathematics, testing, benchmarking, demo and viva guide
 
 **Validated target:** NVIDIA GeForce RTX 4060, compute capability 8.9 (SM89), native Windows x64  
-**Evidence snapshot:** 19 October 2026  
+**Evidence snapshot:** 20 October 2026  
 **Scope:** Main completed forward causal self-attention project only.
 
 > **Core idea:** fuse score computation, causal masking, online softmax and value accumulation in a tile-based GPU kernel. Stream key/value tiles and avoid storing the complete N × N score and probability matrices in GPU global memory.
@@ -46,8 +46,9 @@ The main performance strategy is to compute the operation in tiles, maintain an 
 - Core actual-cuTile attention suite: **48 passed, 0 failed**, with `REQUIRE_CUTILE=1`.
 - Independent numerical report: **29 legal case/tile configurations**, zero tolerance violations.
 - CLI output: finite FP16 output passed an independent NumPy oracle check.
-- Benchmarking: three controlled sessions, seven workload families, and up to five legal tile configurations.
-- Nsight Compute: two workload configurations, each with basic resource/throughput and scheduler/warp-state profiling.
+- Benchmarking: three controlled sessions, seven workload families, and up to five legal tile configurations; see the current [20 October result matrix](CUTILE_RTX4060_RESULTS_2026-10-20.md).
+- Selected optional GPU coverage: 3/3 GQA/MQA and packed-variable-length tests passed on the same successful native run; this guide's implementation walkthrough remains limited to the required forward self-attention path.
+- Nsight Compute: two workload configurations captured; the dedicated profiler artifact contains native reports, metric exports, and seven real GUI screenshots.
 
 ### Validated environment snapshot
 
@@ -400,15 +401,15 @@ The baseline is the repository's deliberately unfused FP32 CuPy implementation. 
 
 | Implementation | Median latency | Speedup |
 |---|---:|---:|
-| Unfused FP32 CuPy baseline | 4.414310 ms | 1.00× |
-| Fused cuTile, 64×64 | 0.267059 ms | 16.53× |
-| Fused cuTile, 64×128 | 0.272794 ms | 16.18× |
+| Unfused FP32 CuPy baseline | 4.390656 ms | 1.00× |
+| Fused cuTile, 64×64 | 0.267059 ms | 16.49× |
+| Fused cuTile, 64×128 | 0.270848 ms | 16.19× |
 
-The long D=128 result had 64×64 and 64×128 practically tied in the root summary: 0.273408 ms versus 0.273203 ms, about 0.08% apart. The report therefore retains 64×64 as the general default.
+In the latest three-session native run, long D=128 / tile 64×64 measured 0.267059 ms median and 0.269128 ms P90. The 64×128 tile measured 0.270848 ms / 0.273449 ms, approximately 1.42% slower by median. Retain 64×64 as the general default.
 
 ### Longer batched D=128 headline
 
-The root report headline gives 0.919347 ms median, 0.924795 ms P90 and 18.62×. The detailed results table gives a nearby snapshot at 0.923034 ms median, 0.937656 ms P90 and 18.54×. These are different preserved benchmark snapshots. The safe common summary is approximately **0.92 ms and 18.5–18.6× versus the unfused FP32 CuPy baseline**. When quoting exact numbers, keep the median/P90/speedup from the same snapshot.
+The latest three-session native run measured the longer-batched D=128 / 64×128 tile at **0.915558 ms median, 0.921457 ms P90, and 18.69×** versus the deliberately unfused FP32 CuPy baseline. Across-session range was 0.50%.
 
 ### Why 64×64 is the general default
 
@@ -737,8 +738,8 @@ The complete source adds input validation, finite-output checks and error handli
 
 ## Evidence and reference notes
 
-The figures above are the preserved successful core-validation snapshot dated 19 October 2026. Later repository changes were still awaiting native-GPU regression at guide preparation time; these values should not be represented as revalidation of every later commit.
+The figures above are refreshed to the successful native RTX 4060 validation [run #39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438), artifact [#12264746195](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438/artifacts/12264746195), from 20 October 2026. That run passed the 48-test required GPU suite, 3 selected optional GQA/MQA/packed-varlen tests, all 29 numerical configurations and the CLI oracle. The separate PyTorch bridge is *not* validated: PyTorch 2.14.0+cu130 fails a plain float32 torch.bmm before the bridge is invoked; a CUDA 13.2 wheel diagnostic is still queued. Do not present any PyTorch SDPA/vendor speedup claim.
 
-The two retained longer-batched timing snapshots differ slightly: root report 0.919347 ms median / 0.924795 ms P90 / 18.62×; detailed results table 0.923034 ms / 0.937656 ms / 18.54×. The robust common conclusion is about 0.92 ms and 18.5–18.6× against the unfused baseline.
+The latest current-source snapshot is now preserved at `docs/CUTILE_RTX4060_RESULTS_2026-10-20.md`: longer-batched D=128 / 64×128 measured 0.915558 ms median / 0.921457 ms P90 / 18.69×, and long D=128 / 64×64 measured 0.267059 ms / 0.269128 ms / 16.49×. Both ratios use the unfused FP32 CuPy baseline.
 
-Principal sources in the project: `Report.md`; `docs/COURSE_PROJECT_REPORT_2026-10-19.md`; `docs/CUTILE_RTX4060_RESULTS_2026-10-19.md`; `docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md`. Background documentation: NVIDIA cuTile Python Quickstart, CuPy installation guide, NVIDIA Nsight Compute documentation, and Vaswani et al., *Attention Is All You Need* (2017).
+Principal sources in the project: `Report.md`; `docs/COURSE_PROJECT_REPORT_2026-10-19.md`; the current [20 October results snapshot](CUTILE_RTX4060_RESULTS_2026-10-20.md); the historical [19 October results snapshot](CUTILE_RTX4060_RESULTS_2026-10-19.md); and `docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md`. Background documentation: NVIDIA cuTile Python Quickstart, CuPy installation guide, NVIDIA Nsight Compute documentation, and Vaswani et al., *Attention Is All You Need* (2017).
