@@ -10,7 +10,7 @@ The fused cuTile kernel and selected optional GPU features have a fresh complete
 
 ## Current validation evidence
 
-- [x] Native actual-cuTile validation: [workflow #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223), commit cd1ec63b210682613ddb29dca3543f0cacc9bacf.
+- [x] Latest complete native actual-cuTile validation: [workflow #39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438), commit bf5a6233e195c2ced647b4e20b5b2d914da60e85. It passes the core and selected optional GPU correctness gates, 29-case numerical matrix, CLI oracle, three-session benchmark, all accuracy-gated hint trials, and two NCU captures. Artifact: [#12264746195](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438/artifacts/12264746195).
 - [x] Latest CPU/reference CI after doc updates and temporary-file cleanup: [workflow #39231291000](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39231291000) — 764 passed, 68 skipped, zero failed. GPU modules skip in CPU CI because CuPy is absent; this does not replace GPU evidence.
 - [x] Dedicated profiler export: [workflow #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066), [artifact #12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
 - [x] Four compressed .ncu-repz reports, four Details exports and four Raw CSV exports downloaded and inspected. No ERR_NVGPUCTRPERM on RTX 4060.
@@ -51,7 +51,7 @@ The fused cuTile kernel and selected optional GPU features have a fresh complete
 - [x] Median, P90, speedup, session range and output-byte throughput recorded with raw JSON/CSV.
 - [x] Short/medium/long workloads include D=64 and D=128.
 - [~] JIT/first-call time is reported when captured, but long and long-batched specializations have null JIT fields because they were already compiled. A deliberate clean-cache measurement or a documented exception is needed to fully close this sub-requirement.
-- [ ] **Framework/vendor attention reference not run.** The PDF requests this as a performance reference, while clarifying it is not part of the speedup grade. After owner approval and environment feasibility checks, compare to a CUDA-enabled PyTorch SDPA reference; record the actual backend/kernel and verify numerical agreement. Current speedups are not versus FlashAttention or SDPA.
+- [ ] **Framework/vendor attention reference blocked before timing.** PyTorch 2.14.0+cu130 reports CUDA available, but a plain float32 torch.bmm smoke fails with CUBLAS_STATUS_INVALID_VALUE before the cuTile bridge runs: [diagnostic run #39423190840](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423190840). A separate CUDA 13.2 wheel probe is queued in [run #39423804493](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423804493); no backend or PyTorch speed claim is made. Current speedups remain vs unfused FP32 CuPy.
 - [x] Tile recommendation reflects evidence: keep 64×64 as general default; 64×128 is promising for long-batched D=128. On long D=128, 64×64 and 64×128 are effectively tied (0.273408 vs 0.273203 ms).
 - [x] Short-case timing caveat is explicit: fused-median range reaches about 197%; maximum baseline drift reaches 81.17%; do not headline noisy short-case ratios.
 
@@ -64,12 +64,12 @@ The fused cuTile kernel and selected optional GPU features have a fresh complete
 - [x] Registers, shared memory, occupancy, SM/DRAM/L1/L2 throughput and scheduler eligibility inspected.
 - [x] Counter access succeeded on RTX 4060; no ERR_NVGPUCTRPERM. Earlier A100 permissions error is separate historical evidence.
 - [x] Limit recorded: smsp__pcsamp_sample_count unavailable; no detailed source-level stall sampling. NCU estimated local-speedup outputs are heuristics, not measured wins.
-- [~] Exports and derived charts are in the report; no native Nsight Compute GUI screenshot was present in the automation artifact. If the audience explicitly requires GUI screenshots, open the native reports on Windows and capture Summary/Details/Occupancy/Scheduler pages; do not fabricate one.
+- [x] Seven native Nsight Compute GUI screenshots are preserved with the actual report files and exports; one longer-batched LOAD_LATENCY=4 screenshot is explicitly skipped in the capture manifest after GetWindowRect failed. The matched medium LOAD_LATENCY=10 profile is queued for the current hint decision.
 
 ## Gate E — four-week milestone tracking
 
 - [x] **Week 1: correct fused kernel.** References, baseline, kernel and deterministic tests have actual-cuTile validation.
-- [~] **Week 2: initial profiling and optimization.** Multiple tiles profiled and earlier correctness-approved changes exist, but a distinct improvement demonstrably selected from the newly collected NCU evidence still needs a before/after record.
+- [~] **Week 2: initial profiling and optimization.** Timing now identifies medium D=128 / tile 64×64 / LOAD_LATENCY=10 as a credible candidate: 0.053248 ms vs 0.058342 ms compiler default (8.73% gain) with about 0.53% session range for both. Matched NCU review remains open; global default stays 0.
 - [ ] **Week 3: second profiler-guided improvement.** Choose a hypothesis from shared-memory/register pressure or scheduling signals; record exact code diff; run targeted correctness first, full correctness, alternating-order benchmark repeats and before/after NCU exports. Record failed experiments too.
 - [~] **Week 4: final report/robustness.** Final GPU correctness/benchmark/profile evidence exists and a seven-page report is prepared. Close remaining reference, JIT, contributions and optimization items or document approved exceptions.
 
