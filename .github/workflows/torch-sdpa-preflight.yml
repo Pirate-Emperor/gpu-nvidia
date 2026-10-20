@@ -23,9 +23,9 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Fetch exact source files for this commit without relying on git checkout
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         env:
-          GITHUB_TOKEN: \${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $Root = $env:GITHUB_WORKSPACE
