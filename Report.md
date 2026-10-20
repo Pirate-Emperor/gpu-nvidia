@@ -181,35 +181,35 @@ All latency values are milliseconds; output throughput is GiB/s of output tensor
 
 | Case | Tile | Fused median | Fused P90 | Unfused baseline | Speedup | Output GiB/s | Range | Max baseline drift |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Long D=128 | 32×64 | 0.338842 | 0.341545 | 4.403866 | 12.98× | 11.53 | 2.4% | 0.22% |
-| Long D=128 | 64×64 | 0.273408 | 0.276931 | 4.403866 | 16.11× | 14.29 | 2.9% | 0.22% |
-| Long D=128 | 64×128 | 0.273203 | 0.277914 | 4.403866 | 16.15× | 14.30 | 3.1% | 0.22% |
-| Long D=128 | 128×64 | 0.318771 | 0.324813 | 4.403866 | 13.84× | 12.25 | 0.6% | 0.22% |
-| Long D=128 | 128×128 | 0.412570 | 0.415785 | 4.403866 | 10.69× | 9.47 | 0.4% | 0.22% |
-| Long batched D=128 | 32×64 | 1.149747 | 1.156874 | 17.126861 | 14.90× | 6.79 | 0.4% | 0.08% |
-| Long batched D=128 | 64×64 | 0.936448 | 0.942121 | 17.126861 | 18.28× | 8.34 | 0.6% | 0.08% |
-| Long batched D=128 | 64×128 | 0.919347 | 0.924795 | 17.126861 | 18.62× | 8.50 | 0.7% | 0.08% |
-| Long batched D=128 | 128×64 | 1.019494 | 1.026929 | 17.126861 | 16.79× | 7.66 | 0.3% | 0.08% |
-| Long batched D=128 | 128×128 | 1.291043 | 1.300439 | 17.126861 | 13.26× | 6.05 | 0.4% | 0.08% |
-| Medium D=128 | 32×64 | 0.065110 | 0.068833 | 0.374733 | 5.77× | 15.00 | 4.1% | 6.09% |
-| Medium D=128 | 64×64 | 0.057242 | 0.059597 | 0.374733 | 6.55× | 17.06 | 3.8% | 6.09% |
-| Medium D=128 | 64×128 | 0.056934 | 0.058959 | 0.374733 | 6.58× | 17.15 | 10.0% | 6.09% |
-| Medium D=128 | 128×64 | 0.078234 | 0.078459 | 0.374733 | 4.79× | 12.48 | 7.3% | 6.09% |
-| Medium D=128 | 128×128 | 0.105370 | 0.108831 | 0.374733 | 3.53× | 9.27 | 8.0% | 6.09% |
-| Medium D=64 | 32×64 | 0.019456 | 0.022528 | 0.288814 | 14.90× | 12.55 | 8.9% | 4.58% |
-| Medium D=64 | 64×64 | 0.017715 | 0.021709 | 0.288814 | 16.12× | 13.78 | 6.9% | 4.58% |
-| Medium D=64 | 64×128 | 0.018022 | 0.019845 | 0.288814 | 15.89× | 13.55 | 8.5% | 4.58% |
-| Medium D=64 | 128×64 | 0.020275 | 0.022999 | 0.288814 | 14.24× | 12.04 | 10.1% | 4.58% |
-| Medium D=64 | 128×128 | 0.022630 | 0.025006 | 0.288814 | 12.76× | 10.79 | 6.4% | 4.58% |
-| Short D=32 | 32×64 | 0.015750 | 0.017747 | 0.308131 | 19.56× | 0.24 | 197.0% | 81.17% |
-| Short D=32 | 64×64 | 0.016282 | 0.019456 | 0.308131 | 19.12× | 0.23 | 6.3% | 81.17% |
-| Short D=64 | 32×64 | 0.017510 | 0.020644 | 0.308677 | 17.63× | 0.44 | 156.2% | 38.80% |
-| Short D=64 | 64×64 | 0.016282 | 0.018227 | 0.308677 | 18.71× | 0.47 | 196.2% | 38.80% |
-| Short multi-head D=64 | 32×64 | 0.015667 | 0.019086 | 0.288666 | 18.42× | 3.90 | 7.1% | 2.27% |
-| Short multi-head D=64 | 64×64 | 0.015478 | 0.018678 | 0.288666 | 18.56× | 3.94 | 21.2% | 2.27% |
-| Short multi-head D=64 | 64×128 | 0.015456 | 0.019041 | 0.288666 | 18.68× | 3.95 | 20.7% | 2.27% |
-| Short multi-head D=64 | 128×64 | 0.016582 | 0.020296 | 0.288666 | 17.80× | 3.68 | 3.7% | 2.27% |
-| Short multi-head D=64 | 128×128 | 0.017818 | 0.019497 | 0.288666 | 16.12× | 3.43 | 14.4% | 2.27% |
+| Long D=128 | 32×64 | 0.334950 | 0.337736 | 4.390656 | 13.11× | 11.66 | 0.06% | 0.03% |
+| Long D=128 | 64×64 | 0.267059 | 0.269128 | 4.390656 | 16.44× | 14.63 | 0.92% | 0.03% |
+| Long D=128 | 64×128 | 0.270848 | 0.273449 | 4.390656 | 16.21× | 14.42 | 1.13% | 0.03% |
+| Long D=128 | 128×64 | 0.316109 | 0.319324 | 4.390656 | 13.89× | 12.36 | 0.78% | 0.03% |
+| Long D=128 | 128×128 | 0.411853 | 0.415846 | 4.390656 | 10.66× | 9.48 | 0.79% | 0.03% |
+| Long batched D=128 | 32×64 | 1.142989 | 1.146900 | 17.104077 | 14.96× | 6.84 | 0.31% | 0.08% |
+| Long batched D=128 | 64×64 | 0.932966 | 0.936468 | 17.104077 | 18.33× | 8.37 | 0.33% | 0.08% |
+| Long batched D=128 | 64×128 | 0.915558 | 0.921457 | 17.104077 | 18.68× | 8.53 | 0.50% | 0.08% |
+| Long batched D=128 | 128×64 | 1.017139 | 1.020314 | 17.104077 | 16.82× | 7.68 | 0.23% | 0.08% |
+| Long batched D=128 | 128×128 | 1.285120 | 1.289237 | 17.104077 | 13.31× | 6.08 | 0.32% | 0.08% |
+| Medium D=128 | 32×64 | 0.069632 | 0.070659 | 0.390861 | 5.61× | 14.02 | 5.00% | 10.83% |
+| Medium D=128 | 64×64 | 0.058368 | 0.058814 | 0.390861 | 6.70× | 16.73 | 9.82% | 10.83% |
+| Medium D=128 | 64×128 | 0.058368 | 0.059044 | 0.390861 | 6.70× | 16.73 | 2.46% | 10.83% |
+| Medium D=128 | 128×64 | 0.079053 | 0.079258 | 0.390861 | 4.94× | 12.35 | 5.31% | 10.83% |
+| Medium D=128 | 128×128 | 0.107315 | 0.107950 | 0.390861 | 3.64× | 9.10 | 3.05% | 10.83% |
+| Medium D=64 | 32×64 | 0.020070 | 0.021238 | 0.269562 | 13.43× | 12.16 | 95.92% | 1.32% |
+| Medium D=64 | 64×64 | 0.017171 | 0.017833 | 0.269562 | 15.70× | 14.22 | 109.73% | 1.32% |
+| Medium D=64 | 64×128 | 0.019456 | 0.020480 | 0.269562 | 13.85× | 12.55 | 90.05% | 1.32% |
+| Medium D=64 | 128×64 | 0.019430 | 0.022733 | 0.269562 | 13.87× | 12.57 | 120.16% | 1.32% |
+| Medium D=64 | 128×128 | 0.024944 | 0.026010 | 0.269562 | 10.81× | 9.79 | 76.36% | 1.32% |
+| Short D=32 | 32×64 | 0.015770 | 0.018473 | 0.297270 | 18.85× | 0.24 | 2.09% | 77.46% |
+| Short D=32 | 64×64 | 0.015974 | 0.018125 | 0.297270 | 18.61× | 0.24 | 0.64% | 77.46% |
+| Short D=64 | 32×64 | 0.016074 | 0.018186 | 0.296243 | 18.43× | 0.47 | 5.20% | 1.69% |
+| Short D=64 | 64×64 | 0.016282 | 0.018862 | 0.296243 | 18.19× | 0.47 | 1.36% | 1.69% |
+| Short multi-head D=64 | 32×64 | 0.016074 | 0.018810 | 0.280320 | 17.44× | 3.80 | 3.70% | 4.93% |
+| Short multi-head D=64 | 64×64 | 0.016179 | 0.018452 | 0.280320 | 17.33× | 3.77 | 1.29% | 4.93% |
+| Short multi-head D=64 | 64×128 | 0.016566 | 0.019313 | 0.280320 | 16.92× | 3.68 | 3.71% | 4.93% |
+| Short multi-head D=64 | 128×64 | 0.016794 | 0.018043 | 0.280320 | 16.69× | 3.63 | 3.66% | 4.93% |
+| Short multi-head D=64 | 128×128 | 0.018842 | 0.020910 | 0.280320 | 14.88× | 3.24 | 4.35% | 4.93% |
 
 ![Figure 3 — Stable long-workload comparison](docs/assets/report/fig02_long_workload_speedup.svg)
 
@@ -217,9 +217,9 @@ All latency values are milliseconds; output throughput is GiB/s of output tensor
 
 ### 7.1 Interpretation
 
-- **Long D=128:** 64×64 and 64×128 differ by only about 0.08%. There is no strong evidence to replace the 64×64 general default.
-- **Long batched D=128:** 64×128 measures approximately 1.8% faster than 64×64, with a 0.7% session range and 0.08% maximum baseline drift. This is a plausible workload-specific specialization.
-- **Medium D=128:** 64×128 has a slightly lower median than 64×64, but the 10.0% session range and 6.09% baseline drift make the small lead less decisive.
+- **Long D=128:** the latest three-session medians are 0.267059 ms for 64×64 and 0.270848 ms for 64×128; 64×64 is about 1.42% faster in this run. Retain 64×64 as the general default.
+- **Long batched D=128:** 64×128 measures 0.915558 ms vs 0.932966 ms for 64×64 (about 1.86% faster), with a 0.50% session range and 0.08% maximum baseline drift. It remains the best-supported workload-specific specialization.
+- **Medium D=128:** 64×64 and 64×128 tie at 0.058368 ms. Ranges differ materially (9.82% vs 2.46%), but maximum bracketed-baseline drift is 10.83%, so the raw tile result is not decisive. A separate hint sweep found LOAD_LATENCY=10 at 0.053248 ms (8.73% faster than the default), pending matched NCU review.
 - **128×128:** loses on both long D=128 cases and produces high resource usage.
 - **Short cases:** very noisy. Fused ranges reach 197%, and baseline drift reaches 81.17%; Windows launch/scheduling overhead dominates. Do not use these ratios as headline performance claims.
 
@@ -229,19 +229,19 @@ The harness records first-call wall time only once per specialization when first
 
 | Case / tile | First-call timings across sessions (ms) | Interpretation |
 |---|---|---|
-| Short D=32 / 32×64 | 227.3, 27.6, 29.4 | Large first-session outlier; not a stable cold compile estimate |
-| Short D=32 / 64×64 | 29.7, 225.2, 225.4 | Sporadic large first-call outliers |
-| Short D=64 / 32×64 | 28.3, 26.1, 30.3 | Typical ~26–30 ms first-call window |
-| Short D=64 / 64×64 | 27.3, 27.0, 35.9 | Typical tens of milliseconds |
-| Short multi-head D=64 / 64×128 | 29.2, 29.9, 28.3 | Typical first-call window |
-| Short multi-head D=64 / 128×64 | 28.7, 28.8, 25.5 | Typical first-call window |
-| Short multi-head D=64 / 128×128 | 27.4, 27.8, 28.7 | Typical first-call window |
-| Medium D=128 / 32×64 | 28.5, 30.8, 30.1 | Typical first-call window |
-| Medium D=128 / 64×64 | 27.3, 31.8, 30.7 | Typical first-call window |
-| Medium D=128 / 64×128 | 27.4, 29.8, 29.1 | Typical first-call window |
-| Medium D=128 / 128×64 | 30.6, 29.9, 30.1 | Typical first-call window |
-| Medium D=128 / 128×128 | 33.5, 33.7, 33.0 | Typical first-call window |
-| Long D=128 and long-batched D=128, several tiles | Null in recorded sessions | Specializations already compiled before sampling; clean-cache times not captured |
+| Short D=32 / 32×64 | 1555.0, 27.2, 27.2 | Large first-call outlier in session 1; cache/compile state is not controlled |
+| Short D=32 / 64×64 | 27.8, 1562.3, 1567.4 | Large first-call outliers in sessions 2 and 3; not stable cold-JIT evidence |
+| Short D=64 / 32×64 | 26.9, 26.7, 27.8 | Typical first-call window |
+| Short D=64 / 64×64 | 26.9, 27.2, 27.1 | Typical first-call window |
+| Short multi-head D=64 / 64×128 | 27.2, 27.8, 27.2 | Typical first-call window |
+| Short multi-head D=64 / 128×64 | 26.7, 28.5, 27.9 | Typical first-call window |
+| Short multi-head D=64 / 128×128 | 26.9, 29.6, 26.8 | Typical first-call window |
+| Medium D=128 / 32×64 | 29.4, 27.3, 27.1 | Typical first-call window |
+| Medium D=128 / 64×64 | 26.2, 27.1, 28.2 | Typical first-call window |
+| Medium D=128 / 64×128 | 86.2, 80.3, 28.0 | Two sessions show elevated first-call latency; likely cache/compile-state interaction |
+| Medium D=128 / 128×64 | 27.6, 28.5, 81.9 | One session shows elevated first-call latency |
+| Medium D=128 / 128×128 | 29.4, 32.9, 30.0 | Typical tens-of-milliseconds first-call window |
+| Medium D=64, short multi-head 32×64/64×64, and all long specializations | Null in recorded sessions | Specializations already seen in those processes; deliberate clean-cache times remain unmeasured |
 
 A controlled clean-cache measurement for the two long cases remains open. It must report first-call wall time separately from steady-state CUDA-event latency, clearly state cache conditions, and avoid substituting JIT-associated timings for kernel medians.
 
@@ -311,7 +311,7 @@ These durations are from separate multi-pass profiler captures and **must not be
 | Medium D=128 / 64×64 | 0.058342 ms | Hint 10: 0.053248 ms | 8.73% | 1.00% | Candidate passes timing gate; matched NCU review pending |
 | Longer batched D=128 / 64×128 | 0.922010 ms | Hint 2: ~0.920576 ms | 0.16% | 5.88% | Retain compiler default; gain is below observed spread |
 
-The medium-workload hint 10 clears the timing gate in this latest three-session run: median 0.053248 ms versus the compiler-inferred default 0.058342 ms, with 0.53% session range for both. The longer-batched candidate is not credible under its 5.88% threshold, so retain LOAD_LATENCY=0 there. **Do not change the global default yet**: the matched medium hint-10 NCU capture and exports have been added to the native profiling workflow; inspect register/shared-memory/occupancy changes before exposing or promoting a workload-specific CLI setting. Raw timing trials are in the artifact above and [the execution evidence index](docs/EXECUTION_EVIDENCE_INDEX.md).
+The medium-workload hint 10 clears the timing gate in native run [#39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438): median 0.053248 ms versus the compiler-inferred default 0.058342 ms, with 0.53% session range for both. The longer-batched candidate is not credible under its 5.88% threshold, so retain LOAD_LATENCY=0 there. **Do not change the global default yet**: the matched medium hint-10 NCU capture and exports have been added to the native profiling workflow; inspect register/shared-memory/occupancy changes before exposing or promoting a workload-specific CLI setting. Raw timing trials are in the artifact above and [the execution evidence index](docs/EXECUTION_EVIDENCE_INDEX.md).
 
 ### 9.4 Scheduler and warp-state data
 
