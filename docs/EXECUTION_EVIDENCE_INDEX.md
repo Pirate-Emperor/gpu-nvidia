@@ -20,12 +20,28 @@ This is the execution record for native runs, artifacts, runner diagnostics and 
 - Hint 4/8 captures do **not** settle which hint is faster. The native multi-session CUDA-event timing/accuracy sweep has not yet finished.
 - Screenshot status: **0 PNGs captured**. The artifact's capture manifest explicitly reports no screenshots. No GUI screenshot is claimed; only the native report files and CSV/Details exports are available from this run.
 
+### Full native regression and measured hint sweep
+
+- Workflow [#39415104135](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135) succeeded on commit `90dafef5318a19e8752a7936643319eb8713083f`; [artifact #12261182182](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135/artifacts/12261182182), 194,346 bytes, SHA-256 `06247a83344f9ef07ec8f69fa732c655c4b4bc99882d72035e0ab33adf449eda`.
+- Passed: genuine cuTile smoke; 48/48 required GPU correctness tests; 3/3 optional GQA/MQA/packed-varlen correctness tests; all 29 numerical case/tile combinations; actual cuTile CLI output against the independent NumPy oracle; three controlled benchmark sessions; and the load-latency hint sweep.
+- Benchmark controls: ten warmups, 30 CUDA-event samples, five launches per event sample, three sessions with rotated/reversed tile order.
+- Fresh benchmark summary:
+
+| Workload | Tile | Median (ms) | P90 (ms) | Speedup vs unfused FP32 CuPy | Across-session range |
+|---|---:|---:|---:|---:|---:|
+| Long D=128 | 64×64 | 0.268083 | 0.269128 | 16.45× | 0.50% |
+| Longer batched D=128 | 64×128 | 0.915046 | 0.920576 | 18.70× | 0.59% |
+| Medium D=128 | 64×64 | 0.055501 | 0.056955 | 7.02× | 8.86% |
+
+- The latency-hint report used the same accuracy-before-timing gate across all 36 candidate trials; every trial passed. For medium D=128 / 64×64, hint 10 gained 8.27% versus the sweep's default median, but the noise-aware required gain was 9.88%. For longer-batched D=128 / 64×128, the strongest candidate (hint 6) gained only 0.10% versus a 1.00% minimum threshold. **Neither recommendation is credible; keep LOAD_LATENCY=0 for both workloads.**
+- The general native-validation run covers core and selected optional cuTile objectives; it does **not** run the separate PyTorch autograd integration tests. Those remain tracked below.
+
 ### PyTorch SDPA, core-regression and optional-objective workflow
 
 - First native run: [#39403488341](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341), failed during test collection due to a missing module-scope `torch` import; partial artifact [#12255372678](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341/artifacts/12255372678). Follow-up: [#39414502429](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502429), passed collection and core gates but failed two autograd bridge tests on `BufferError: Can't export tensors that require gradient, use tensor.detach()` and then logged `CUBLAS_STATUS_NOT_INITIALIZED` during the model-block test. The bridge now detaches only the DLPack views; another native run must verify this fix and resolve any remaining cuBLAS issue.
 - Passed before the collection error: PyTorch 2.14.0+cu130 was present in the project-local `.venv-cutile-windows`; PyTorch reported CUDA build 13.0 and `torch.cuda.is_available() == True`; CuPy/cuTile/PyTorch import check; cuTile smoke; the required core GPU correctness suite; 29-case/tile accuracy matrix; actual-cuTile CLI output and independent NumPy-oracle verification.
-- Root causes so far: (1) `_CuTileCausalAttention(torch.autograd.Function)` required the module-scope `torch` import, now present; (2) DLPack input conversion rejected Q/K/V tensors that require gradients, now fixed with `q.detach()`, `k.detach()`, and `v.detach()` for the CuPy views while original tensors remain saved for backward. The cuBLAS initialization error is not yet explained. No SDPA timing, model-integration timing, optional-objective suite, autotuner recommendation, or load-latency timing result is claimed; the failed run stopped before these stages.
-- Next gate: run the complete native workflow again on the fixed commit, inspect its JSON/CSV, verify SDPA operator identity and numerical accuracy, then update the report with measured results.
+- Current targeted fix: the reference backward now flattens batch and head into an explicit GEMM batch and makes transposed operands contiguous before `torch.bmm`, avoiding the non-contiguous singleton-head GEMM path implicated by the trace. This change is not yet validated until the next native PyTorch run finishes. The previous SDPA run stopped before writing its timing JSON/CSV; no vendor comparison, integration timing, or gradient pass is claimed from it.
+- Next gate: inspect the new native PyTorch run after the contiguous-batched-GEMM fix. Require all autograd and model tests to pass first, then verify SDPA operator identity, NumPy/cuTile output accuracy, and its three-session JSON/CSV before recording any framework speedup.
 
 ## Latest native profiler capture and genuine GUI screenshots
 

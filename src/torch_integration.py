@@ -65,34 +65,41 @@ class _CuTileCausalAttention(torch.autograd.Function):
         import torch
 
         q, k, v = ctx.saved_tensors
-        q32, k32, v32 = q.float(), k.float(), v.float()
-        grad = grad_output.float()
-        d = q.shape[-1]
+        batch_heads = q.shape[0] * q.shape[1]
+        n, d = q.shape[-2], q.shape[-1]
         scale = 1.0 / math.sqrt(d)
 
-        scores = torch.matmul(q32, k32.transpose(-2, -1)) * scale
-        n = q.shape[-2]
+        # Flatten batch and head into one explicit GEMM batch. Making every
+        # transposed operand contiguous avoids the singleton-head cuBLAS SGEMM
+        # INVALID_VALUE observed on Windows for torch.matmul([1,1,N,D], ...).
+        # This remains a correctness-first FP32 reference backward.
+        q32 = q.float().contiguous().reshape(batch_heads, n, d)
+        k32 = k.float().contiguous().reshape(batch_heads, n, d)
+        v32 = v.float().contiguous().reshape(batch_heads, n, d)
+        grad = grad_output.float().contiguous().reshape(batch_heads, n, d)
+
+        scores = torch.bmm(q32, k32.transpose(1, 2).contiguous()) * scale
         future = torch.triu(
             torch.ones((n, n), dtype=torch.bool, device=q.device), diagonal=1
         )
         scores = scores.masked_fill(future, float("-inf"))
         probabilities = torch.softmax(scores, dim=-1)
 
-        grad_v = torch.matmul(probabilities.transpose(-2, -1), grad)
-        grad_p = torch.matmul(grad, v32.transpose(-2, -1))
+        grad_v = torch.bmm(probabilities.transpose(1, 2).contiguous(), grad)
+        grad_p = torch.bmm(grad, v32.transpose(1, 2).contiguous())
         grad_s = probabilities * (
             grad_p - (grad_p * probabilities).sum(dim=-1, keepdim=True)
         )
         grad_s = grad_s.masked_fill(future, 0.0)
-        grad_q = torch.matmul(grad_s, k32) * scale
-        grad_k = torch.matmul(grad_s.transpose(-2, -1), q32) * scale
+        grad_q = torch.bmm(grad_s, k32) * scale
+        grad_k = torch.bmm(grad_s.transpose(1, 2).contiguous(), q32) * scale
 
         # Cast gradients back to the input dtype. This is an unfused FP32
         # reference backward and is not claimed as a performance optimization.
         return (
-            grad_q.to(q.dtype),
-            grad_k.to(k.dtype),
-            grad_v.to(v.dtype),
+            grad_q.reshape_as(q).to(q.dtype),
+            grad_k.reshape_as(k).to(k.dtype),
+            grad_v.reshape_as(v).to(v.dtype),
             None,
             None,
         )

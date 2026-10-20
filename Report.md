@@ -285,7 +285,7 @@ The clearest observed constraint is shared-memory CTA residency: occupancy analy
 
 Neither workload approaches peak overall compute or DRAM throughput. The long batched case is particularly far from peak DRAM throughput. These percentages refer to separate NCU utilization metrics and must not be combined into one total memory-bandwidth estimate.
 
-### 9.5 DRAM load-latency hint experiment (NCU captures complete; timing sweep pending)
+### 9.5 DRAM load-latency hint experiment (native timing complete; default retained)
 
 The profile evidence motivated a narrow experiment using cuTile's documented DRAM-load latency hint, without changing the attention algorithm or tile dimensions at the same time. The kernel now has a compile-time LOAD_LATENCY parameter. Value 0 preserves compiler-inferred scheduling; values 1–10 select explicit hints, as documented in NVIDIA's [cuTile performance guide](https://docs.nvidia.com/cuda/cutile-python/performance.html). All existing calls default to 0.
 
@@ -293,7 +293,7 @@ The new [benchmark harness](benchmarks/benchmark_load_latency_hints.py) evaluate
 - Medium D=128, tile 64×64.
 - Longer batched D=128, tile 64×128.
 
-Each hint (0/2/4/6/8/10) must pass the independent FP32 NumPy mixed-tolerance check before timing. The benchmark uses ten warmups, 30 CUDA-event samples and five launches averaged per sample, with three sessions and rotated/reversed hint order. A hint is recommended only if its median gain exceeds both a 1% minimum gain and half the combined default/candidate session range. If no candidate clears that rule, hint 0 remains the recommendation. The native profile run [#39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373) completed and exported LOAD_LATENCY=4 and =8 NCU reports on both workloads. Latest export observations:
+Each hint (0/2/4/6/8/10) must pass the independent FP32 NumPy mixed-tolerance check before timing. The benchmark uses ten warmups, 30 CUDA-event samples and five launches averaged per sample, with three sessions and rotated/reversed hint order. A hint is recommended only if its median gain exceeds both a 1% minimum gain and half the combined default/candidate session range. If no candidate clears that rule, hint 0 remains the recommendation. The latest GUI/profile run [#39414502490](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502490) exported LOAD_LATENCY=4 and =8 NCU reports on both workloads. Latest export observations:
 
 | Workload / LOAD_LATENCY | NCU duration (µs) | Registers/thread | Static shared memory/CTA (KiB) | Achieved occupancy | DRAM throughput |
 |---|---:|---:|---:|---:|---:|
@@ -304,7 +304,14 @@ Each hint (0/2/4/6/8/10) must pass the independent FP32 NumPy mixed-tolerance ch
 | Longer batched D=128 / 64×128 / 4 | 984.26 | 255 | 98.30 | 8.31% | 11.88% |
 | Longer batched D=128 / 64×128 / 8 | 988.64 | 255 | 81.92 | 8.30% | 11.82% |
 
-These durations are recorded from separate multi-pass profiler captures and **must not be used as ordinary timing measurements or as evidence to promote a hint**. Hint 8 changes resource use noticeably for the medium workload and did not show a consistent direction across the two workloads. The benchmark harness still needs to complete its per-hint NumPy correctness gates and three-session CUDA-event comparison; until then, keep LOAD_LATENCY=0 as the default. Raw evidence: [native NCU run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373); the artifact is linked in the execution index.
+These durations are recorded from separate multi-pass profiler captures and **must not be used as ordinary timing measurements**. The timed experiment has now completed on native validation [#39415104135](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135), artifact [#12261182182](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135/artifacts/12261182182). All 36 candidate trials passed the NumPy mixed-tolerance check. It used three CUDA-event sessions, 10 warmups, 30 samples and five launches per sample, rotating candidate order. The noise-aware recommendation was:
+
+| Workload | Compiler-default median | Best candidate | Candidate gain | Required gain threshold | Decision |
+|---|---:|---:|---:|---:|---|
+| Medium D=128 / 64×64 | 0.058163 ms | Hint 10 | 8.27% | 9.88% | Reject promotion; gain within measured spread |
+| Longer batched D=128 / 64×128 | 0.922010 ms | Hint 6 | 0.10% | 1.00% | Reject promotion; not above minimum threshold |
+
+Neither candidate clears the predeclared noise-aware rule. **Keep LOAD_LATENCY=0 for both cases**. The hint sweep is complete; this is a valid negative result, not a pending run. Native timing data and raw trials are in the artifact above and in [docs/EXECUTION_EVIDENCE_INDEX.md](docs/EXECUTION_EVIDENCE_INDEX.md).
 
 ### 9.4 Scheduler and warp-state data
 
@@ -369,11 +376,11 @@ An initial default UTF-8 decode attempt of NCU-export text raised a UnicodeDecod
 
 ## 12. Framework/vendor attention baseline: PyTorch SDPA
 
-The user approved installation only in `.venv-cutile-windows`. Native run [#39403488341](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341) verified the project venv had PyTorch 2.14.0+cu130, CUDA build 13.0, `torch.cuda.is_available() == True`, and compatible CuPy/cuTile imports on the RTX 4060. Before reaching PyTorch integration tests, it passed cuTile smoke, the required core GPU correctness suite, the 29-case/tile accuracy matrix, and CLI verification against the independent NumPy oracle. PyTorch was already present in the project venv; this run did not alter global/system Python packages.
+The user approved installation only in `.venv-cutile-windows`. Native runs [#39403488341](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341) and [#39415104113](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104113) verified the project venv had PyTorch 2.14.0+cu130, CUDA build 13.0, `torch.cuda.is_available() == True`, and compatible CuPy/cuTile imports on the RTX 4060. Both runs passed the core cuTile gates (the newest passed 48/48 tests, all 29 accuracy combinations, and CLI/NumPy verification) before reaching the optional integration test. PyTorch remains installed only in the project-local venv.
 
 The benchmark script is scripts/benchmark_torch_sdpa.py. It uses identical deterministic FP16 Q/K/V data in both libraries, calls torch.nn.functional.scaled_dot_product_attention with is_causal=True, and uses DLPack to avoid a separate copy of the input arrays when bridging the CuPy tensors to PyTorch. It records the actual attention-related operator seen by torch.profiler where available, checks PyTorch and cuTile output against the independent FP32 NumPy oracle and against each other, and repeats GPU-event timing over three sessions with alternating backend order. Each configuration uses 10 warmups, 30 event samples and five launches averaged per sample. First-call/JIT-associated wall time is separate.
 
-**SDPA correctness/timing is still pending.** The first native run failed collection because `src/torch_integration.py` used `torch.autograd.Function` without a module-scope `torch` import; that defect was fixed. The next run passed core cuTile checks and test collection, then exposed `BufferError: Can't export tensors that require gradient` in the bridge's `cp.from_dlpack` calls; those inputs now use detached DLPack views while the original PyTorch tensors remain saved for the custom backward. That run also logged `CUBLAS_STATUS_NOT_INITIALIZED` in the model-block test after the earlier bridge failures, so the native rerun must check whether it persists. No SDPA timing JSON/CSV was produced. PyTorch's [official previous-version installer](https://pytorch.org/get-started/previous-versions/) and the [SDPA API documentation](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html) are the source references. The exact approved CUDA 13.0 wheel index also lists the Windows CPython 3.12 torch 2.14.0 wheel: [official CUDA 13.0 wheel index](https://download.pytorch.org/whl/cu130/torch/). The comparison should record whether PyTorch actually selected flash attention, memory-efficient attention, cuDNN attention, or the math fallback; API availability alone does not prove which backend ran.
+**SDPA correctness/timing is still pending.** The first native run failed collection because the autograd bridge lacked a module-scope `torch` import; that was fixed. The next run found that direct DLPack export rejects tensors with `requires_grad=True`; the bridge now exports detached views to CuPy but stores original tensors for custom backward. On the latest native run [#39415104113](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104113), the two-head output/gradient test passed, but the one-head reference backward failed in `torch.matmul(q32, k32.transpose(-2, -1))` with `CUBLAS_STATUS_INVALID_VALUE`; the model-block test then reported `CUBLAS_STATUS_NOT_INITIALIZED`. The new source update uses flattened, contiguous `torch.bmm` operands for the reference backward, but this is **not yet a pass** until the rerun verifies it. No valid SDPA timing JSON/CSV or vendor-speedup claim exists yet. PyTorch's [official previous-version installer](https://pytorch.org/get-started/previous-versions/) and the [SDPA API documentation](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html) are the source references. The exact approved CUDA 13.0 wheel index also lists the Windows CPython 3.12 torch 2.14.0 wheel: [official CUDA 13.0 wheel index](https://download.pytorch.org/whl/cu130/torch/). The comparison should record whether PyTorch actually selected flash attention, memory-efficient attention, cuDNN attention, or the math fallback; API availability alone does not prove which backend ran.
 
 If SDPA is faster, that is a legitimate result. The report will retain both comparisons: the required project baseline (unfused FP32 CuPy) and the optimized framework reference, with backend and caveats clearly labeled.
 
@@ -383,7 +390,7 @@ The optional goals should be pursued one feature at a time: implementation, refe
 
 | Objective | Implementation progress | Evidence still required before marking done |
 |---|---|---|
-| PyTorch SDPA reference | CUDA PyTorch 2.14.0+cu130 import/CUDA check, core cuTile gates and CLI oracle passed on runs #39403488341/#39414502429; integration exposed DLPack requires-grad export failure (fixed with detached views) and a model-block cuBLAS initialization error that must be rechecked | Rerun native output/gradient/model tests; record actual operator/backend, NumPy/cuTile comparison, and three-session timing JSON/CSV |
+| PyTorch SDPA reference | CUDA PyTorch 2.14.0+cu130, core gates and CLI oracle pass; latest integration run passes two-head gradients but fails singleton-head reference backward with CUBLAS_STATUS_INVALID_VALUE; contiguous batched `torch.bmm` fix committed but pending native verification | Pass autograd/model tests, then record actual SDPA backend/operator, NumPy/cuTile comparison, and three-session timing JSON/CSV |
 | PyTorch model integration | Added cuTile autograd bridge, QKV-projection model block, SDPA-matched reference block, GPU tests and end-to-end benchmark script | Run forward/output and gradient tests on GPU; record actual end-to-end latency and error |
 | BF16 or FP8 | Not implemented | Add true supported input-dtype path (not an FP16 conversion masquerading as BF16/FP8); oracle/error matrix, repeated benchmark and NCU evidence |
 | Backward propagation | Added torch.autograd.Function with fused cuTile forward and explicit FP32 PyTorch reference backward | GPU gradient comparison against PyTorch autograd/SDPA; document backward as reference/non-fused; check gradients and finite behavior |
@@ -442,7 +449,7 @@ All images should show the workload name, tile dimensions and metric units where
 
 ## Final closure sequence
 
-1. Rerun and inspect the native PyTorch SDPA/integration workflow after the module-scope torch-import and detached-DLPack-view fixes; verify output/gradient/model tests and investigate the prior cuBLAS initialization error before collecting SDPA timings.
+1. Rerun and inspect the native PyTorch SDPA/integration workflow after the module-scope torch import, detached-DLPack views, and contiguous-batched-GEMM fixes; require one- and two-head gradient plus model-block tests to pass before timing SDPA.
 2. Capture authentic Nsight GUI screenshots from the four preserved native report files.
 3. Implement/measure a profiler-guided resource/scheduling improvement; retain or reject it on repeatable data.
 4. Complete the selected optional code objectives independently: BF16/FP8, backward, packed variable length, GQA/MQA, tile autotuning and supported architecture hints.
