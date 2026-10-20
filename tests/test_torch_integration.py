@@ -25,6 +25,17 @@ import torch.nn.functional as F
 from torch_integration import cutile_attention_torch, make_attention_module
 
 
+def test_torch_cuda_gemm_smoke_before_cutile_bridge():
+    """Separate general PyTorch/cuBLAS GEMM health from DLPack/cuTile interactions."""
+    torch.manual_seed(90817)
+    lhs = torch.randn((1, 64, 32), device="cuda", dtype=torch.float32)
+    rhs = torch.randn((1, 64, 32), device="cuda", dtype=torch.float32)
+    product = torch.bmm(lhs, rhs.transpose(1, 2).contiguous())
+    torch.cuda.synchronize()
+    assert product.shape == (1, 64, 64)
+    assert torch.isfinite(product).all().item()
+
+
 @pytest.mark.parametrize("batch_size, n_heads", [(1, 1), (1, 2), (2, 1), (2, 2)])
 def test_torch_autograd_bridge_matches_sdpa_output_and_gradients(batch_size, n_heads):
     """Cover the singleton-head cuBLAS regression and a real multi-batch GEMM path."""
