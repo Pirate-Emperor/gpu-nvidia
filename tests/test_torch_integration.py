@@ -25,12 +25,13 @@ import torch.nn.functional as F
 from torch_integration import cutile_attention_torch, make_attention_module
 
 
-@pytest.mark.parametrize("n_heads", [1, 2])
-def test_torch_autograd_bridge_matches_sdpa_output_and_gradients(n_heads):
-    torch.manual_seed(1200 + n_heads)
-    q = torch.randn((1, n_heads, 64, 32), device="cuda", dtype=torch.float16, requires_grad=True)
-    k = torch.randn((1, n_heads, 64, 32), device="cuda", dtype=torch.float16, requires_grad=True)
-    v = torch.randn((1, n_heads, 64, 32), device="cuda", dtype=torch.float16, requires_grad=True)
+@pytest.mark.parametrize("batch_size, n_heads", [(1, 1), (1, 2), (2, 1), (2, 2)])
+def test_torch_autograd_bridge_matches_sdpa_output_and_gradients(batch_size, n_heads):
+    """Cover the singleton-head cuBLAS regression and a real multi-batch GEMM path."""
+    torch.manual_seed(1200 + batch_size * 10 + n_heads)
+    q = torch.randn((batch_size, n_heads, 64, 32), device="cuda", dtype=torch.float16, requires_grad=True)
+    k = torch.randn((batch_size, n_heads, 64, 32), device="cuda", dtype=torch.float16, requires_grad=True)
+    v = torch.randn((batch_size, n_heads, 64, 32), device="cuda", dtype=torch.float16, requires_grad=True)
     q_ref = q.detach().clone().requires_grad_(True)
     k_ref = k.detach().clone().requires_grad_(True)
     v_ref = v.detach().clone().requires_grad_(True)
