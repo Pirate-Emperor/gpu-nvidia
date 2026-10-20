@@ -45,6 +45,14 @@ jobs:
             --variable=linkcolor:blue \
             --table-of-contents
 
+      - name: Upload phone-friendly PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-attention-project-guide-pdf
+          path: docs/CUTILE_ATTENTION_PROJECT_GUIDE_PHONE.pdf
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Commit PDF into repository
         env:
           GH_TOKEN: ${{ github.token }}
