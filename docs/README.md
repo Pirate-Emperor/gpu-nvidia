@@ -1,9 +1,10 @@
 # Documentation index
 
-Start with [the complete experiment narrative](../Report.md) for the detailed assignment, test, benchmark, profiler, error and optional-objective record. [Run provenance](../RUN_EVIDENCE.md) is intentionally kept separate.
+Start with the [Project Two-Pager](PROJECT_TWO_PAGER.md) for the current concise overview and gates, then use [the complete experiment narrative](../Report.md) for the detailed assignment, test, benchmark, profiler, error and optional-objective record. [Run provenance](../RUN_EVIDENCE.md) is intentionally kept separate.
 
 ## Read in this order
 
+0. [Project Two-Pager](PROJECT_TWO_PAGER.md) — compact current status, strongest recorded core result, implementation map and validation gates.
 0. [Complete experiment narrative](../Report.md) — single authoritative record for the course scope, all core tests/results, all benchmark rows, profiler analysis/plots, project/CUDA/library errors, optional objectives and next actions.
 0a. [Automation/run provenance](../RUN_EVIDENCE.md) — separate workflow/runner URLs and infrastructure failures; not part of the technical report.
 
@@ -22,6 +23,6 @@ Start with [the complete experiment narrative](../Report.md) for the detailed as
 
 ## Current evidence-based status
 
-**Core GPU gates PASS; assignment closure remains PARTIAL.** Native RTX 4060 run [#39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223) passed the cuTile smoke, 48 required attention tests, 29 numerical configurations, CLI/reference verification and three controlled benchmark sessions. Four actual-cuTile Nsight Compute reports and CSV/Details exports are preserved in [profile artifact #12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). Remaining rubric items are visible in the checklist: framework/vendor attention reference; clean-cache JIT times for long specializations or an approved exception; Week 3’s second profiler-guided improvement; and accurate author/team contribution details.
+**Historical core GPU gates PASS; current main is pending a fresh native regression; assignment closure remains PARTIAL.** Native RTX 4060 run [#39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223) passed the cuTile smoke, 48 required attention tests, 29 numerical configurations, CLI/reference verification and three controlled benchmark sessions. Four actual-cuTile Nsight Compute reports and CSV/Details exports are preserved in [profile artifact #12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). Since that baseline, optional GQA/MQA, packed-sequence, PyTorch bridge, autotuner and load-latency-hint paths were added, so the old pass does not automatically validate the current source. The latest CPU/reference CI passes; fresh native SDPA/core regression and NCU jobs are queued after a Windows PowerShell startup fix. Remaining rubric items are visible in the checklist: framework/vendor attention reference; clean-cache JIT times for long specializations or an approved exception; Week 3’s second profiler-guided improvement; and accurate author/team contribution details.
 
 The most recent completed CPU/reference CI is documented separately in [RUN_EVIDENCE.md](../RUN_EVIDENCE.md); GPU-specific tests skip on CPU-only CI because CuPy is not installed. See [Report.md](../Report.md) for the currently verified GPU results and remaining optional-objective status. GPU-specific tests skip on that CPU-only runner because CuPy is not installed; the separate native RTX 4060 run is the GPU evidence.
