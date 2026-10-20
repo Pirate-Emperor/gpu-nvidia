@@ -2,7 +2,8 @@
 
 **Updated:** 20 October 2026  
 **Target GPU:** NVIDIA GeForce RTX 4060, SM89, native Windows x64  
-**Project focus:** A fused, numerically stable causal self-attention forward kernel, plus carefully isolated optional extensions.
+**Project focus:** A fused, numerically stable causal self-attention forward kernel, plus carefully isolated optional extensions.  
+**Product goal:** A reproducible engineering demo that takes Q/K/V tensors, produces causal attention output on a Windows RTX 4060, and provides auditable correctness, latency, and profiler evidence. It is not positioned as a production replacement for FlashAttention or vendor-optimized PyTorch SDPA.
 
 ## 1. Problem and solution
 
@@ -39,12 +40,12 @@ The NCU snapshots show a resource-constrained kernel with low achieved occupancy
 
 The current source also contains GQA/MQA launch support, a packed-variable-length wrapper, a PyTorch autograd/model bridge, a correctness-gated tile autotuner, and a cuTile DRAM-load-latency hint sweep. These were added after the last fully validated core GPU snapshot.
 
-**Current gate:** all those new paths—and the core kernel after its new compile-time parameters—need a fresh native RTX 4060 regression. CPU/reference CI passing is useful but does not prove GPU compilation, execution, numerical correctness or speed. PyTorch SDPA timing is not yet claimed; it must record the actually selected backend/operator, compare outputs against the FP32 NumPy oracle, and preserve repeated CUDA-event measurements. No BF16/FP8 path or general async/TMA implementation is claimed.
+**Fresh native status — 20 October 2026 (Windows RTX 4060):**
 
-Recent automation startup failed before reaching any GPU test because Windows PowerShell refused to execute the generated workflow script. The workflows now explicitly use a non-profiled PowerShell process with execution-policy bypass. The CPU/reference CI for the fix passed; the updated native SDPA and NCU jobs are queued at the time of this update:
-- [SDPA / core-regression / optional-suite workflow](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402053172)
-- [RTX 4060 NCU capture workflow](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402058064)
-- [CPU/reference CI for the workflow fix](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402058165)
+- The native cuTile Nsight Compute job [run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373) completed successfully. Its [artifact #12256589808](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373/artifacts/12256589808) contains eight real `.ncu-repz` reports, matching Details/Raw CSV exports, and per-profile logs. These include base profiles, scheduler/warp-state profiles, and load-latency-hint 4/8 captures for both D=128 workloads.
+- A separate native rerun [#39403488341](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341) passed the PyTorch/CuPy/cuTile import and CUDA-availability check, genuine cuTile smoke, required core GPU correctness tests, the 29-case/tile accuracy matrix, and CLI verification against the independent NumPy oracle. It then failed while collecting `tests/test_torch_integration.py`: `src/torch_integration.py` used `torch.autograd.Function` as a module-level base class without importing `torch` at module scope. This commit fixes that import defect; SDPA timing and later optional stages are **not yet claimed passed** until a new native run completes.
+- The profiler's screenshot attempt produced **zero PNG screenshots**. Its manifest says none were captured; the profiler evidence is the native report/Details/CSV set, not GUI screenshots. The capture helper is being corrected to locate `ncu-ui.exe` across installation layouts and preserve explicit skip reasons.
+- The previously recorded core benchmark remains ~0.92 ms median and ~18.5–18.6× versus the deliberately unfused FP32 CuPy baseline. That baseline is not FlashAttention or vendor-optimized PyTorch SDPA. Fresh hint 4/8 NCU durations are profiling observations only and must not be treated as ordinary benchmark results.
 
 ## 5. Next completion gates
 

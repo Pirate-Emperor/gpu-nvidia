@@ -144,13 +144,32 @@ def _visible_windows():
 
 
 def _ui_path(ncu_exe: Path):
+    """Find ncu-ui.exe across supported Nsight Compute install layouts."""
     candidates = [ncu_exe.resolve().parent / "ncu-ui.exe"]
     pf = os.environ.get("ProgramFiles")
     if pf:
         root = Path(pf) / "NVIDIA Corporation"
         if root.is_dir():
-            candidates.extend(root.glob("Nsight Compute*/ncu-ui.exe"))
-    return next((item for item in candidates if item.is_file()), None)
+            for install in sorted(root.glob("Nsight Compute*")):
+                candidates.extend((
+                    install / "ncu-ui.exe",
+                    install / "host" / "windows-desktop-win7-x64" / "ncu-ui.exe",
+                    install / "target" / "windows-desktop-win7-x64" / "ncu-ui.exe",
+                ))
+                if install.is_dir():
+                    try:
+                        candidates.extend(install.rglob("ncu-ui.exe"))
+                    except OSError:
+                        pass
+    seen = set()
+    for item in candidates:
+        key = str(item).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        if item.is_file():
+            return item
+    return None
 
 
 def _wait_window(pid, stem, timeout):
@@ -227,10 +246,14 @@ def main():
     manifest = {
         "ncu_ui": str(ui) if ui else None,
         "capture_method": "Windows PrintWindow capture of only the real Nsight Compute application window",
-        "captures": [], "skipped": [],
+        "captures": [], "skipped": [], "status": "pending",
     }
     if ui is None:
-        manifest["status"] = "skipped: ncu-ui.exe not found"
+        manifest["status"] = "skipped: ncu-ui.exe not found in the Nsight Compute installation"
+        manifest["skipped"].extend({
+            "report": str(report),
+            "reason": "ncu-ui.exe not found in the Nsight Compute installation",
+        } for report in args.reports)
     else:
         for report in args.reports:
             if not report.is_file():
@@ -264,7 +287,10 @@ def main():
             except Exception as exc:
                 manifest["skipped"].append({"report": str(report), "reason": f"{type(exc).__name__}: {exc}"})
                 print(f"NCU_SNAPSHOT_SKIPPED={report}: {type(exc).__name__}: {exc}")
-    manifest["status"] = "captured" if manifest["captures"] else "no screenshots captured"
+    if manifest["captures"]:
+        manifest["status"] = "captured"
+    elif manifest["status"] == "pending":
+        manifest["status"] = "no screenshots captured; see skipped reasons"
     (output_dir / "capture-manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     md = ["# Nsight Compute GUI screenshot manifest", "", f"Status: {manifest['status']}", ""]
     md.extend(

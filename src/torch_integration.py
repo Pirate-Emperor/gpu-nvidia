@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import math
 
+import torch
+
 
 def _validate_torch_inputs(q, k, v):
     import torch

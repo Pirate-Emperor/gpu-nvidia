@@ -247,7 +247,7 @@ A controlled clean-cache measurement for the two long cases remains open. It mus
 
 ## 9. Nsight Compute analysis
 
-The four actual-cuTile reports cover two workloads: medium D=128, tile 64×64; and long-batched D=128, tile 64×128. Each has a basic resource/throughput report and a supplemental SchedulerStats/WarpStateStats report. Details text and Raw CSV exports are preserved for reproducible metric analysis.
+The latest successful native profile run [#39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373) preserves eight actual-cuTile `.ncu-repz` reports with Details/Raw CSV exports. It covers the medium D=128 / 64×64 and longer-batched D=128 / 64×128 workloads, base and SchedulerStats/WarpStateStats profiles, and LOAD_LATENCY=4/8 captures for both shapes. The historical baseline tables below are refreshed to the latest base profiles; the raw artifacts are linked in [docs/EXECUTION_EVIDENCE_INDEX.md](docs/EXECUTION_EVIDENCE_INDEX.md).
 
 For interactive inspection, use NVIDIA's [Nsight Compute User Guide](https://docs.nvidia.com/nsight-compute/NsightCompute/index.html), [CLI guide](https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html), and [profiling guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html). Native compressed reports use .ncu-repz; they can be opened/imported by Nsight Compute. The figures below are derived charts from the exported counters, not fabricated application screenshots.
 
@@ -255,8 +255,8 @@ For interactive inspection, use NVIDIA's [Nsight Compute User Guide](https://doc
 
 | Profile | Tensor shape | Tile Q×K | Grid CTAs / threads per block | NCU kernel duration |
 |---|---|---:|---:|---:|
-| Medium D=128 | B=1, H=8, N=512, D=128 | 64×64 | 64 / 128 | 52.896 µs |
-| Long batched D=128 | B=2, H=8, N=2048, D=128 | 64×128 | 512 / 128 | 984.256 µs (scheduler report: 986.624 µs) |
+| Medium D=128 | B=1, H=8, N=512, D=128 | 64×64 | 64 / 128 | 52.86 µs |
+| Long batched D=128 | B=2, H=8, N=2048, D=128 | 64×128 | 512 / 128 | 987.94 µs |
 
 ### 9.2 Register, shared-memory and occupancy findings
 
@@ -266,7 +266,7 @@ For interactive inspection, use NVIDIA's [Nsight Compute User Guide](https://doc
 | Static shared memory per CTA | 65.536 KiB | 81.920 KiB |
 | Allocated shared memory per CTA, including driver usage | ~66.56 KiB | ~82.94 KiB |
 | Theoretical occupancy | ~8.33% | ~8.33% |
-| Achieved occupancy | 8.35% | 8.33% |
+| Achieved occupancy | 8.30% | 8.31% |
 
 ![Figure 5 — NCU resources and occupancy](docs/assets/report/fig05_ncu_resources.svg)
 
@@ -276,16 +276,16 @@ The clearest observed constraint is shared-memory CTA residency: occupancy analy
 
 | Metric | Medium D=128 / 64×64 | Long batched D=128 / 64×128 |
 |---|---:|---:|
-| SM compute throughput vs peak | 18.81% | 30.27% |
-| DRAM throughput vs peak | 22.88% | 11.89% |
-| L1/TEX throughput vs peak | 17.35% | 21.00% |
-| L2 throughput vs peak | 14.52% | 20.07% |
+| SM compute throughput vs peak | 18.83% | 30.38% |
+| DRAM throughput vs peak | 22.94% | 11.85% |
+| L1/TEX throughput vs peak | 17.26% | 20.96% |
+| L2 throughput vs peak | 14.49% | 19.85% |
 
 ![Figure 6 — NCU throughput exports](docs/assets/report/fig06_ncu_throughput.svg)
 
 Neither workload approaches peak overall compute or DRAM throughput. The long batched case is particularly far from peak DRAM throughput. These percentages refer to separate NCU utilization metrics and must not be combined into one total memory-bandwidth estimate.
 
-### 9.5 DRAM load-latency hint experiment (pending native GPU run)
+### 9.5 DRAM load-latency hint experiment (NCU captures complete; timing sweep pending)
 
 The profile evidence motivated a narrow experiment using cuTile's documented DRAM-load latency hint, without changing the attention algorithm or tile dimensions at the same time. The kernel now has a compile-time LOAD_LATENCY parameter. Value 0 preserves compiler-inferred scheduling; values 1–10 select explicit hints, as documented in NVIDIA's [cuTile performance guide](https://docs.nvidia.com/cuda/cutile-python/performance.html). All existing calls default to 0.
 
@@ -293,19 +293,30 @@ The new [benchmark harness](benchmarks/benchmark_load_latency_hints.py) evaluate
 - Medium D=128, tile 64×64.
 - Longer batched D=128, tile 64×128.
 
-Each hint (0/2/4/6/8/10) must pass the independent FP32 NumPy mixed-tolerance check before timing. The benchmark uses ten warmups, 30 CUDA-event samples and five launches averaged per sample, with three sessions and rotated/reversed hint order. A hint is recommended only if its median gain exceeds both a 1% minimum gain and half the combined default/candidate session range. If no candidate clears that rule, hint 0 remains the recommendation. NCU captures are configured for hints 4 and 8 on both shapes to compare registers, shared memory, occupancy and throughput. **No load-latency timing or recommendation is claimed until the native experiment artifact has been inspected.**
+Each hint (0/2/4/6/8/10) must pass the independent FP32 NumPy mixed-tolerance check before timing. The benchmark uses ten warmups, 30 CUDA-event samples and five launches averaged per sample, with three sessions and rotated/reversed hint order. A hint is recommended only if its median gain exceeds both a 1% minimum gain and half the combined default/candidate session range. If no candidate clears that rule, hint 0 remains the recommendation. The native profile run [#39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373) completed and exported LOAD_LATENCY=4 and =8 NCU reports on both workloads. Latest export observations:
+
+| Workload / LOAD_LATENCY | NCU duration (µs) | Registers/thread | Static shared memory/CTA (KiB) | Achieved occupancy | DRAM throughput |
+|---|---:|---:|---:|---:|---:|
+| Medium D=128 / 64×64 / 0 (default) | 52.86 | 231 | 65.54 | 8.30% | 22.94% |
+| Medium D=128 / 64×64 / 4 | 52.99 | 231 | 65.54 | 8.30% | 22.86% |
+| Medium D=128 / 64×64 / 8 | 51.07 | 255 | 98.30 | 8.34% | 23.94% |
+| Longer batched D=128 / 64×128 / 0 (default) | 987.94 | 255 | 81.92 | 8.31% | 11.85% |
+| Longer batched D=128 / 64×128 / 4 | 984.51 | 255 | 98.30 | 8.31% | 11.86% |
+| Longer batched D=128 / 64×128 / 8 | 990.14 | 255 | 81.92 | 8.31% | 11.82% |
+
+These durations are recorded from separate multi-pass profiler captures and **must not be used as ordinary timing measurements or as evidence to promote a hint**. Hint 8 changes resource use noticeably for the medium workload and did not show a consistent direction across the two workloads. The benchmark harness still needs to complete its per-hint NumPy correctness gates and three-session CUDA-event comparison; until then, keep LOAD_LATENCY=0 as the default. Raw evidence: [native NCU run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373); the artifact is linked in the execution index.
 
 ### 9.4 Scheduler and warp-state data
 
 | Metric | Medium D=128 / 64×64 | Long batched D=128 / 64×128 |
 |---|---:|---:|
-| Scheduler cycles with no eligible warp | 85.83% | 85.26% |
-| Scheduler cycles with an eligible warp | 14.17% | 14.74% |
+| Scheduler cycles with no eligible warp | 85.90% | 85.27% |
+| Scheduler cycles with an eligible warp | 14.10% | 14.73% |
 | Eligible warps per scheduler, average | 0.14 | 0.15 |
 | Active warps per scheduler, average | ~1.00 | ~1.00 |
-| Warp cycles per issued instruction | 7.08 | 6.78 |
+| Warp cycles per issued instruction | 7.07 | 6.78 |
 | NCU rule estimate of pipeline issue stall | 2.4 cycles | 3.1 cycles |
-| NCU rule estimated local speedup | 33.57% heuristic | 46.04% heuristic |
+| NCU rule estimated local speedup | 33.61% heuristic | 46.00% heuristic |
 
 ![Figure 7 — Scheduler eligible-warp snapshot](docs/assets/report/fig07_scheduler_eligibility.svg)
 
@@ -358,11 +369,11 @@ An initial default UTF-8 decode attempt of NCU-export text raised a UnicodeDecod
 
 ## 12. Framework/vendor attention baseline: PyTorch SDPA
 
-The user approved installation only in .venv-cutile-windows. The no-change preflight confirmed Python 3.12.10, pip 25.0.1, RTX 4060 driver 616.92 / SM89 and the present NumPy, CuPy, cuTile, TileIRAS, NVCC and NVVM package versions. Pip resolved the official Windows CPython 3.12 CUDA 13.0 torch 2.14.0 wheel and eight declared support dependencies in a dry run; that step changed no package versions.
+The user approved installation only in `.venv-cutile-windows`. Native run [#39403488341](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341) verified the project venv had PyTorch 2.14.0+cu130, CUDA build 13.0, `torch.cuda.is_available() == True`, and compatible CuPy/cuTile imports on the RTX 4060. Before reaching PyTorch integration tests, it passed cuTile smoke, the required core GPU correctness suite, the 29-case/tile accuracy matrix, and CLI verification against the independent NumPy oracle. PyTorch was already present in the project venv; this run did not alter global/system Python packages.
 
 The benchmark script is scripts/benchmark_torch_sdpa.py. It uses identical deterministic FP16 Q/K/V data in both libraries, calls torch.nn.functional.scaled_dot_product_attention with is_causal=True, and uses DLPack to avoid a separate copy of the input arrays when bridging the CuPy tensors to PyTorch. It records the actual attention-related operator seen by torch.profiler where available, checks PyTorch and cuTile output against the independent FP32 NumPy oracle and against each other, and repeats GPU-event timing over three sessions with alternating backend order. Each configuration uses 10 warmups, 30 event samples and five launches averaged per sample. First-call/JIT-associated wall time is separate.
 
-**Actual PyTorch installation, CUDA interoperability, numerical check and SDPA timing remain pending.** No speedup claim is made until the successful install log and generated JSON/CSV are inspected. PyTorch's [official previous-version installer](https://pytorch.org/get-started/previous-versions/) and the [SDPA API documentation](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html) are the source references. The exact approved CUDA 13.0 wheel index also lists the Windows CPython 3.12 torch 2.14.0 wheel: [official CUDA 13.0 wheel index](https://download.pytorch.org/whl/cu130/torch/). The comparison should record whether PyTorch actually selected flash attention, memory-efficient attention, cuDNN attention, or the math fallback; API availability alone does not prove which backend ran.
+**SDPA correctness/timing is still pending.** The native run failed while collecting `tests/test_torch_integration.py` because `src/torch_integration.py` used `torch.autograd.Function` without importing `torch` at module scope. The import defect is fixed in the current source update; a new native run must pass test collection and finish the benchmark before any SDPA speedup claim is made. The failed run generated no SDPA timing JSON/CSV. PyTorch's [official previous-version installer](https://pytorch.org/get-started/previous-versions/) and the [SDPA API documentation](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html) are the source references. The exact approved CUDA 13.0 wheel index also lists the Windows CPython 3.12 torch 2.14.0 wheel: [official CUDA 13.0 wheel index](https://download.pytorch.org/whl/cu130/torch/). The comparison should record whether PyTorch actually selected flash attention, memory-efficient attention, cuDNN attention, or the math fallback; API availability alone does not prove which backend ran.
 
 If SDPA is faster, that is a legitimate result. The report will retain both comparisons: the required project baseline (unfused FP32 CuPy) and the optimized framework reference, with backend and caveats clearly labeled.
 
@@ -372,7 +383,7 @@ The optional goals should be pursued one feature at a time: implementation, refe
 
 | Objective | Implementation progress | Evidence still required before marking done |
 |---|---|---|
-| PyTorch SDPA reference | Benchmark script and official CUDA-wheel dry-run are ready; no install/results yet | Successful install/import; actual kernel/backend operator; NumPy/cuTile comparison; 3-session timing JSON/CSV |
+| PyTorch SDPA reference | CUDA PyTorch 2.14.0+cu130 import/CUDA check passed, as did core cuTile gates and CLI oracle on run #39403488341; integration tests then failed during collection due to a missing module-scope `torch` import (now fixed) | Rerun the native gate; record actual operator/backend, NumPy/cuTile comparison, and three-session timing JSON/CSV |
 | PyTorch model integration | Added cuTile autograd bridge, QKV-projection model block, SDPA-matched reference block, GPU tests and end-to-end benchmark script | Run forward/output and gradient tests on GPU; record actual end-to-end latency and error |
 | BF16 or FP8 | Not implemented | Add true supported input-dtype path (not an FP16 conversion masquerading as BF16/FP8); oracle/error matrix, repeated benchmark and NCU evidence |
 | Backward propagation | Added torch.autograd.Function with fused cuTile forward and explicit FP32 PyTorch reference backward | GPU gradient comparison against PyTorch autograd/SDPA; document backward as reference/non-fused; check gradients and finite behavior |
@@ -386,7 +397,7 @@ The optional goals should be pursued one feature at a time: implementation, refe
 | Native Nsight GUI screenshots | Seven metric plots exist; no native GUI screenshot is falsely claimed | Open preserved reports on Windows and capture Summary, Launch/Occupancy, Memory Workload Analysis, Scheduler/Warp State and a side-by-side comparison |
 | Final authorship/contribution statement | Needs owner input | Confirm actual project authors and responsibilities; attribution must not be guessed |
 
-The optional code added in this snapshot is: [GQA/MQA and packed-sequence launch wrappers](src/cutile_attention.py), [independent extended references](src/extended_attention.py), [PyTorch autograd and model blocks](src/torch_integration.py), [PyTorch SDPA comparison](scripts/benchmark_torch_sdpa.py), [end-to-end model-block benchmark](benchmarks/benchmark_torch_model_integration.py), [correctness-gated tile autotuner](scripts/autotune_cutile_tiles.py), and [DRAM load-latency hint sweep](benchmarks/benchmark_load_latency_hints.py). The native profiler workflow is configured to capture/export hint 4 and hint 8 reports for both profiled shapes. CPU/reference tests validate the pure references, CLI syntax and recommendation rules, but the new GPU paths and hint results remain pending native CUDA execution. The prior core GPU pass applies to the previously validated equal-head implementation; the current source adds KV_GROUPS=1 and LOAD_LATENCY=0 compile-time parameters and must pass a fresh full native regression before being treated as revalidated.
+The optional code added in this snapshot is: [GQA/MQA and packed-sequence launch wrappers](src/cutile_attention.py), [independent extended references](src/extended_attention.py), [PyTorch autograd and model blocks](src/torch_integration.py), [PyTorch SDPA comparison](scripts/benchmark_torch_sdpa.py), [end-to-end model-block benchmark](benchmarks/benchmark_torch_model_integration.py), [correctness-gated tile autotuner](scripts/autotune_cutile_tiles.py), and [DRAM load-latency hint sweep](benchmarks/benchmark_load_latency_hints.py). The native profiler workflow is configured to capture/export hint 4 and hint 8 reports for both profiled shapes. CPU/reference tests validate the pure references, CLI syntax and recommendation rules. Native run #39403488341 revalidated the core GPU gates, actual CLI output and numerical matrix on the current kernel, but stopped at PyTorch integration test collection before GQA/MQA, packed-sequence, gradient/model, autotuner and hint-timing stages. The module-level `torch` import defect is fixed in the current source update; those later stages must pass a new complete native run before being treated as validated. The hint NCU captures are available but do not substitute for the required CUDA-event timing.
 
 The optional architecture-hint experiments should reference NVIDIA's [cuTile performance guide](https://docs.nvidia.com/cuda/cutile-python/performance.html). The CuTe DSL alternative is described in NVIDIA CUTLASS's [CuTe DSL quick-start](https://docs.nvidia.com/cutlass/4.4.2/media/docs/pythonDSL/quick_start.html); it is an alternative track, not a mandatory add-on to an already validated cuTile implementation.
 
@@ -401,7 +412,7 @@ The report embeds seven SVG plots generated from the actual exported benchmark/N
 6. Figure 6: SM/DRAM/L1/L2 NCU throughput values.
 7. Figure 7: scheduler cycles with and without eligible warps.
 
-These are metric plots derived from exported evidence, not screenshots of the Nsight Compute application. The four native NCU report files remain available for interactive inspection. A helper now attempts to open each available native report in Nsight Compute and capture only the real application window via Windows PrintWindow, rejecting blank captures. **No GUI screenshot is claimed complete until its PNG and capture manifest have been inspected.** Recommended screenshots are:
+These are metric plots derived from exported evidence, not screenshots of the Nsight Compute application. The latest native profile artifact from [run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373) contains eight native NCU reports and matching Details/Raw CSV exports. Its GUI capture attempt produced zero PNGs and the manifest explicitly says no screenshots were captured. The helper is being fixed to find the actual `ncu-ui.exe` installation layout and retain per-report skip reasons. **No GUI screenshot is claimed complete until actual PNGs and their manifest have been inspected.** Recommended screenshots are:
 - Overview/Summary for the medium D=128 / 64×64 report.
 - Launch/Occupancy and resource-limiting section for the medium report.
 - Memory Workload Analysis and throughput section for both configurations.
@@ -431,7 +442,7 @@ All images should show the workload name, tile dimensions and metric units where
 
 ## Final closure sequence
 
-1. Complete and inspect the actual PyTorch install plus SDPA experiment.
+1. Rerun and inspect the native PyTorch SDPA/integration workflow after the module-level torch-import fix; confirm output/gradient tests before collecting SDPA timings.
 2. Capture authentic Nsight GUI screenshots from the four preserved native report files.
 3. Implement/measure a profiler-guided resource/scheduling improvement; retain or reject it on repeatable data.
 4. Complete the selected optional code objectives independently: BF16/FP8, backward, packed variable length, GQA/MQA, tile autotuning and supported architecture hints.

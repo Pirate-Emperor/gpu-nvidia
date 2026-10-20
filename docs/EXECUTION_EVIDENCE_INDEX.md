@@ -1,66 +1,52 @@
 # Execution and Artifact Evidence Index
 
-This file intentionally contains GitHub Actions links, workflow/runner diagnostics and artifact references that are excluded from the technical narrative in root Report.md. It is an execution record, not a substitute for the code, raw measurements or profiler exports.
+This is the execution record for native runs, artifacts, runner diagnostics and their limits. It supplements rather than replaces `Report.md`, raw measurements and the implementation.
 
 ## Core native RTX 4060 validation
 
-- Full native validation: [run #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223).
-- Core test/benchmark artifact: [artifact #12149980979](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223/artifacts/12149980979).
-- Observed successful gates: genuine cuTile smoke; 48 required attention tests; 29 numerical case/tile configurations with zero mixed-tolerance violations; CLI against independent NumPy; three controlled benchmark sessions.
-- Hardware recorded by the run: RTX 4060 / SM89, Windows x64, driver 616.92, Python 3.12.10, CuPy 14.2.0, cuda-tile 1.6.0.
+- Historical full native validation: [run #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223) and [artifact #12149980979](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223/artifacts/12149980979).
+- Demonstrated there: genuine cuTile smoke; 48 required GPU correctness tests; 29 legal case/tile combinations with zero mixed-tolerance violations; CLI versus independent NumPy oracle; three controlled benchmark sessions.
+- Environment: Windows x64, GeForce RTX 4060 / SM89, driver 616.92, Python 3.12.10, CuPy 14.2.0, cuda-tile 1.6.0.
+- Historical performance headline: longer batched D=128, tile 64×128, ~0.919 ms median / ~0.925 ms P90 / 18.62× against an intentionally unfused FP32 CuPy baseline. It is not a comparison with FlashAttention or vendor-optimized SDPA.
 
-## Native Nsight Compute evidence
+## Fresh native results — 20 October 2026
 
-- Profiler workflow: [run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066).
-- Profiler artifact: [artifact #12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
-- Artifact content: four compressed native NCU reports, four Details exports, four Raw CSV exports, plus capture/status logs.
-- Captured workloads: medium D=128 / tile 64×64 and long-batched D=128 / tile 64×128; each has a basic resource/throughput profile and SchedulerStats/WarpStateStats profile.
-- GPU counter collection succeeded on the RTX 4060 without ERR_NVGPUCTRPERM.
-- The source report and capture helper for authentic GUI screenshots are root Report.md and scripts/capture_ncu_screenshots.py. Export-derived SVG plots are committed under docs/assets/report/.
+### Actual cuTile Nsight Compute profiles
 
-## CPU/reference CI and test limitations
+- Workflow: [run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373), completed successfully on commit `affd935649c2cf9967210769b0381d807c6c4d6a`.
+- Artifact: [#12256589808 — cutile-rtx4060-ncu-profiles](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373/artifacts/12256589808), 631,797 bytes; SHA-256 reported by Actions: `d8ddf993d41b4bccc4aaf1d1b50c2c917c93c02a347e6d51362521e562d59fef`.
+- The artifact includes eight genuine `.ncu-repz` reports with Details/Raw CSV exports and logs: baseline profiles and scheduler/warp-state profiles for medium D=128 64×64 and longer-batched D=128 64×128, plus LOAD_LATENCY=4 and =8 profiles for both cases.
+- Latest baseline profile durations were 52.86 µs (medium) and 987.94 µs (longer-batched). Latest scheduler snapshots showed no eligible warp for 85.90% and 85.27% of scheduler cycles, respectively; the reports show about 8.3% achieved occupancy due chiefly to shared-memory residency. These are profiler measurements/diagnostics, not replacements for ordinary CUDA-event benchmark medians.
+- Hint 4/8 captures do **not** settle which hint is faster. The native multi-session CUDA-event timing/accuracy sweep has not yet finished.
+- Screenshot status: **0 PNGs captured**. The artifact's capture manifest explicitly reports no screenshots. No GUI screenshot is claimed; only the native report files and CSV/Details exports are available from this run.
 
-- Latest CPU/reference CI at the time of this index: [run #39249828521](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39249828521): 764 passed, 68 skipped, 0 failed.
-- GPU-specific cases skipped in CPU-only CI when CuPy or CUDA is absent. Use the native RTX 4060 run as the evidence for real GPU execution.
-- Further documentation-only CI runs are useful repository checks but should not be misreported as GPU validation.
+### PyTorch SDPA, core-regression and optional-objective workflow
 
-## Fresh-run infrastructure failures (excluded from Report.md)
+- Native workflow: [run #39403488341](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341), failed during pytest collection in `tests/test_torch_integration.py`; [artifact #12255372678](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341/artifacts/12255372678) preserves the partial-run outputs.
+- Passed before the collection error: PyTorch 2.14.0+cu130 was present in the project-local `.venv-cutile-windows`; PyTorch reported CUDA build 13.0 and `torch.cuda.is_available() == True`; CuPy/cuTile/PyTorch import check; cuTile smoke; the required core GPU correctness suite; 29-case/tile accuracy matrix; actual-cuTile CLI output and independent NumPy-oracle verification.
+- Root cause: `src/torch_integration.py` defines `_CuTileCausalAttention(torch.autograd.Function)` at module load but previously imported `torch` only inside methods. The new fix adds the module-level import. No SDPA timing, model-integration timing, optional-objective suite, autotuner recommendation, or load-latency timing result is claimed from the failed run; those commands occur later in the workflow.
+- Next gate: run the complete native workflow again on the fixed commit, inspect its JSON/CSV, verify SDPA operator identity and numerical accuracy, then update the report with measured results.
 
-A deliberate final native rerun was started after the report/checklist update. It did not reach the kernel or test commands.
+## Native Nsight Compute evidence from the earlier baseline
 
-- [Run #39234069849](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39234069849), attempt 1: failed before checkout while resolving/download metadata for a GitHub Action. Logs reported “Failed to resolve action download info” after network retries.
-- The same run, attempt 2: setup completed but the checkout step failed with a Git/TLS transport error, SEC_E_MESSAGE_ALTERED (0x8009030F), while fetching source. All GPU/test steps were skipped; this is not evidence of a kernel failure.
-- Other native GPU/NCU jobs have at times remained queued while the self-hosted runner is unavailable or not accepting jobs. Those statuses are operational limitations, not test outcomes.
+- Historical profiler workflow: [run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066), [artifact #12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
+- The figures committed under `docs/assets/report/` are exported-metric plots, not screenshots of the Nsight Compute application.
 
-These runner errors are kept here solely for traceability and must not be described as CUDA kernel errors.
+## CPU/reference CI and limits
 
-## Approved PyTorch SDPA / optional objective experiment
+- CPU/reference suite: [run #39403495477](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495477) passed after the PowerShell/source-fetch fix. CPU-only CI does not prove GPU compilation, execution, numerical agreement or performance.
+- Native GPU workflows use the Windows self-hosted RTX 4060 runner; the Linux A100/ordinary-CUDA control environment is separate and its results are not used as proof of native RTX 4060 cuTile execution.
 
-- Existing workflow: [PyTorch SDPA venv benchmark](https://github.com/xemptynothing/gpu-nvidia/blob/main/.github/workflows/torch-sdpa-preflight.yml).
-- It is intended to install CUDA-enabled PyTorch only into the project-local .venv-cutile-windows environment, validate imports/CUDA availability and run:
-  - scripts/benchmark_torch_sdpa.py
-  - tests/test_torch_integration.py
-  - benchmarks/benchmark_torch_model_integration.py
-  - tests/test_gpu_optional_attention_objectives.py
-  - scripts/autotune_cutile_tiles.py
-- Evidence artifact will be added here once an actual native execution run finishes. A dry-run resolver result is not a completed install, and an installed package without CUDA or passing numerical tests does not qualify as an SDPA comparison.
+## Historical runner failures
 
-## Report and image source-of-truth
+- [Run #39234069849](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39234069849) failed before GPU tests: first action download metadata resolution failed; its retry later hit a Git/TLS `SEC_E_MESSAGE_ALTERED (0x8009030F)` transport error during checkout.
+- Earlier native jobs also failed before testing when Windows PowerShell refused the generated script under its execution policy. Native PowerShell steps now use `powershell -NoProfile -ExecutionPolicy Bypass -File {0}`.
+- These are runner/transport failures, not evidence of a CUDA kernel defect.
+
+## Source-of-truth and report locations
 
 - Canonical technical report: [Report.md](../Report.md).
-- Rubric/checklist: [COURSE_PROJECT_COMPLETION_CHECKLIST.md](COURSE_PROJECT_COMPLETION_CHECKLIST.md).
+- Project two-pager/product scope: [PROJECT_TWO_PAGER.md](PROJECT_TWO_PAGER.md).
+- Completion checklist: [COURSE_PROJECT_COMPLETION_CHECKLIST.md](COURSE_PROJECT_COMPLETION_CHECKLIST.md).
 - Profile interpretation: [CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 - Detailed benchmark snapshot: [CUTILE_RTX4060_RESULTS_2026-10-19.md](CUTILE_RTX4060_RESULTS_2026-10-19.md).
-- The technical report contains external citations and project-relative figures, but deliberately omits action-run URLs and file checksums.
-
-
-## Native Windows runner status — 20 October 2026
-
-- The earlier PyTorch experiment [run #39252195780](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39252195780) **failed before source fetch or GPU work**. The log records a PowerShell `PSSecurityException`: execution of the generated workflow script was disabled by the Windows execution policy. The subsequent pip install, cuTile smoke, GPU tests, CLI check, SDPA benchmark, model bridge, autotuning and load-latency experiment were never reached. This is a workflow-startup failure, not a kernel result.
-- Workflow-fix commits: [SDPA workflow](https://github.com/xemptynothing/gpu-nvidia/commit/1cfb609efa31859795007fba1f5de890e8d787c2) and [NCU workflow](https://github.com/xemptynothing/gpu-nvidia/commit/433ca9cd63167f1ef7b33a3592d3a5408a78d77a). Native Windows PowerShell steps now use `powershell -NoProfile -ExecutionPolicy Bypass -File {0}`; the GitHub token expression was also corrected.
-- CPU/reference CI after the workflow fixes: [run #39402058165](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402058165) completed successfully. This is CPU/reference validation only, not GPU validation.
-- Fresh PyTorch SDPA/core regression/optional-objective run: [run #39402053172](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402053172) was queued at the last status check. It is configured to fetch exact source at its commit, use only the project-local `.venv-cutile-windows`, revalidate the core, then run the SDPA/model comparison, optional attention tests, tile autotuning and load-latency-hint sweep.
-- Updated actual-cuTile NCU run: [run #39402058064](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402058064) was queued at the last status check. The prior NCU run [#39252236513](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39252236513) is an older queued snapshot; if it executes first, it still reflects the earlier workflow file.
-- The updated NCU workflow must preserve native `.ncu-repz`/`.ncu-rep` reports, CSV/Details exports, screenshot manifest and capture logs. Only actual captured PNGs may be described as screenshots. If no interactive desktop is available, record that limitation instead of fabricating screenshots.
-
-Queued is **not** a result. Add the real job logs, artifact links, exact package/environment snapshot, outputs and numerical/performance decisions here after the native runner has actually executed the work.
