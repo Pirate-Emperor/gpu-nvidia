@@ -23,9 +23,9 @@ jobs:
       # Preserve existing NCU reports, but fetch the source pinned to this commit
       # through the Contents API to avoid relying on a fresh git/TLS checkout.
       - name: Fetch NCU capture source pinned to this commit
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         env:
-          GITHUB_TOKEN: \${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $Root = $env:GITHUB_WORKSPACE
@@ -50,7 +50,7 @@ jobs:
 
 
       - name: Recover or capture and export two cuTile Nsight Compute reports
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
           $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
@@ -172,7 +172,7 @@ jobs:
       - name: Capture genuine Nsight Compute GUI window screenshots
         if: always()
         continue-on-error: true
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
           $ProjectRoot = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
