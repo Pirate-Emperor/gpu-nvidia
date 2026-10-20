@@ -38,7 +38,7 @@ jobs:
           foreach ($Relative in $Paths) {
             $ApiPath = $Relative.Replace('\','/')
             Write-Host "FETCHING_SOURCE=$ApiPath REF=$env:GITHUB_SHA"
-            $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/$ApiPath?ref=$env:GITHUB_SHA"
+            $Uri = 'https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/{0}?ref={1}' -f $ApiPath, $env:GITHUB_SHA
                         try {
               $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
             } catch {
