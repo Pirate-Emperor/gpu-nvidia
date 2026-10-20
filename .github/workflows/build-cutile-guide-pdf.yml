@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "docs/CUTILE_ATTENTION_PROJECT_GUIDE.md"
+      - "docs/COURSE_PROJECT_REPORT_2026-10-20.md"
       - ".github/workflows/build-cutile-guide-pdf.yml"
   workflow_dispatch:
 
@@ -45,11 +46,33 @@ jobs:
             --variable=linkcolor:blue \
             --table-of-contents
 
+      - name: Build submission-length technical report PDF
+        run: |
+          pandoc docs/COURSE_PROJECT_REPORT_2026-10-20.md \
+            --from=gfm+tex_math_dollars \
+            --output=docs/COURSE_PROJECT_REPORT_2026-10-20.pdf \
+            --pdf-engine=xelatex \
+            --variable=papersize:a4 \
+            --variable=geometry:margin=17mm \
+            --variable=mainfont:"DejaVu Sans" \
+            --variable=monofont:"DejaVu Sans Mono" \
+            --variable=fontsize:9pt \
+            --variable=colorlinks:true \
+            --variable=linkcolor:blue
+
       - name: Upload phone-friendly PDF
         uses: actions/upload-artifact@v4
         with:
           name: cutile-attention-project-guide-pdf
           path: docs/CUTILE_ATTENTION_PROJECT_GUIDE_PHONE.pdf
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload submission report PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-course-project-report-pdf
+          path: docs/COURSE_PROJECT_REPORT_2026-10-20.pdf
           if-no-files-found: error
           retention-days: 30
 
@@ -59,7 +82,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/CUTILE_ATTENTION_PROJECT_GUIDE_PHONE.pdf
+          git add docs/CUTILE_ATTENTION_PROJECT_GUIDE_PHONE.pdf docs/COURSE_PROJECT_REPORT_2026-10-20.pdf
           if git diff --cached --quiet; then
             echo "PDF unchanged; nothing to commit."
             exit 0
