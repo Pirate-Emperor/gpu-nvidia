@@ -154,6 +154,7 @@ jobs:
           $HintProfiles = @(
             @{ Label = 'medium-latency4'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 4 },
             @{ Label = 'medium-latency8'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 8 },
+            @{ Label = 'medium-latency10'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 10 },
             @{ Label = 'long-batched-latency4'; Case = 'longer_batched_d128'; TQ = 64; TK = 128; Latency = 4 },
             @{ Label = 'long-batched-latency8'; Case = 'longer_batched_d128'; TQ = 64; TK = 128; Latency = 8 }
           )
@@ -250,6 +251,11 @@ jobs:
             results/cutile-profile-medium-latency8.ncu-rep
             results/cutile-profile-medium-latency8-details.txt
             results/cutile-profile-medium-latency8-raw.csv
+            cutile-profile-medium-latency10.log
+            results/cutile-profile-medium-latency10.ncu-repz
+            results/cutile-profile-medium-latency10.ncu-rep
+            results/cutile-profile-medium-latency10-details.txt
+            results/cutile-profile-medium-latency10-raw.csv
             cutile-profile-long-batched-latency4.log
             results/cutile-profile-long-batched-latency4.ncu-repz
             results/cutile-profile-long-batched-latency4.ncu-rep
