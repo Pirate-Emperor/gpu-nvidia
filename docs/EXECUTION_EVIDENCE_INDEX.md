@@ -50,3 +50,9 @@ This is the execution record for native runs, artifacts, runner diagnostics and 
 - Completion checklist: [COURSE_PROJECT_COMPLETION_CHECKLIST.md](COURSE_PROJECT_COMPLETION_CHECKLIST.md).
 - Profile interpretation: [CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 - Detailed benchmark snapshot: [CUTILE_RTX4060_RESULTS_2026-10-19.md](CUTILE_RTX4060_RESULTS_2026-10-19.md).
+
+
+## General native-validation shell fix — 20 October 2026
+
+- [Run #39414502390](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502390) failed in its first dependency step before installing packages or running any GPU checks. The job log shows the runner's default shell attempted to dot-source the generated temporary PowerShell script and received `PSSecurityException: running scripts is disabled on this system`.
+- The workflow `.github/workflows/cutile-rtx4060-docker.yml` has been updated so each PowerShell step explicitly invokes `powershell -NoProfile -ExecutionPolicy Bypass -File {0}`, matching the already-working native NCU/SDPA workflow pattern. The rerun result on the fix commit is pending; the failed run is not a kernel result.
