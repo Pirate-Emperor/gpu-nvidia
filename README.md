@@ -26,6 +26,7 @@ Use this order to understand the project and decide what to do next.
 | Dated experiment history | [Progress log](docs/PROGRESS.md) |
 | How benchmark/profile artifacts should be stored | [Results README](results/README.md) |
 | Current hardware, test, and blocker snapshot | [Results status](results/STATUS.md) |
+| **Latest dated RTX 4060 benchmark/accuracy/hint snapshot** | [20 October results](docs/CUTILE_RTX4060_RESULTS_2026-10-20.md) |
 | Actual-cuTile Nsight Compute profiling results | [Profiler analysis](docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) |
 | Local RTX 4060/Windows cuTile bring-up and smoke evidence | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
 | Native Windows RTX 4060 Actions runner setup | [Local GPU guide](docs/LOCAL_GPU_WINDOWS.md) |
