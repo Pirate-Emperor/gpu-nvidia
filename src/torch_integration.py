@@ -41,9 +41,13 @@ class _CuTileCausalAttention(torch.autograd.Function):
         from cutile_attention import launch_device
 
         _validate_torch_inputs(q, k, v)
-        q_cp = cp.from_dlpack(q)
-        k_cp = cp.from_dlpack(k)
-        v_cp = cp.from_dlpack(v)
+        # This custom autograd.Function owns gradient handling. DLPack exports
+        # share the input storage with CuPy, but PyTorch rejects direct exports
+        # of requires-grad tensors; detach the views while saving original q/k/v
+        # below so backward still returns gradients for the original inputs.
+        q_cp = cp.from_dlpack(q.detach())
+        k_cp = cp.from_dlpack(k.detach())
+        v_cp = cp.from_dlpack(v.detach())
         out_cp = launch_device(
             q_cp, k_cp, v_cp, tile_q=int(tile_q), tile_k=int(tile_k)
         )
