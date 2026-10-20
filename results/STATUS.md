@@ -1,6 +1,13 @@
 # Current Result Snapshot
 
-## Verified 2026-10-19 — actual cuTile correctness, benchmark, and Nsight profiling pass
+## Current main status — 20 October 2026
+
+- The repo's strongest recorded native RTX 4060 results are from an earlier core snapshot. Since then, main added GQA/MQA, packed-variable-length semantics, the PyTorch bridge, tile autotuning and the DRAM-load-latency hint parameter. These additions also changed the kernel launch signature, so the earlier GPU pass does **not** establish that current main still passes.
+- The Windows native workflow initially failed before source fetch and GPU work because PowerShell execution policy blocked the generated workflow script. The [SDPA workflow fix](https://github.com/xemptynothing/gpu-nvidia/commit/1cfb609efa31859795007fba1f5de890e8d787c2) and [NCU workflow fix](https://github.com/xemptynothing/gpu-nvidia/commit/433ca9cd63167f1ef7b33a3592d3a5408a78d77a) now use a non-profiled PowerShell process with execution-policy bypass.
+- CPU/reference CI after the fix passed in [run #39402058165](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402058165); that is not GPU validation. At the last status check, the fresh native SDPA/core-regression job [#39402053172](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402053172) and NCU job [#39402058064](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402058064) were queued.
+- **Current gate:** run the current source on the RTX 4060; inspect core correctness/numerical/CLI outputs before treating the existing baseline as re-established, then review optional-extension timings and artifacts. Workflow details are in [the execution evidence index](../docs/EXECUTION_EVIDENCE_INDEX.md).
+
+## Historical baseline verified 2026-10-19 — actual cuTile correctness, benchmark, and Nsight profiling pass
 
 **Primary native run:** [RTX 4060 validation #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223), commit `cd1ec63b210682613ddb29dca3543f0cacc9bacf).  
 **Profiler run:** [#39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066).  
@@ -10,7 +17,7 @@
 **Verified gates:** genuine smoke PASS; 48 required attention tests PASS with REQUIRE_CUTILE=1; 29 accuracy configurations PASS with zero tolerance violations; CLI/reference PASS; three controlled benchmark sessions PASS; two actual-cuTile NCU profiles and scheduler/warp-state reports captured and inspected.  
 **Stable performance highlights:** long D=128, tile 64×64, median 0.267059 ms / P90 0.271626 ms, 16.53× vs unfused CuPy, spread 2.0%, max baseline drift 0.5%. Longer batched D=128, tile 64×128, median 0.923034 ms / P90 0.937656 ms, 18.54×, spread 0.9%, max baseline drift 0.1%.  
 **Profiler findings:** the two profiled kernels use 231/255 registers per thread and 65.54/81.92 KiB static shared memory per block; achieved occupancy was 8.35%/8.33%, with shared memory limiting CTA residency to one CTA per SM. Scheduler sections reported no-eligible-warp cycles of 85.83%/85.26%. See [profile analysis](../docs/CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). The optional stall-sampling metric `smsp__pcsamp_sample_count` was unavailable, so the detailed stall source attribution is limited.  
-**Current status:** core required correctness, CLI, controlled-performance, and two-configuration profiling gates are complete. CUDA-enabled PyTorch SDPA comparison remains an optional follow-up; current comparison is against the deliberately unfused FP32 CuPy baseline.
+**Historical-snapshot status:** core required correctness, CLI, controlled-performance, and two-configuration profiling gates passed for this recorded implementation snapshot. Current main has since changed and is being revalidated; do not treat the old result as proof for the newer optional paths. The prior speedup comparison is against the deliberately unfused FP32 CuPy baseline, not vendor-optimized attention.
 
 ## Assignment-level closure audit — 2026-10-19
 
