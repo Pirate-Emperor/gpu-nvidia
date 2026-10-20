@@ -42,8 +42,15 @@ jobs:
           $Headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
           foreach ($Relative in $Paths) {
             $ApiPath = $Relative.Replace('\','/')
+            Write-Host "FETCHING_SOURCE=$ApiPath REF=$env:GITHUB_SHA"
             $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/$ApiPath?ref=$env:GITHUB_SHA"
-            $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
+                        try {
+              $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
+            } catch {
+              $StatusCode = 'n/a'
+              if ($_.Exception.Response -and $_.Exception.Response.StatusCode) { $StatusCode = [int]$_.Exception.Response.StatusCode }
+              throw "GitHub contents fetch failed: path='$ApiPath' ref='$env:GITHUB_SHA' status=$StatusCode uri='$Uri' error=$($_.Exception.Message)"
+            }
             if ($Item.type -ne 'file' -or -not $Item.content) { throw "No source content returned for $ApiPath" }
             $Destination = Join-Path $Root $Relative
             New-Item -ItemType Directory -Force -Path (Split-Path $Destination -Parent) | Out-Null
