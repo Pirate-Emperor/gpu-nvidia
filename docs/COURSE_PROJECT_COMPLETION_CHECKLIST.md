@@ -6,7 +6,7 @@
 
 ## Executive status
 
-The fused cuTile implementation and core GPU validation gates are verified. The assignment should not yet be described as fully closed. Outstanding rubric-level items are: framework/vendor attention as a performance reference (the PDF says this is not part of the speedup grade, but does list it in performance evaluation), a second profiler-guided improvement, consistent cold/JIT timing for every workload, and a truthful individual-contributions statement. Do not install PyTorch or additional tools without owner approval.
+The fused cuTile kernel and selected optional GPU features have a fresh complete native pass. The assignment should not yet be described as fully closed. Outstanding rubric-level items are: framework/vendor attention comparison (currently blocked by a plain PyTorch CUDA GEMM failure on the pinned CUDA 13.0 wheel), matched NCU validation of the medium-workload LOAD_LATENCY=10 timing candidate, clean-cache JIT timing for long specializations, and the owner's truthful individual-contributions statement. A CUDA 13.2 PyTorch build is being checked in a separate project-local venv; the existing cuTile venv remains unchanged.
 
 ## Current validation evidence
 
