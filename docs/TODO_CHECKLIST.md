@@ -1,7 +1,7 @@
 # Project TODO Checklist — Fused Causal Attention with NVIDIA cuTile
 
-**Last reviewed:** 2026-10-19  
-**Start here:** this file explains the goal, what has already been done, what remains, and the evidence required before the course project can be marked complete. The [root README](../README.md) is the entry point; the [experiment report](EXPERIMENT_REPORT.md) contains the more detailed measurements and history.
+**Last reviewed:** 2026-10-20  
+**Start here:** use the [Project Two-Pager](PROJECT_TWO_PAGER.md) for the current concise state and gates. This checklist explains the goal, historical evidence, remaining requirements and the evidence needed before the current source tree can be marked complete. The [root README](../README.md) is the entry point; the [experiment report](EXPERIMENT_REPORT.md) contains the detailed measurements and history.
 
 **Authoritative experiment record:** [root Report.md](../Report.md) contains the full benchmark matrix, profiler metrics/figures, all project/CUDA/library errors, external references and optional-objective tracker. [RUN_EVIDENCE.md](../RUN_EVIDENCE.md) keeps automation-only provenance separate as requested.
 
@@ -34,6 +34,8 @@ The current A100 runner uses driver R550.90.07, below NVIDIA's documented R580+ 
 
 ## 2. Current status at a glance
 
+**Current-main boundary (20 October 2026):** the strongest native RTX 4060 results below belong to an earlier validated core snapshot. Main now includes GQA/MQA, packed-variable-length, PyTorch bridge, autotuner and load-latency-hint additions, with new compile-time parameters in the core kernel. The PowerShell startup issue was fixed in [the SDPA workflow](../.github/workflows/torch-sdpa-preflight.yml) and [the NCU workflow](../.github/workflows/cutile-rtx4060-ncu.yml); CPU/reference CI passed, but fresh native regression and profiler jobs were queued at the last check. See the [execution evidence index](EXECUTION_EVIDENCE_INDEX.md). Treat the pass rows below as historical evidence until the current-main GPU job finishes.
+
 **Latest full native Windows validation:** [run #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223), commit `cd1ec63b210682613ddb29dca3543f0cacc9bacf`; smoke, 48 required attention tests, 29 numerical configurations, CLI/oracle verification, and all three controlled benchmark sessions passed. That run also found Nsight Compute 2026.3.1.0 and completed both basic captures, but its first artifact omitted the compressed `.ncu-repz` files because the upload expected `.ncu-rep`. The dedicated follow-up [profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066) reused those reports, captured scheduler/warp-state reports, exported details/raw CSVs, and preserved all four reports in [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). The controlled benchmark snapshot and raw three-session data remain linked in [the result report](CUTILE_RTX4060_RESULTS_2026-10-19.md) and [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465).
 
 | Area | Status | Meaning |
@@ -41,12 +43,12 @@ The current A100 runner uses driver R550.90.07, below NVIDIA's documented R580+ 
 | Mathematics and independent references | **DONE** | Independent scalar and FP32 matrix references are used for checks. |
 | Ordinary-CUDA correctness on A100 | **DONE as control only** | Historical ordinary-CUDA runs do not count as cuTile results. |
 | Shared-tile experiments v1–v5 | **DONE for implementation and targeted checks** | Versions are preserved; no unproven win is promoted. |
-| Actual cuTile smoke and attention correctness | **PASS** | The RTX 4060 run passed 48 required tests with REQUIRE_CUTILE=1. |
-| Numerical diagnostics | **PASS** | 29 legal case/tile combinations; zero mixed-tolerance violations. |
-| CLI and independent oracle | **PASS** | FP16 output verified by the independent NumPy oracle. |
-| Actual cuTile benchmark | **PASS WITH CAVEATS** | Three sessions cover five tiles; long cases are stable, very short cases are noisy. |
-| Nsight Compute profiles | **PASS** | Two basic reports plus two Scheduler/ Warp State reports captured and inspected; [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). |
-| Assignment / final course deliverable | **GPU gates PASS; rubric closure PARTIAL** | The fused kernel, correctness, CLI, controlled benchmark and four-profile NCU evidence are complete. Framework/vendor reference, clean-cache JIT for long cases, second profiler-guided improvement and author contributions remain in [the rubric checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md).
+| Actual cuTile smoke and attention correctness | **Historical baseline PASS; current main pending** | The earlier RTX 4060 run passed 48 required tests with REQUIRE_CUTILE=1. Current main needs a fresh full GPU regression. |
+| Numerical diagnostics | **Historical baseline PASS** | 29 legal case/tile combinations; zero mixed-tolerance violations in the earlier snapshot. |
+| CLI and independent oracle | **Historical baseline PASS** | FP16 output verified by the independent NumPy oracle in the earlier snapshot. |
+| Actual cuTile benchmark | **Historical baseline PASS WITH CAVEATS** | Three sessions covered five tiles; long cases were stable, very short cases noisy. |
+| Nsight Compute profiles | **Historical baseline PASS; refresh pending** | Two basic reports plus two Scheduler/Warp State reports were captured and inspected; [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). Reprofile current source after the native regression. |
+| Assignment / final course deliverable | **Historical baseline PASS; current source pending revalidation; rubric closure PARTIAL** | The earlier snapshot passed core correctness, CLI, controlled benchmark and four-profile NCU gates. Current-source revalidation, framework/vendor reference, clean-cache JIT for long cases, a second profiler-guided improvement and owner-confirmed contributions remain in [the rubric checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md).
 
 ## 3. Done so far — brief explanations and evidence
 
@@ -94,7 +96,7 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 - [x] **Verify the command-line path end to end.** Run `python run_attention.py --input INPUT.npz --output OUTPUT.npy --backend cutile`; check the output file, shape, FP16 dtype, finite values and tolerance against an independent oracle.
 - [x] **Record proof that the actual tests executed.** Save the run URL, tested commit, GPU/toolchain versions, pass/skip/fail counts, and logs. A workflow that skips cuTile tests does not count.
 
-**Priority 0 is complete:** the actual kernel compiles/launches and the required correctness suite passes (run #39160827910).
+**Historical Priority 0 baseline passed:** the earlier kernel compiled/launched and passed the required correctness suite (run #39160827910). Because the current main adds compile-time kernel parameters and optional launch paths, rerun that full gate before marking the current source revalidated.
 
 ### Priority 1 — obtain profiler evidence
 
@@ -103,7 +105,7 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 - [x] Inspect register/shared-memory usage, occupancy, throughput, scheduler eligibility, and execution-pipeline-stall diagnostics. Findings and limitations are recorded in [CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md).
 - [x] Capture Nsight Systems timelines and CUDA API/kernel summaries for the warmed ordinary-CUDA surrogate at `medium_d128, tile_k=64` and `longer_batched_d128, tile_k=32`: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950), [uploaded trace + summary artifacts](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954). This is supplementary surrogate evidence; actual-cuTile timelines remain to be captured after cuTile runs on supported hardware.
 
-**Profiler gate complete:** two successful, inspectable actual-cuTile reports were captured and interpreted. Scheduler/warp-state analysis is directional because the optional `smsp__pcsamp_sample_count` metric was unavailable; do not overinterpret Nsight's estimated local-speedup heuristics.
+**Historical profiler gate complete:** two successful, inspectable actual-cuTile reports were captured and interpreted. The current source should be re-profiled after the fresh regression; scheduler/warp-state analysis remains directional because `smsp__pcsamp_sample_count` was unavailable. Do not overinterpret Nsight's estimated local-speedup heuristics.
 
 ### Priority 1 — complete a reliable performance comparison
 
@@ -128,7 +130,7 @@ Note: a self-hosted runner executes repository workflow code on the machine; it 
 - [x] Verify core deliverables: fused cuTile implementation, independent correctness tests, multiple tiles, unfused FP32 CuPy comparison, at least 30 measured iterations, separate first-call/JIT-associated timing, and two actual-cuTile profiler configurations. A CUDA-enabled PyTorch SDPA comparison was not available in the existing project venv and remains optional follow-up; current speedups are explicitly against the unfused CuPy baseline.
 - [x] Reproduced through native Windows workflow checkout and preserved benchmark output in artifact 12148414465 and profiler output in [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
 - [x] Keep ordinary-CUDA metrics labelled as controls; actual cuTile data are tabulated separately.
-- [x] Mark the core project scope complete after correctness, performance, and two-configuration profiling gates all have supporting evidence.
+- [ ] Re-run and inspect the full native correctness, numerical, CLI, benchmark and NCU gates against current main after the optional additions; then reaffirm current-tree closure or document any regressions.
 
 ## Decision rules
 
