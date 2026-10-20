@@ -13,35 +13,33 @@ This is the execution record for native runs, artifacts, runner diagnostics and 
 
 ### Actual cuTile Nsight Compute profiles
 
-- Workflow: [run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373), completed successfully on commit `affd935649c2cf9967210769b0381d807c6c4d6a`.
-- Artifact: [#12256589808 — cutile-rtx4060-ncu-profiles](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373/artifacts/12256589808), 631,797 bytes; SHA-256 reported by Actions: `d8ddf993d41b4bccc4aaf1d1b50c2c917c93c02a347e6d51362521e562d59fef`.
-- The artifact includes eight genuine `.ncu-repz` reports with Details/Raw CSV exports and logs: baseline profiles and scheduler/warp-state profiles for medium D=128 64×64 and longer-batched D=128 64×128, plus LOAD_LATENCY=4 and =8 profiles for both cases.
-- Latest baseline profile durations were 52.86 µs (medium) and 987.94 µs (longer-batched). Latest scheduler snapshots showed no eligible warp for 85.90% and 85.27% of scheduler cycles, respectively; the reports show about 8.3% achieved occupancy due chiefly to shared-memory residency. These are profiler measurements/diagnostics, not replacements for ordinary CUDA-event benchmark medians.
-- Hint 4/8 captures do **not** settle which hint is faster. The native multi-session CUDA-event timing/accuracy sweep has not yet finished.
-- Screenshot status: **0 PNGs captured**. The artifact's capture manifest explicitly reports no screenshots. No GUI screenshot is claimed; only the native report files and CSV/Details exports are available from this run.
+- Latest completed dedicated profile workflow: [run #39414502490](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502490), artifact [#12261445684](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502490/artifacts/12261445684), 1,074,786 bytes; zip SHA-256 5a544007115bbe5fa1d97b4d27699fe1c49bc1f83964d33f616a18e80eddeaae.
+- The artifact contains eight native .ncu-repz reports, matching Details/Raw CSV exports and **seven verified genuine 1936×1048 Nsight Compute application-window screenshots**. The skipped screenshot was the longer-batched LOAD_LATENCY=4 report because Windows GetWindowRect failed; the capture manifest records the reason.
+- The latest completed full native core workflow [#39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438) also captured fresh default-hint reports for medium D=128 / 64×64 and longer-batched D=128 / 64×128 in [artifact #12264746195](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438/artifacts/12264746195).
+- A three-session timed experiment then found a credible LOAD_LATENCY=10 candidate for medium D=128 / 64×64. The dedicated profiler workflow now includes a matched medium hint-10 report; run [#39423368441](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423368441) was queued at this evidence snapshot. No hint-10 NCU resource values are claimed yet.
 
 ### Full native regression and measured hint sweep
 
-- Workflow [#39415104135](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135) succeeded on commit `90dafef5318a19e8752a7936643319eb8713083f`; [artifact #12261182182](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135/artifacts/12261182182), 194,346 bytes, SHA-256 `06247a83344f9ef07ec8f69fa732c655c4b4bc99882d72035e0ab33adf449eda`.
-- Passed: genuine cuTile smoke; 48/48 required GPU correctness tests; 3/3 optional GQA/MQA/packed-varlen correctness tests; all 29 numerical case/tile combinations; actual cuTile CLI output against the independent NumPy oracle; three controlled benchmark sessions; and the load-latency hint sweep.
-- Benchmark controls: ten warmups, 30 CUDA-event samples, five launches per event sample, three sessions with rotated/reversed tile order.
-- Fresh benchmark summary:
+- Latest completed full native Windows validation: [run #39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438), commit bf5a6233e195c2ced647b4e20b5b2d914da60e85; artifact [#12264746195](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438/artifacts/12264746195), 194,711 bytes; zip SHA-256 e3eaf4ae1e88d2547d2034dfe333db86b70f69e2f2d6c71b0d67b7c8bdde0c32.
+- Passed: genuine cuTile smoke; 48/48 required core GPU correctness tests; 3/3 optional GQA/MQA and packed-variable-length GPU tests; all 29 independent numerical case/tile combinations with zero tolerance violations; CLI output against the independent NumPy oracle; three controlled benchmark sessions; all accuracy-gated latency-hint trials; and two actual cuTile NCU captures.
+- Benchmark controls: ten warmups, 30 CUDA-event samples, five launches per sample, three sessions with rotated/reversed tile order. Fresh summary:
 
-| Workload | Tile | Median (ms) | P90 (ms) | Speedup vs unfused FP32 CuPy | Across-session range |
-|---|---:|---:|---:|---:|---:|
-| Long D=128 | 64×64 | 0.268083 | 0.269128 | 16.45× | 0.50% |
-| Longer batched D=128 | 64×128 | 0.915046 | 0.920576 | 18.70× | 0.59% |
-| Medium D=128 | 64×64 | 0.055501 | 0.056955 | 7.02× | 8.86% |
+| Workload | Tile | Median (ms) | Speedup vs unfused FP32 CuPy | Across-session range |
+|---|---:|---:|---:|---:|
+| Long D=128 | 64×64 | 0.267059 | 16.49× | 0.9% |
+| Longer batched D=128 | 64×128 | 0.915558 | 18.69× | 0.5% |
+| Medium D=128 | 64×64 | 0.058368 | 6.70× | 9.8% |
 
-- The latency-hint report used the same accuracy-before-timing gate across all 36 candidate trials; every trial passed. For medium D=128 / 64×64, hint 10 gained 8.27% versus the sweep's default median, but the noise-aware required gain was 9.88%. For longer-batched D=128 / 64×128, the strongest candidate (hint 6) gained only 0.10% versus a 1.00% minimum threshold. **Neither recommendation is credible; keep LOAD_LATENCY=0 for both workloads.**
-- The general native-validation run covers core and selected optional cuTile objectives; it does **not** run the separate PyTorch autograd integration tests. Those remain tracked below.
+- The three-session latency-hint sweep passed all 36 accuracy-before-timing trials. Medium D=128 / 64×64 with LOAD_LATENCY=10 measured 0.053248 ms median versus 0.058342 ms default (8.73% gain); candidate and default session ranges were both about 0.53%, clearing the configured 1.00% noise-aware threshold. Longer-batched D=128 / 64×128 did not produce a credible gain: its best candidate (hint 2) gained only 0.16%, below a 5.88% threshold under that run's session spread. Keep LOAD_LATENCY=0 as the global default until the matched medium hint-10 NCU report is inspected.
+- These are native Windows RTX 4060 cuTile results versus the intentionally unfused FP32 CuPy baseline, **not** comparisons against FlashAttention or vendor-optimized PyTorch SDPA. PyTorch integration is a separate gate.
 
 ### PyTorch SDPA, core-regression and optional-objective workflow
 
-- First native run: [#39403488341](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341), failed during test collection due to a missing module-scope `torch` import; partial artifact [#12255372678](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403488341/artifacts/12255372678). Follow-up: [#39414502429](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502429), passed collection and core gates but failed two autograd bridge tests on `BufferError: Can't export tensors that require gradient, use tensor.detach()` and then logged `CUBLAS_STATUS_NOT_INITIALIZED` during the model-block test. The bridge now detaches only the DLPack views; another native run must verify this fix and resolve any remaining cuBLAS issue.
-- Passed before the collection error: PyTorch 2.14.0+cu130 was present in the project-local `.venv-cutile-windows`; PyTorch reported CUDA build 13.0 and `torch.cuda.is_available() == True`; CuPy/cuTile/PyTorch import check; cuTile smoke; the required core GPU correctness suite; 29-case/tile accuracy matrix; actual-cuTile CLI output and independent NumPy-oracle verification.
-- Current targeted fix: the reference backward now flattens batch and head into an explicit GEMM batch and makes transposed operands contiguous before `torch.bmm`, avoiding the non-contiguous singleton-head GEMM path implicated by the trace. This change is not yet validated until the next native PyTorch run finishes. The previous SDPA run stopped before writing its timing JSON/CSV; no vendor comparison, integration timing, or gradient pass is claimed from it.
-- Next gate: inspect the new native PyTorch run after the contiguous-batched-GEMM fix. Require all autograd and model tests to pass first, then verify SDPA operator identity, NumPy/cuTile output accuracy, and its three-session JSON/CSV before recording any framework speedup.
+- Native SDPA run [#39422402415](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402415), after the flattened-batched torch.bmm backward change, failed all four batch/head autograd cases with CUBLAS_STATUS_INVALID_VALUE. Artifact: [#12265041153](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402415/artifacts/12265041153).
+- A new diagnostic test reproduced CUBLAS_STATUS_INVALID_VALUE in plain float32 torch.bmm **before invoking the cuTile bridge**: [run #39423190840](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423190840), artifact [#12263887676](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423190840/artifacts/12263887676). This points to a PyTorch/cuBLAS wheel/runtime issue in the installed environment, rather than a cuTile-kernel-only bug. The subsequent FP16 model-block CUBLAS_STATUS_NOT_INITIALIZED followed those GEMM failures and is not independently diagnostic.
+- To test whether the behavior is tied to the CUDA 13.0 PyTorch wheel, [scripts/torch_cublas_diagnostic.py](../scripts/torch_cublas_diagnostic.py) runs 2D GEMM, batch-1 and batch-2 BMM, and FP16 linear in isolated child processes. Run [#39423804493](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423804493) creates a separate project-local CUDA 13.2 PyTorch 2.14.0 virtual environment without overwriting .venv-cutile-windows; it was queued at this snapshot. No result for the alternative wheel, no PyTorch autograd pass, and no SDPA/vendor timing are claimed yet.
+- The core remains independently validated by run #39422402438. Do not conflate the PyTorch failure with failure of the actual cuTile core, GQA/MQA, packed-varlen, numeric, CLI, or timing gates.
+- Next gate: establish plain PyTorch GEMM/linear health; then pass all autograd and model tests; only afterwards capture actual SDPA backend/operator identity, output accuracy, and repeated timing JSON/CSV.
 
 ## Latest native profiler capture and genuine GUI screenshots
 
@@ -85,8 +83,9 @@ This is the execution record for native runs, artifacts, runner diagnostics and 
 - The workflow `.github/workflows/cutile-rtx4060-docker.yml` has been updated so each PowerShell step explicitly invokes `powershell -NoProfile -ExecutionPolicy Bypass -File {0}`, matching the already-working native NCU/SDPA workflow pattern. The rerun result on the fix commit is pending; the failed run is not a kernel result.
 
 
-## Latest source fix and pending reruns
+## Current source changes and queued native follow-ups
 
-- Commit [#90dafef](https://github.com/xemptynothing/gpu-nvidia/commit/90dafef5318a19e8752a7936643319eb8713083f) updates `src/torch_integration.py`: DLPack now receives detached views of Q/K/V while the custom autograd context stores original tensors for backward.
-- Full native-validation job [#39414730179](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414730179) passed setup and core/optional correctness gates and was running the three-session CUDA-event benchmark at the last check. Its final artifact must be inspected before benchmark results are asserted.
-- Current-source native SDPA rerun [#39415104113](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104113) and full native regression [#39415104135](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135) are queued on commit `90dafef5318a19e8752a7936643319eb8713083f`. They must finish before declaring PyTorch integration, SDPA comparison, autotuning, or load-latency timed sweep complete.
+- The custom autograd bridge passes detached views to CuPy's DLPack importer while saving the original tensors for backward. Its flattened torch.bmm reference backward remains unvalidated because plain GEMM in the installed CUDA 13.0 wheel failed before the bridge was called.
+- The extra test in commit [#92e6a04](https://github.com/xemptynothing/gpu-nvidia/commit/92e6a04f300fbe9c059c8b34a0f30ab59230594e) isolates plain PyTorch BMM health; run [#39423190840](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423190840) failed this sanity check with CUBLAS_STATUS_INVALID_VALUE.
+- The isolated CUDA 13.2 wheel probe is tracked by [run #39423804493](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423804493) and was queued at this snapshot. Do not change the primary venv until its results establish whether basic GEMM and linear work in the alternate build.
+- The NCU workflow was extended by [commit #d9837db](https://github.com/xemptynothing/gpu-nvidia/commit/d9837db33c416f63547d9f376ba8a583996b8c0f) to add the medium D=128 / 64×64 LOAD_LATENCY=10 capture plus Details/Raw CSV exports. Its run [#39423368441](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39423368441) was queued at this snapshot.
