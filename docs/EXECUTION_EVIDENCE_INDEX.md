@@ -27,6 +27,17 @@ This is the execution record for native runs, artifacts, runner diagnostics and 
 - Root causes so far: (1) `_CuTileCausalAttention(torch.autograd.Function)` required the module-scope `torch` import, now present; (2) DLPack input conversion rejected Q/K/V tensors that require gradients, now fixed with `q.detach()`, `k.detach()`, and `v.detach()` for the CuPy views while original tensors remain saved for backward. The cuBLAS initialization error is not yet explained. No SDPA timing, model-integration timing, optional-objective suite, autotuner recommendation, or load-latency timing result is claimed; the failed run stopped before these stages.
 - Next gate: run the complete native workflow again on the fixed commit, inspect its JSON/CSV, verify SDPA operator identity and numerical accuracy, then update the report with measured results.
 
+## Latest native profiler capture and genuine GUI screenshots
+
+- Workflow: [run #39414502490](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502490), successful on commit `2fd70a36248650c778b2353ef45e7762cb568c22`.
+- Artifact: [#12261445684 — cutile-rtx4060-ncu-profiles](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502490/artifacts/12261445684), 1,074,786 bytes; zip SHA-256 `5a544007115bbe5fa1d97b4d27699fe1c49bc1f83964d33f616a18e80eddeaae`.
+- Verified artifact contents: eight native `.ncu-repz` reports, Details and Raw CSV exports, capture logs/manifest, and **seven actual Nsight Compute application-window PNGs**, each 1936×1048, checked after download. The screenshot shows NCU's own window with the actual report and metrics, not a synthesized visualization.
+- Captured files: `cutile-profile-medium.png`, `cutile-profile-medium-stalls.png`, `cutile-profile-medium-latency4.png`, `cutile-profile-medium-latency8.png`, `cutile-profile-long-batched.png`, `cutile-profile-long-batched-stalls.png`, and `cutile-profile-long-batched-latency8.png`.
+- One capture remains incomplete: `cutile-profile-long-batched-latency4.ncu-repz` was skipped because Windows `GetWindowRect` failed for that window. No screenshot is claimed for it. The seven successful PNGs plus all eight reports are in the artifact above.
+- Latest profiler-only base observations: medium D=128 / 64×64 = 53.31 µs, 231 registers/thread, 65.54 KiB static shared memory/CTA, 8.34% achieved occupancy; longer-batched D=128 / 64×128 = 989.98 µs, 255 registers/thread, 81.92 KiB static shared memory/CTA, 8.31% achieved occupancy. These multi-pass NCU durations are not the ordinary CUDA-event benchmark.
+- Scheduler exports: no eligible warp for 85.94% (medium) and 85.25% (longer-batched) of scheduler cycles, 0.14/0.15 eligible warps per scheduler on average, and 7.08/6.80 warp cycles per issued instruction. NCU speedup/issue-stall figures remain heuristics, not measured optimization gains.
+- Hint 4/8 exports are present for both workload shapes. Because they are captured under the profiler and not the required repeated timing sweep, they do not promote a hint; keep LOAD_LATENCY=0 pending timed/accuracy evidence.
+
 ## Native Nsight Compute evidence from the earlier baseline
 
 - Historical profiler workflow: [run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066), [artifact #12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
@@ -56,3 +67,10 @@ This is the execution record for native runs, artifacts, runner diagnostics and 
 
 - [Run #39414502390](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502390) failed in its first dependency step before installing packages or running any GPU checks. The job log shows the runner's default shell attempted to dot-source the generated temporary PowerShell script and received `PSSecurityException: running scripts is disabled on this system`.
 - The workflow `.github/workflows/cutile-rtx4060-docker.yml` has been updated so each PowerShell step explicitly invokes `powershell -NoProfile -ExecutionPolicy Bypass -File {0}`, matching the already-working native NCU/SDPA workflow pattern. The rerun result on the fix commit is pending; the failed run is not a kernel result.
+
+
+## Latest source fix and pending reruns
+
+- Commit [#90dafef](https://github.com/xemptynothing/gpu-nvidia/commit/90dafef5318a19e8752a7936643319eb8713083f) updates `src/torch_integration.py`: DLPack now receives detached views of Q/K/V while the custom autograd context stores original tensors for backward.
+- Full native-validation job [#39414730179](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414730179) passed setup and core/optional correctness gates and was running the three-session CUDA-event benchmark at the last check. Its final artifact must be inspected before benchmark results are asserted.
+- Current-source native SDPA rerun [#39415104113](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104113) and full native regression [#39415104135](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39415104135) are queued on commit `90dafef5318a19e8752a7936643319eb8713083f`. They must finish before declaring PyTorch integration, SDPA comparison, autotuning, or load-latency timed sweep complete.

@@ -247,7 +247,7 @@ A controlled clean-cache measurement for the two long cases remains open. It mus
 
 ## 9. Nsight Compute analysis
 
-The latest successful native profile run [#39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373) preserves eight actual-cuTile `.ncu-repz` reports with Details/Raw CSV exports. It covers the medium D=128 / 64×64 and longer-batched D=128 / 64×128 workloads, base and SchedulerStats/WarpStateStats profiles, and LOAD_LATENCY=4/8 captures for both shapes. The historical baseline tables below are refreshed to the latest base profiles; the raw artifacts are linked in [docs/EXECUTION_EVIDENCE_INDEX.md](docs/EXECUTION_EVIDENCE_INDEX.md).
+The latest successful native profile run [#39414502490](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502490) preserves eight actual-cuTile `.ncu-repz` reports with Details/Raw CSV exports and seven genuine Nsight Compute GUI screenshots. It covers the medium D=128 / 64×64 and longer-batched D=128 / 64×128 workloads, base and SchedulerStats/WarpStateStats profiles, and LOAD_LATENCY=4/8 captures for both shapes. One GUI capture (longer-batched LOAD_LATENCY=4) was skipped because `GetWindowRect` failed; the other seven PNGs were downloaded and visually checked. Artifact and complete manifest are linked in [docs/EXECUTION_EVIDENCE_INDEX.md](docs/EXECUTION_EVIDENCE_INDEX.md).
 
 For interactive inspection, use NVIDIA's [Nsight Compute User Guide](https://docs.nvidia.com/nsight-compute/NsightCompute/index.html), [CLI guide](https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html), and [profiling guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html). Native compressed reports use .ncu-repz; they can be opened/imported by Nsight Compute. The figures below are derived charts from the exported counters, not fabricated application screenshots.
 
@@ -255,8 +255,8 @@ For interactive inspection, use NVIDIA's [Nsight Compute User Guide](https://doc
 
 | Profile | Tensor shape | Tile Q×K | Grid CTAs / threads per block | NCU kernel duration |
 |---|---|---:|---:|---:|
-| Medium D=128 | B=1, H=8, N=512, D=128 | 64×64 | 64 / 128 | 52.86 µs |
-| Long batched D=128 | B=2, H=8, N=2048, D=128 | 64×128 | 512 / 128 | 987.94 µs |
+| Medium D=128 | B=1, H=8, N=512, D=128 | 64×64 | 64 / 128 | 53.31 µs |
+| Long batched D=128 | B=2, H=8, N=2048, D=128 | 64×128 | 512 / 128 | 989.98 µs |
 
 ### 9.2 Register, shared-memory and occupancy findings
 
@@ -266,7 +266,7 @@ For interactive inspection, use NVIDIA's [Nsight Compute User Guide](https://doc
 | Static shared memory per CTA | 65.536 KiB | 81.920 KiB |
 | Allocated shared memory per CTA, including driver usage | ~66.56 KiB | ~82.94 KiB |
 | Theoretical occupancy | ~8.33% | ~8.33% |
-| Achieved occupancy | 8.30% | 8.31% |
+| Achieved occupancy | 8.34% | 8.31% |
 
 ![Figure 5 — NCU resources and occupancy](docs/assets/report/fig05_ncu_resources.svg)
 
@@ -276,10 +276,10 @@ The clearest observed constraint is shared-memory CTA residency: occupancy analy
 
 | Metric | Medium D=128 / 64×64 | Long batched D=128 / 64×128 |
 |---|---:|---:|
-| SM compute throughput vs peak | 18.83% | 30.38% |
-| DRAM throughput vs peak | 22.94% | 11.85% |
-| L1/TEX throughput vs peak | 17.26% | 20.96% |
-| L2 throughput vs peak | 14.49% | 19.85% |
+| SM compute throughput vs peak | 18.82% | 30.28% |
+| DRAM throughput vs peak | 22.72% | 11.81% |
+| L1/TEX throughput vs peak | 17.35% | 20.95% |
+| L2 throughput vs peak | 14.36% | 19.81% |
 
 ![Figure 6 — NCU throughput exports](docs/assets/report/fig06_ncu_throughput.svg)
 
@@ -297,12 +297,12 @@ Each hint (0/2/4/6/8/10) must pass the independent FP32 NumPy mixed-tolerance ch
 
 | Workload / LOAD_LATENCY | NCU duration (µs) | Registers/thread | Static shared memory/CTA (KiB) | Achieved occupancy | DRAM throughput |
 |---|---:|---:|---:|---:|---:|
-| Medium D=128 / 64×64 / 0 (default) | 52.86 | 231 | 65.54 | 8.30% | 22.94% |
-| Medium D=128 / 64×64 / 4 | 52.99 | 231 | 65.54 | 8.30% | 22.86% |
-| Medium D=128 / 64×64 / 8 | 51.07 | 255 | 98.30 | 8.34% | 23.94% |
-| Longer batched D=128 / 64×128 / 0 (default) | 987.94 | 255 | 81.92 | 8.31% | 11.85% |
-| Longer batched D=128 / 64×128 / 4 | 984.51 | 255 | 98.30 | 8.31% | 11.86% |
-| Longer batched D=128 / 64×128 / 8 | 990.14 | 255 | 81.92 | 8.31% | 11.82% |
+| Medium D=128 / 64×64 / 0 (default) | 53.31 | 231 | 65.54 | 8.34% | 22.72% |
+| Medium D=128 / 64×64 / 4 | 52.74 | 231 | 65.54 | 8.28% | 22.96% |
+| Medium D=128 / 64×64 / 8 | 50.91 | 255 | 98.30 | 8.34% | 24.00% |
+| Longer batched D=128 / 64×128 / 0 (default) | 989.98 | 255 | 81.92 | 8.31% | 11.81% |
+| Longer batched D=128 / 64×128 / 4 | 984.26 | 255 | 98.30 | 8.31% | 11.88% |
+| Longer batched D=128 / 64×128 / 8 | 988.64 | 255 | 81.92 | 8.30% | 11.82% |
 
 These durations are recorded from separate multi-pass profiler captures and **must not be used as ordinary timing measurements or as evidence to promote a hint**. Hint 8 changes resource use noticeably for the medium workload and did not show a consistent direction across the two workloads. The benchmark harness still needs to complete its per-hint NumPy correctness gates and three-session CUDA-event comparison; until then, keep LOAD_LATENCY=0 as the default. Raw evidence: [native NCU run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373); the artifact is linked in the execution index.
 
@@ -310,13 +310,13 @@ These durations are recorded from separate multi-pass profiler captures and **mu
 
 | Metric | Medium D=128 / 64×64 | Long batched D=128 / 64×128 |
 |---|---:|---:|
-| Scheduler cycles with no eligible warp | 85.90% | 85.27% |
-| Scheduler cycles with an eligible warp | 14.10% | 14.73% |
+| Scheduler cycles with no eligible warp | 85.94% | 85.25% |
+| Scheduler cycles with an eligible warp | 14.06% | 14.75% |
 | Eligible warps per scheduler, average | 0.14 | 0.15 |
 | Active warps per scheduler, average | ~1.00 | ~1.00 |
-| Warp cycles per issued instruction | 7.07 | 6.78 |
+| Warp cycles per issued instruction | 7.08 | 6.80 |
 | NCU rule estimate of pipeline issue stall | 2.4 cycles | 3.1 cycles |
-| NCU rule estimated local speedup | 33.61% heuristic | 46.00% heuristic |
+| NCU rule estimated local speedup | 33.58% heuristic | 45.88% heuristic |
 
 ![Figure 7 — Scheduler eligible-warp snapshot](docs/assets/report/fig07_scheduler_eligibility.svg)
 
@@ -412,7 +412,7 @@ The report embeds seven SVG plots generated from the actual exported benchmark/N
 6. Figure 6: SM/DRAM/L1/L2 NCU throughput values.
 7. Figure 7: scheduler cycles with and without eligible warps.
 
-These are metric plots derived from exported evidence, not screenshots of the Nsight Compute application. The latest native profile artifact from [run #39403495373](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39403495373) contains eight native NCU reports and matching Details/Raw CSV exports. Its GUI capture attempt produced zero PNGs and the manifest explicitly says no screenshots were captured. The helper is being fixed to find the actual `ncu-ui.exe` installation layout and retain per-report skip reasons. **No GUI screenshot is claimed complete until actual PNGs and their manifest have been inspected.** Recommended screenshots are:
+These are metric plots derived from exported evidence, not screenshots of the Nsight Compute application. The latest native profiler artifact from [run #39414502490](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39414502490) contains eight native NCU reports, matching Details/Raw CSV exports, a capture manifest, and seven verified screenshots of the real Nsight Compute application window (1936×1048). The skipped screenshot was the longer-batched LOAD_LATENCY=4 report because Windows `GetWindowRect` failed for that window. These seven successful images are genuine UI evidence; the metric SVGs remain separately identified as plots. See the artifact in [docs/EXECUTION_EVIDENCE_INDEX.md](docs/EXECUTION_EVIDENCE_INDEX.md). Recommended screenshots are:
 - Overview/Summary for the medium D=128 / 64×64 report.
 - Launch/Occupancy and resource-limiting section for the medium report.
 - Memory Workload Analysis and throughput section for both configurations.
@@ -442,7 +442,7 @@ All images should show the workload name, tile dimensions and metric units where
 
 ## Final closure sequence
 
-1. Rerun and inspect the native PyTorch SDPA/integration workflow after the module-level torch-import fix; confirm output/gradient tests before collecting SDPA timings.
+1. Rerun and inspect the native PyTorch SDPA/integration workflow after the module-scope torch-import and detached-DLPack-view fixes; verify output/gradient/model tests and investigate the prior cuBLAS initialization error before collecting SDPA timings.
 2. Capture authentic Nsight GUI screenshots from the four preserved native report files.
 3. Implement/measure a profiler-guided resource/scheduling improvement; retain or reject it on repeatable data.
 4. Complete the selected optional code objectives independently: BF16/FP8, backward, packed variable length, GQA/MQA, tile autotuning and supported architecture hints.
