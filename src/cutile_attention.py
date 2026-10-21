@@ -50,137 +50,50 @@ def _build_kernel(
     cp, ct = _import_runtime()
 
     @ct.kernel
-    def kernel(
-        Q,
-        K,
-        V,
-        O,
-        TQ: ct.Constant[int],
-        TK: ct.Constant[int],
-        D: ct.Constant[int],
-        DV: ct.Constant[int],
-        KV_GROUPS: ct.Constant[int],
-        LOAD_LATENCY: ct.Constant[int],
-        SCALE: ct.Constant[float],
-    ):
-        # One block owns one (batch, head, query-tile) work item and streams
-        # key/value tiles through the online-softmax state.
-        batch_id = ct.bid(0)
-        head_id = ct.bid(1)
-        query_block = ct.bid(2)
-
-        if LOAD_LATENCY == 0:
-            q4 = ct.load(
-                Q,
-                index=(batch_id, head_id, query_block, 0),
-                shape=(1, 1, TQ, D),
-                padding_mode=ct.PaddingMode.ZERO,
-            )
+    def kernel(q,k,v,o,tq:ct.Constant[int],tk:ct.Constant[int],d:ct.Constant[int],dv:ct.Constant[int],kg:ct.Constant[int],ll:ct.Constant[int],scl:ct.Constant[float]):
+        b=ct.bid(0);h=ct.bid(1);qb=ct.bid(2)
+        if ll==0:
+            q4=ct.load(q,index=(b,h,qb,0),shape=(1,1,tq,d),padding_mode=ct.PaddingMode.ZERO)
         else:
-            q4 = ct.load(
-                Q,
-                index=(batch_id, head_id, query_block, 0),
-                shape=(1, 1, TQ, D),
-                padding_mode=ct.PaddingMode.ZERO,
-                latency=LOAD_LATENCY,
-            )
-        q = ct.reshape(q4, (TQ, D))
-
-        running_max = ct.full((TQ, 1), float("-inf"), dtype=ct.float32)
-        running_norm = ct.zeros((TQ, 1), dtype=ct.float32)
-        running_out = ct.zeros((TQ, DV), dtype=ct.float32)
-
-        q_pos = ct.reshape(ct.arange(TQ, dtype=ct.int32), (TQ, 1))
-        q_pos = q_pos + query_block * TQ
-
-        # Causality means this query tile can never use keys past its
-        # final query position. Limit the reduction loop to those K/V tiles
-        # instead of loading and multiplying wholly-future tiles for every
-        # output block. The input contract guarantees full, divisible tiles.
-        num_k_tiles_for_query = ct.cdiv((query_block + 1) * TQ, TK)
-        kv_head_id = head_id // KV_GROUPS
-
-        for key_block in range(num_k_tiles_for_query):
-            if LOAD_LATENCY == 0:
-                k4 = ct.load(
-                    K,
-                    index=(batch_id, kv_head_id, key_block, 0),
-                    shape=(1, 1, TK, D),
-                    padding_mode=ct.PaddingMode.ZERO,
-                )
-                v4 = ct.load(
-                    V,
-                    index=(batch_id, kv_head_id, key_block, 0),
-                    shape=(1, 1, TK, DV),
-                    padding_mode=ct.PaddingMode.ZERO,
-                )
+            q4=ct.load(q,index=(b,h,qb,0),shape=(1,1,tq,d),padding_mode=ct.PaddingMode.ZERO,latency=ll)
+        q0=ct.reshape(q4,(tq,d))
+        m=ct.full((tq,1),float("-inf"),dtype=ct.float32)
+        l=ct.zeros((tq,1),dtype=ct.float32)
+        u=ct.zeros((tq,dv),dtype=ct.float32)
+        qi=ct.reshape(ct.arange(tq,dtype=ct.int32),(tq,1))
+        qi=qi+qb*tq
+        nkt=ct.cdiv((qb+1)*tq,tk)
+        kh=h//kg
+        for kb in range(nkt):
+            if ll==0:
+                k4=ct.load(k,index=(b,kh,kb,0),shape=(1,1,tk,d),padding_mode=ct.PaddingMode.ZERO)
+                v4=ct.load(v,index=(b,kh,kb,0),shape=(1,1,tk,dv),padding_mode=ct.PaddingMode.ZERO)
             else:
-                k4 = ct.load(
-                    K,
-                    index=(batch_id, kv_head_id, key_block, 0),
-                    shape=(1, 1, TK, D),
-                    padding_mode=ct.PaddingMode.ZERO,
-                    latency=LOAD_LATENCY,
-                )
-                v4 = ct.load(
-                    V,
-                    index=(batch_id, kv_head_id, key_block, 0),
-                    shape=(1, 1, TK, DV),
-                    padding_mode=ct.PaddingMode.ZERO,
-                    latency=LOAD_LATENCY,
-                )
-
-            k = ct.reshape(k4, (TK, D))
-            v = ct.reshape(v4, (TK, DV))
-
-            kt = ct.transpose(k)
-
-            # FP16 operands with an explicit FP32 accumulator satisfy the
-            # mandatory precision requirement.
-            score_acc = ct.zeros((TQ, TK), dtype=ct.float32)
-            scores = ct.mma(q, kt, score_acc)
-            scores = scores * SCALE
-
-            k_pos = ct.reshape(ct.arange(TK, dtype=ct.int32), (1, TK))
-            k_pos = k_pos + key_block * TK
-
-            future = k_pos > q_pos
-            scores = ct.where(
-                future,
-                float("-inf"),
-                scores,
-            )
-
-            tile_max = ct.max(scores, axis=1, keepdims=True)
-            new_max = ct.maximum(running_max, tile_max)
-
-            rescale = ct.exp(running_max - new_max)
-            probabilities = ct.exp(scores - new_max)
-
-            new_norm = rescale * running_norm + ct.sum(
-                probabilities,
-                axis=1,
-                keepdims=True,
-            )
-
-            # Keep online softmax and its running normalization in FP32.
-            # For P @ V, round the probabilities to FP16 so cuTile can use
-            # the FP16 matrix-multiply path; ct.mma still accumulates into the
-            # FP32 running_out tile. Numerical impact is gated by the independent
-            # FP32 reference tests and their fixed mixed absolute/relative tolerance.
-            probabilities16 = probabilities.astype(ct.float16)
-            previous_out = rescale * running_out
-            running_out = ct.mma(probabilities16, v, previous_out)
-            running_norm = new_norm
-            running_max = new_max
-
-        output = running_out / running_norm
-        output4 = ct.reshape(output, (1, 1, TQ, DV))
-        ct.store(
-            O,
-            index=(batch_id, head_id, query_block, 0),
-            tile=output4.astype(O.dtype),
-        )
+                k4=ct.load(k,index=(b,kh,kb,0),shape=(1,1,tk,d),padding_mode=ct.PaddingMode.ZERO,latency=ll)
+                v4=ct.load(v,index=(b,kh,kb,0),shape=(1,1,tk,dv),padding_mode=ct.PaddingMode.ZERO,latency=ll)
+            k0=ct.reshape(k4,(tk,d))
+            v0=ct.reshape(v4,(tk,dv))
+            kt=ct.transpose(k0)
+            acc=ct.zeros((tq,tk),dtype=ct.float32)
+            s=ct.mma(q0,kt,acc)
+            s=s*scl
+            ki=ct.reshape(ct.arange(tk,dtype=ct.int32),(1,tk))
+            ki=ki+kb*tk
+            fut=ki>qi
+            s=ct.where(fut,float("-inf"),s)
+            mt=ct.max(s,axis=1,keepdims=True)
+            mn=ct.maximum(m,mt)
+            a=ct.exp(m-mn)
+            p=ct.exp(s-mn)
+            ln=a*l+ct.sum(p,axis=1,keepdims=True)
+            p16=p.astype(ct.float16)
+            u0=a*u
+            u=ct.mma(p16,v0,u0)
+            l=ln
+            m=mn
+        out=u/l
+        out4=ct.reshape(out,(1,1,tq,dv))
+        ct.store(o,index=(b,h,qb,0),tile=out4.astype(o.dtype))
 
     return kernel
 
