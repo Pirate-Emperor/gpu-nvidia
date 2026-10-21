@@ -103,11 +103,11 @@ jobs:
           if (!(Test-Path $py)) { throw "Python path not found" }
           $tmp = Join-Path $root ".tmp\mentor-check"
           New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-          $inp = Join-Path $tmp "input.npz"
-          $out = Join-Path $tmp "output.npy"
-          & $py scripts/generate_inputs.py --output $inp --batch 1 --heads 1 --seq 64 --head-dim 32 --seed 20261018
+          $inFile = Join-Path $tmp "input.npz"
+          $outFile = Join-Path $tmp "output.npy"
+          & $py scripts/generate_inputs.py --output "$inFile" --batch 1 --heads 1 --seq 64 --head-dim 32 --seed 20261018
           if ($LASTEXITCODE -ne 0) { throw "Input generation failed" }
-          & $py run_attention.py --input $inp --output $out --backend cutile --tile-q 64 --tile-k 64
+          & $py run_attention.py --input "$inFile" --output "$outFile" --backend cutile --tile-q 64 --tile-k 64
           if ($LASTEXITCODE -ne 0) { throw "CLI execution failed" }
-          & $py scripts/verify_cli_output.py --input $inp --output $out
+          & $py scripts/verify_cli_output.py --input "$inFile" --output "$outFile"
           if ($LASTEXITCODE -ne 0) { throw "Independent NumPy output verification failed" }
