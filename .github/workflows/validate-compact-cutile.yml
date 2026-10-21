@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Fetch exact source without external checkout action
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -51,7 +51,7 @@ jobs:
           "WORKSPACE=$root"
 
       - name: Locate existing project-local cuTile environment
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
           $candidates = @(
@@ -70,7 +70,7 @@ jobs:
           "GPU_INVENTORY=$gpu"
 
       - name: Compile launch synchronize and verify real cuTile smoke
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
           $root = $env:GITHUB_WORKSPACE
@@ -81,7 +81,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Genuine cuTile smoke failed" }
 
       - name: Run required core GPU tests with missing cuTile treated as failure
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         env:
           REQUIRE_CUTILE: "1"
         run: |
@@ -94,7 +94,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Required cuTile tests failed" }
 
       - name: Run deterministic CLI and independent NumPy verification
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
           $root = $env:GITHUB_WORKSPACE
