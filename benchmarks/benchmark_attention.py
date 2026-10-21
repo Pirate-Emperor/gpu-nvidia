@@ -314,21 +314,56 @@ def main() -> int:
         writer.writerows(all_rows)
 
     print(f"GPU: {gpu_name}")
-    print(f"Results: {args.output}")
-    print(f"CSV: {csv_path}")
+    print(f"Python: {metadata['python']} | CuPy: {metadata['cupy']} | cuTile: {metadata['cutile']}")
+    print(
+        f"Protocol: warmup={args.warmup}, samples={args.iterations}, "
+        f"launches/sample={args.repeats_per_sample}, "
+        f"timed launches/config={args.iterations * args.repeats_per_sample}"
+    )
+    print("Baseline: deliberately unfused FP32 CuPy attention; not FlashAttention/optimized SDPA")
+    print(f"Results JSON: {args.output}")
+    print(f"Results CSV:  {csv_path}")
+    print("")
+    print(
+        f"{'CASE':24s} {'TILE':9s} {'MEDIAN ms':>11s} {'P90 ms':>10s} "
+        f"{'BASE ms':>10s} {'SPEEDUP':>9s} {'DRIFT %':>9s} {'FIRST CALL':>16s}"
+    )
     for row in all_rows:
         first_call = (
             f"{row['jit_ms']:.1f} ms"
             if row["jit_ms"] is not None
-            else "already compiled"
+            else "cached/already compiled"
         )
         print(
-            f"{row['case']:24s} tile={row['tile_q']}x{row['tile_k']} "
-            f"fused={row['fused_median_ms']:.3f} ms "
-            f"baseline={row['baseline_median_ms']:.3f} ms "
-            f"speedup={row['speedup_vs_unfused']:.2f}x "
-            f"first_call={first_call}"
+            f"{row['case']:24s} "
+            f"{row['tile_q']}x{row['tile_k']:<5d} "
+            f"{row['fused_median_ms']:11.4f} "
+            f"{row['fused_p90_ms']:10.4f} "
+            f"{row['baseline_median_ms']:10.4f} "
+            f"{row['speedup_vs_unfused']:8.2f}x "
+            f"{row['baseline_bracket_drift_pct']:8.2f}% "
+            f"{first_call:>16s}"
         )
+    print("")
+    print("BEST MEDIAN TILE PER CASE (for this measured sweep only):")
+    for case_name in dict.fromkeys(row["case"] for row in all_rows):
+        case_rows = [row for row in all_rows if row["case"] == case_name]
+        best = min(case_rows, key=lambda row: row["fused_median_ms"])
+        spread = max(row["fused_median_ms"] for row in case_rows) - min(
+            row["fused_median_ms"] for row in case_rows
+        )
+        print(
+            f"  {case_name}: {best['tile_q']}x{best['tile_k']} "
+            f"median={best['fused_median_ms']:.4f} ms, "
+            f"P90={best['fused_p90_ms']:.4f} ms; "
+            f"within-case tile spread={100.0 * spread / best['fused_median_ms']:.2f}%"
+        )
+    if any(row["baseline_bracket_drift_pct"] > 5.0 for row in all_rows):
+        print(
+            "WARNING: at least one baseline bracket drifted by >5%; "
+            "treat speedup for those rows as noisy and repeat the sweep."
+        )
+    print("NOTE: first-call wall time may be a compiler-cache hit; it is not a clean-cache JIT measurement.")
     return 0
 
 
