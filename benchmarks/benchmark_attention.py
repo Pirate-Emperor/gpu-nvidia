@@ -295,8 +295,9 @@ def main() -> int:
         return 2
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    metadata = environment_metadata(cp, gpu_name)
     payload = {
-        "environment": environment_metadata(cp, gpu_name),
+        "environment": metadata,
         "warmup": args.warmup,
         "iterations": args.iterations,
         "repeats_per_sample": args.repeats_per_sample,
