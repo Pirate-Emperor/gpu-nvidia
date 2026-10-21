@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [switch]$WithBenchmark,
+    [switch]$SkipTileSweep,
     [switch]$WithProfile
 )
 
@@ -101,21 +101,33 @@ $verifyArgs = @(
 )
 Invoke-Checked "CLI vs independent NumPy oracle" $py $verifyArgs
 
-if ($WithBenchmark) {
+if (!$SkipTileSweep) {
     $benchFile = Join-Path $logDir "mentor_benchmark_$stamp.json"
+    $benchCsv = Join-Path $logDir "mentor_benchmark_$stamp.csv"
+    Write-Host ""
+    Write-Host "=== Runtime tile comparison: five tile shapes x two workloads ===" -ForegroundColor Cyan
+    Write-Host "This is a presentation-sized sweep: it is not the full three-session experiment."
+    Write-Host "Each tile gets 10 warmups, 30 CUDA-event samples, and 5 launches/sample."
+    Write-Host "The script records median, P90, unfused FP32 CuPy baseline, speedup, baseline drift, and first-call wall time."
     $benchArgs = @(
         (Join-Path $repoRoot "benchmarks\benchmark_attention.py"),
         "--output",$benchFile,
         "--warmup","10",
         "--iterations","30",
         "--repeats-per-sample","5",
-        "--tiles","64x64","64x128",
+        "--tiles","32x64","64x64","64x128","128x64","128x128",
         "--case","medium_d128",
         "--case","longer_batched_d128"
     )
-    Invoke-Checked "Representative spot benchmark (not the full 3-session experiment)" $py $benchArgs
+    Invoke-Checked "Runtime tile sweep" $py $benchArgs
     if (!(Test-Path -LiteralPath $benchFile)) { throw "Benchmark did not create $benchFile" }
+    if (!(Test-Path -LiteralPath $benchCsv)) { throw "Benchmark did not create $benchCsv" }
     Write-Host "BENCHMARK_JSON=$benchFile"
+    Write-Host "BENCHMARK_CSV=$benchCsv"
+    Write-Host "Use the printed BEST MEDIAN TILE PER CASE, then compare P90 and drift before drawing a conclusion."
+}
+else {
+    Write-Host "TILE_SWEEP=SKIPPED (explicit -SkipTileSweep)"
 }
 
 if ($WithProfile) {
@@ -172,4 +184,4 @@ Write-Host "TEST_LOG=$testLog"
 Write-Host "CLI_LOG=$cliLog"
 Write-Host "INPUT_NPZ=$inFile"
 Write-Host "OUTPUT_NPY=$outFile"
-Write-Host "Next: show the saved benchmark summary and previously captured NCU report. Add -WithBenchmark for a fresh spot check or -WithProfile for a live NCU attempt."
+Write-Host "Next: show the saved benchmark summary and previously captured NCU report. The default run includes the runtime tile sweep. Add -SkipTileSweep only for a quick smoke/test/CLI check; add -WithProfile for a live NCU attempt."
