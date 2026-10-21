@@ -121,3 +121,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_demo.ps1
           if ($LASTEXITCODE -ne 0) { throw "Reusable mentor demo failed with exit code $LASTEXITCODE" }
+
+      - name: Exercise mentor demo benchmark and Nsight Compute switches
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_demo.ps1 -WithBenchmark -WithProfile
+          if ($LASTEXITCODE -ne 0) { throw "Extended mentor demo failed with exit code $LASTEXITCODE" }
