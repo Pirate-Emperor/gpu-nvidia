@@ -1,0 +1,113 @@
+name: Validate compact cuTile kernel on local runner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-compact-cutile.yml"
+      - "src/cutile_attention.py"
+      - "src/reference.py"
+      - "src/contract.py"
+      - "tests/**"
+      - "scripts/cutile_smoke.py"
+      - "scripts/generate_inputs.py"
+      - "scripts/verify_cli_output.py"
+      - "run_attention.py"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 20
+    steps:
+      - name: Fetch exact source without external checkout action
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          if (!(Test-Path $root)) { throw "Workspace missing" }
+          if (!(Test-Path (Join-Path $root ".git"))) {
+            git -C $root init
+            if ($LASTEXITCODE -ne 0) { throw "git init failed" }
+          }
+          $remote = git -C $root remote get-url origin 2>$null
+          if ($LASTEXITCODE -ne 0 -or !$remote) {
+            git -C $root remote add origin https://github.com/xemptynothing/gpu-nvidia.git
+            if ($LASTEXITCODE -ne 0) { throw "git remote setup failed" }
+          }
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GH_TOKEN"))
+          git -C $root -c "http.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Fetching the exact source commit failed" }
+          git -C $root checkout --force --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Checking out the exact source commit failed" }
+          $head = git -C $root rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) { throw "Source commit mismatch: $head" }
+          "VALIDATED_SOURCE_SHA=$head"
+          "WORKSPACE=$root"
+
+      - name: Locate existing project-local cuTile environment
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidates = @(
+            (Join-Path $env:GITHUB_WORKSPACE ".venv-cutile-windows\Scripts\python.exe"),
+            "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe"
+          )
+          $py = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$py) { throw "Existing project-local cuTile venv not found in the workspace or documented local project root. No packages were installed." }
+          "PYTHON_EXE=$py"
+          & $py --version
+          if ($LASTEXITCODE -ne 0) { throw "Project Python did not run" }
+          nvidia-smi
+          if ($LASTEXITCODE -ne 0) { throw "nvidia-smi failed" }
+          $gpu = nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader
+          if ($LASTEXITCODE -ne 0 -or !($gpu -match "RTX 4060")) { throw "Expected the local RTX 4060; found: $gpu" }
+          "GPU_INVENTORY=$gpu"
+
+      - name: Compile launch synchronize and verify real cuTile smoke
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          & $py scripts/cutile_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Genuine cuTile smoke failed" }
+
+      - name: Run required core GPU tests with missing cuTile treated as failure
+        shell: powershell
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          & $py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py
+          if ($LASTEXITCODE -ne 0) { throw "Required cuTile tests failed" }
+
+      - name: Run deterministic CLI and independent NumPy verification
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          $tmp = Join-Path $root ".tmp\mentor-check"
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+          $inp = Join-Path $tmp "input.npz"
+          $out = Join-Path $tmp "output.npy"
+          & $py scripts/generate_inputs.py --output $inp --batch 1 --heads 1 --seq 64 --head-dim 32 --seed 20261018
+          if ($LASTEXITCODE -ne 0) { throw "Input generation failed" }
+          & $py run_attention.py --input $inp --output $out --backend cutile --tile-q 64 --tile-k 64
+          if ($LASTEXITCODE -ne 0) { throw "CLI execution failed" }
+          & $py scripts/verify_cli_output.py --input $inp --output $out
+          if ($LASTEXITCODE -ne 0) { throw "Independent NumPy output verification failed" }
