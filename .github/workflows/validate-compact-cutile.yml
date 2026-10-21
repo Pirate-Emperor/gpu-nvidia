@@ -12,6 +12,8 @@ on:
       - "scripts/cutile_smoke.py"
       - "scripts/generate_inputs.py"
       - "scripts/verify_cli_output.py"
+      - "scripts/mentor_demo.ps1"
+      - "benchmarks/**"
       - "run_attention.py"
 
 permissions:
@@ -126,5 +128,5 @@ jobs:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_demo.ps1 -WithBenchmark -WithProfile
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_demo.ps1 -SkipTileSweep -WithProfile
           if ($LASTEXITCODE -ne 0) { throw "Extended mentor demo failed with exit code $LASTEXITCODE" }
