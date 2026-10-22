@@ -143,14 +143,14 @@ $outputFile = Join-Path $logDir "mentor_output_$stamp.npy"
 
 The expected answer comes from the independent full-matrix FP32 NumPy reference. The cuTile kernel is never used to manufacture its own expected result. Recorded marker: `CLI_REFERENCE_CHECK=PASS`.
 
-### Step 8 — run the full legal numerical matrix (29 rows)
+### Step 8 — run every legal numerical configuration in the JSON registry
 
 ```powershell
 $matrixFile = Join-Path $logDir "mentor_legal_numerical_matrix_$stamp.json"
 & $py .\scripts\mentor_numerical_matrix.py --output $matrixFile
 ```
 
-This dedicated matrix script is added for the step-by-step presentation. It runs each **legal** mandatory workload/tile pair, prints a PASS/FAIL line with absolute error, P99 absolute error, RMSE and tolerance-envelope usage, and writes JSON plus a sibling CSV. The successful historical project run reported 29/29 and zero violations; this newly added explicit script must produce its own fresh output before it is claimed as freshly validated.
+This dedicated matrix script reads `tests/legal_attention_configs.json`. It runs each **legal** registered workload/tile pair, prints a PASS/FAIL line with absolute error, P99 absolute error, RMSE and tolerance-envelope usage, and writes JSON plus a sibling CSV. The initial list reports 29/29 pairs; adding a valid workload or tile increases the number automatically. The script checks the configuration file before using it.
 
 **Why the legality filter exists:** the core fixed-tile contract supports positive power-of-two query/key tiles and requires the sequence length (N) to be divisible by both (TQ) and (TK). It also requires finite contiguous FP16 input, (D\in\{32,64,128\}), (Dv=D), matching Q/K/V batch/sequence dimensions and matching Q/K head dimensions. The matrix uses the same seven frozen workloads and the five main tile candidates. Illegal pairs are not counted as successes; exactly 29 pairs are legal.
 
@@ -373,7 +373,7 @@ Use [the code walkthrough](CUTILE_KERNEL_WALKTHROUGH.md) for the line-by-line al
 
 1. Show the GPU and cuTile smoke, then run each pytest file separately. Explain why missing cuTile is treated as a failure.
 2. Open baseline.py, then cutile_attention.py, then reference.py. Explain the causal mask, the online-softmax state and why the independent oracle is separate.
-3. Show the 29 legal numerical rows and the saved CLI oracle result.
+3. Show every legal numerical row currently registered in the JSON file and the saved CLI reference check.
 4. Show the three-session tile table. Compare median, P90 and baseline drift, not just the lowest median.
 5. Show the latency hint experiment's accuracy gate and noise-aware recommendation. Explain why hint 0 remains the global default.
 6. Stop before Nsight Compute; profiler interpretation is for the later session.
