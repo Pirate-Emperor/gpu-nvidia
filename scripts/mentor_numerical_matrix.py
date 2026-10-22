@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the 29 legal cuTile attention case/tile pairs against the independent NumPy oracle.
+"""Run the 29 legal cuTile attention case/tile pairs against an independent NumPy reference.
 
 This is a numerical validation matrix, not a timing benchmark. It reports one
 row per legal specialization and exits non-zero on any contract/tolerance failure.
@@ -113,7 +113,7 @@ def main() -> int:
     rows = []
     checked_pairs = 0
     print(f"GPU: {gpu_name}")
-    print(f"Oracle: independent full-matrix FP32 NumPy attention")
+    print(f"Reference: independent full-matrix FP32 NumPy attention")
     print(f"Mixed tolerance: abs(actual - reference) <= {ABS_TOL} + {REL_TOL} * abs(reference)")
     print("Only positive power-of-two tiles that divide N are tested.")
     if args.case is not None:
@@ -224,7 +224,7 @@ def main() -> int:
         "platform": platform.platform(),
         "cupy": cp.__version__,
         "cuda_tile": importlib.metadata.version("cuda-tile"),
-        "oracle": "independent full-matrix FP32 NumPy attention",
+        "reference": "independent full-matrix FP32 NumPy attention",
         "tolerance": "abs(actual-reference) <= 0.02 + 0.02*abs(reference)",
         "legal_pair_count": checked_pairs,
         "expected_legal_pair_count": expected_pair_count,
