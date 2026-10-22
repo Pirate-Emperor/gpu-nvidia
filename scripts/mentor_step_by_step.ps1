@@ -112,20 +112,26 @@ if ($runMenu) {
                     }
                     $node = $nodes[$index - 1]
                     Write-Host "PURPOSE: the pytest test name and source function identify the exact behavior being checked." -ForegroundColor Gray
-                    $relative = ($node -split "::")[0].Replace("/", [string][char]92)
-                    $func = (($node -split "::")[1] -split "\[")[0]
+                    $separator = $node.IndexOf("::")
+                    $relative = $node.Substring(0, $separator).Replace("/", [string][char]92)
+                    $func = $node.Substring($separator + 2)
+                    $bracket = $func.IndexOf("[")
+                    if ($bracket -ge 0) { $func = $func.Substring(0, $bracket) }
                     $source = Join-Path $menuRoot $relative
-                    $sourceLines = Get-Content -LiteralPath $source -Encoding utf8
+                    $sourceLines = @(Get-Content -LiteralPath $source -Encoding UTF8)
+                    $signaturePrefix = "def " + $func + "("
                     $start = -1
                     for ($i = 0; $i -lt $sourceLines.Count; $i++) {
-                        if ($sourceLines[$i] -match ("^def " + [regex]::Escape($func) + "\s*\(")) { $start = $i; break }
+                        if ($sourceLines[$i].StartsWith($signaturePrefix)) { $start = $i; break }
                     }
                     if ($start -ge 0) {
                         $end = $sourceLines.Count - 1
                         for ($i = $start + 1; $i -lt $sourceLines.Count; $i++) {
-                            if ($sourceLines[$i].StartsWith('def ')) { $end = $i - 1; break }
+                            if ($sourceLines[$i].StartsWith("def ")) { $end = $i - 1; break }
                         }
-                        for ($i = $start; $i -le $end; $i++) { Write-Host ("{0,4}: {1}" -f ($i + 1), $sourceLines[$i]) }
+                        for ($i = $start; $i -le $end; $i++) {
+                            Write-Host (($i + 1).ToString().PadLeft(4) + ": " + $sourceLines[$i])
+                        }
                     }
                     Read-Host "Review the test source. Press Enter to execute it"
                     $old = $env:REQUIRE_CUTILE
