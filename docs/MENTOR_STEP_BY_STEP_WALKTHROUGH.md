@@ -148,6 +148,54 @@ This session driver runs the existing benchmark harness three times over all sev
 
 The event benchmark measures device-resident functions. The input copies are outside the timed calls. The benchmark also reports output-byte throughput, which is **output tensor bytes only**, not total DRAM bandwidth.
 
+### What the three benchmark sessions mean
+
+The three sessions are three separate runs of the benchmark program, not three samples and not three different input cases. Each session repeats the same seven workloads and the same five candidate tile shapes wherever each shape is supported. Each session uses the same fixed input seeds and the same timing settings.
+
+The driver changes the order of tile shapes to reduce a systematic order effect:
+
+| Session | Tile order |
+|---|---|
+| 1 | 32×64 → 64×64 → 64×128 → 128×64 → 128×128 |
+| 2 | 64×64 → 64×128 → 128×64 → 128×128 → 32×64 |
+| 3 | 128×128 → 128×64 → 64×128 → 64×64 → 32×64 |
+
+Why change the order? The GPU may warm up, change clock speed or temperature, or experience background activity as the run proceeds. If a configuration is always measured first, it may be measured under different conditions from one always measured last. Rotating and reversing the order helps reveal that risk. Three sessions do not eliminate all measurement noise, but they show whether a claimed win repeats across separate runs.
+
+For each case/tile pair, each session performs 10 warmup calls, then 30 timing samples of five launches each: **150 timed launches per session**. Across three sessions, that is **450 timed launches and 30 warmup calls per configuration**. The aggregate retains the three session medians and P90s, reports the median across those session summaries, and calculates the spread between the slowest and fastest session median.
+
+### The seven workloads behind the 29 legal configurations
+
+In the shape notation `(B,H,N,D)`, `B` is batch size, `H` is attention-head count, `N` is sequence length, and `D` is the dimension of each query/key/value vector.
+
+| Case | Shape (B,H,N,D) | Legal tiles | Count |
+|---|---:|---|---:|
+| `short_d32` | (1,1,64,32) | 32×64, 64×64 | 2 |
+| `short_d64` | (1,1,64,64) | 32×64, 64×64 | 2 |
+| `short_multihead_d64` | (1,4,128,64) | all five candidates | 5 |
+| `medium_d64` | (1,8,256,64) | all five candidates | 5 |
+| `medium_d128` | (1,8,512,128) | all five candidates | 5 |
+| `long_d128` | (1,16,1024,128) | all five candidates | 5 |
+| `longer_batched_d128` | (2,8,2048,128) | all five candidates | 5 |
+| **Total** | **7 workloads** | | **29** |
+
+The five tile candidates are 32×64, 64×64, 64×128, 128×64 and 128×128. The two shortest cases have sequence length 64, so key tiles of 128 and query tiles of 128 do not satisfy the fixed-divisibility requirement. The other cases have sequence lengths that divide evenly by all five candidates.
+
+### Why compare medium D=128 with longer-batched D=128?
+
+Both workloads use vector dimension `D=128` and eight attention heads, so the data width and head count stay fixed. The important differences are batch size and sequence length:
+
+| Property | Medium D=128 | Longer-batched D=128 |
+|---|---:|---:|
+| Batch size (`B`) | 1 | 2 |
+| Heads (`H`) | 8 | 8 |
+| Sequence length (`N`) | 512 | 2,048 |
+| Head dimension (`D`) | 128 | 128 |
+| Total query positions (`B × H × N`) | 4,096 | 32,768 |
+| Purpose | Mid-sized workload | Longer sequence with a larger batch |
+
+Yes, the longer-batched experiment uses a larger batch: **2 instead of 1**. Its sequence is also four times longer. The total number of query positions is therefore eight times larger. Causal attention compares each query with its allowed prefix of keys, so the total number of score entries grows roughly with the square of sequence length. With these batch sizes, the longer-batched case processes roughly 32 times as many causal query-key pairs as the medium case. This is why its absolute latency is much larger and why a tile choice that works well for one shape may behave differently for the other.
+
 ### Step 10 — test the cuTile DRAM load-latency hint
 
 ```powershell
