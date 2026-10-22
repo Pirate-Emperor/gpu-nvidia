@@ -206,6 +206,30 @@ Hint 10 on the medium workload is the interesting result. On the longer batched 
 - **PyTorch SDPA comparison:** currently blocked before the cuTile bridge because a plain `torch.bmm` fails with `CUBLAS_STATUS_INVALID_VALUE` in the pinned CUDA 13.0 PyTorch wheel. No PyTorch speedup is claimed.
 - **First-call/JIT:** measured separately from steady-state latency, but historical first-call observations sometimes look like cache hits. Do not call them clean-cache compile times.
 
+### 7.4 Historical baseline-ladder experiments (ordinary CUDA controls, not cuTile)
+
+The repository also retains v1/v2/v3/current and v4/v5 experiments from the earlier CUDA C++ implementation ladder. They help explain why kernel structure matters, but **they were run as ordinary CUDA C++ control kernels on the A100 path—not as the current NVIDIA cuTile Python kernel on the RTX 4060**. Their timings must not be placed in the same speedup ranking as the actual-cuTile results above.
+
+Best observed median per approach in one historical ladder run (ms; lowest measured median over `tile_k=16/32/64` within that run):
+
+| Workload | v1 | v2 | v3 | Current CUDA control |
+|---|---:|---:|---:|---:|
+| short D=32 | 0.111 | 0.066 | 0.055 | 0.055 |
+| short D=64 | 0.119 | 0.073 | 0.060 | 0.061 |
+| short multi-head D=64 | 0.385 | 0.102 | 0.077 | 0.081 |
+| medium D=64 | 1.727 | 0.234 | 0.180 | 0.193 |
+| medium D=128 | — | 0.947 | 0.815 | 0.792 |
+| long D=128 | — | 7.188 | 6.556 | 6.131 |
+| longer batched D=128 | — | 22.895 | 26.533 | 25.678 |
+
+The earlier code ladder changed the work decomposition progressively. The measured first-compile wall times in that ladder run were v1 1652 ms, v2 717 ms, v3 1063 ms and current 808 ms. Those are compile/JIT-related times and must not be reported as steady-state kernel latency. Absolute medians differed across workflow runs, so use these as historical engineering evidence rather than current RTX 4060 headline results.
+
+The v4 persistent-Q-fragment variant passed its 30 correctness tests but had mixed performance: it was near the current control on short cases, faster on some D=128 cases and substantially slower on longer-batched inputs with smaller K tiles. Its PTXAS report found no resource advantage over the then-current code: v2/current/v4 each reported 32 registers, 33,792 bytes shared memory and zero spills; current and v4 cubins were both 15,136 bytes. Decision: **not promoted**.
+
+The v5 half2-oriented Q/K-load variant passed 30/30 correctness tests and a three-session paired timing study. Its results were mixed for short inputs. On long D=128, measured improvements were only about 0.3–0.4%; on longer-batched D=128 they were about 0.4–0.6%. Some medium-D=64 rows improved by roughly 2–11%, but these gains did not establish a reliable, general speedup. Decision: **not promoted**. The full per-case/per-tile v5 table remains in [the historical experiment report](EXPERIMENT_REPORT.md).
+
+These negative results matter: passing correctness is necessary but not sufficient to promote an optimization. An optimization should change one well-defined factor, pass the same independent correctness tests, beat the existing implementation by more than observed timing variation, and avoid disproportionate resource cost.
+
 ## 8. Suggested mentor narrative
 
 > “The baseline explicitly materializes the full score and probability matrices, while the cuTile kernel streams K/V tiles and fuses score calculation, causal masking, softmax-state updates and the weighted-value product. The running maximum, normalization and value accumulator are the online-softmax state. I first validate every legal shape and tile against independent NumPy, then benchmark the already-resident GPU functions. The measurements show workload-dependent tile choices, not a universal winner. The latency-hint experiment found a promising medium-workload candidate, but the global default is unchanged until that candidate clears the remaining review.”
