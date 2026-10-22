@@ -13,13 +13,23 @@ From PowerShell in the repository root:
 
 The script pauses before each stage so you can read the purpose and command, press Enter, and watch that stage execute. The verbose pytest output shows the individual tests rather than only one aggregate PASS. It saves separate timestamped logs and result JSON/CSV files under `.tmp\logs`.
 
-The default walkthrough runs the full 29-pair numerical matrix, the full seven-workload/three-session tile experiment and the three-session latency-hint experiment. These experiments are longer than the core tests. To focus on the correctness + tile experiment while leaving the separate hint sweep for another time:
+The default walkthrough runs the 48 tests as two verbose test-file executions, then runs the 29-pair numerical matrix, the full seven-workload/three-session tile experiment and the three-session latency-hint experiment.
+
+For the **guided source-and-test mode**, use:
 
 ```powershell
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\mentor_step_by_step.ps1 -SkipLatencyHintExperiment
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\mentor_step_by_step.ps1 -Guided
 ```
 
-`-NoPause` removes the prompts; `-SkipNumericalMatrix`, `-SkipTileExperiment` and `-SkipLatencyHintExperiment` each skip only that explicitly named stage. Skipping a stage does not turn its evidence green. The script has no Nsight Compute step.
+Guided mode shows each relevant section of `src/cutile_attention.py`, explains what that section does, then runs an evidence test before continuing. It next shows and runs each of the 48 parameterized GPU test executions separately. It then runs each of the 29 legal case/tile numerical comparisons separately. This is intentionally much more interactive than the standard mode.
+
+To focus on tests and code without running the longer timing experiments:
+
+```powershell
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\mentor_step_by_step.ps1 -Guided -SkipTileExperiment -SkipLatencyHintExperiment
+```
+
+The options `-NoPause`, `-SkipNumericalMatrix`, `-SkipTileExperiment` and `-SkipLatencyHintExperiment` belong to the standard mode; guided mode individually executes the 29 matrix rows by design. `-NoPause` removes guided prompts too, but it does **not** skip the 48 individual tests or 29 individual numerical checks. Skipping a stage does not turn its evidence green. Neither mode runs Nsight Compute.
 
 ## Stage-by-stage commands and what each one proves
 
