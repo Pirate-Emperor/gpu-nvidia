@@ -205,45 +205,45 @@ try {
 
     Show-WalkthroughStep "THE 29 LEGAL NUMERICAL CONFIGURATIONS" "These are separate numerical comparisons against the independent FP32 NumPy calculation. A case fixes B, H, N and D; a tile selects query-block and key/value-block sizes. A pair is included only when N divides evenly by both tile dimensions."
     Show-CodeRange -Path $coreTestPath -Title "Core per-case/tile comparison assertion" -StartPattern '^\s*def test_cutile_matches_independent_reference\(' -EndPattern '^\s*@pytest\.mark\.parametrize\('
-    $cases = @(
-        @{ Name = "short_d32"; B = 1; H = 1; N = 64; D = 32 },
-        @{ Name = "short_d64"; B = 1; H = 1; N = 64; D = 64 },
-        @{ Name = "short_multihead_d64"; B = 1; H = 4; N = 128; D = 64 },
-        @{ Name = "medium_d64"; B = 1; H = 8; N = 256; D = 64 },
-        @{ Name = "medium_d128"; B = 1; H = 8; N = 512; D = 128 },
-        @{ Name = "long_d128"; B = 1; H = 16; N = 1024; D = 128 },
-        @{ Name = "longer_batched_d128"; B = 2; H = 8; N = 2048; D = 128 }
-    )
-    $tiles = @(
-        @{ Q = 32; K = 64 },
-        @{ Q = 64; K = 64 },
-        @{ Q = 64; K = 128 },
-        @{ Q = 128; K = 64 },
-        @{ Q = 128; K = 128 }
-    )
-    $pairIndex = 0
-    foreach ($case in $cases) {
-        foreach ($tile in $tiles) {
-            if (($case.N % $tile.Q) -ne 0 -or ($case.N % $tile.K) -ne 0) { continue }
-            $pairIndex++
-            $pairLog = Join-Path $logDir ("guided_numerical_{0}_{1}x{2}_{3}.log" -f $stamp,$case.Name,$tile.Q,$tile.K)
-            $pairJson = Join-Path $logDir ("guided_numerical_{0}_{1}_{2}x{3}.json" -f $stamp,$case.Name,$tile.Q,$tile.K)
-            Show-WalkthroughStep -Title ("NUMERICAL CONFIGURATION {0}/29 — {1}, tile {2}x{3}" -f $pairIndex,$case.Name,$tile.Q,$tile.K) -Explanation ("Shape B={0}, H={1}, N={2}, D={3}. B is batch size; H is head count; N is sequence length; D is vector width. This run checks the chosen case/tile pair only, records its error metrics and returns PASS or FAIL." -f $case.B,$case.H,$case.N,$case.D)
-            Write-Host "TEST SOURCE: $coreTestPath — test_cutile_matches_independent_reference" -ForegroundColor Yellow
-            Write-Host "NUMERICAL CONTRACT: abs(actual - reference) <= 0.02 + 0.02 * abs(reference)"
-            Pause-BeforeExecution -Prompt "Press Enter to run this one numerical configuration."
-            & $py (Join-Path $repoRoot "scripts\mentor_numerical_matrix.py") --case $case.Name --tile-q $tile.Q --tile-k $tile.K --output $pairJson 2>&1 | Tee-Object -FilePath $matrixLog -Append
-            $matrixExit = $LASTEXITCODE
-            if ($matrixExit -ne 0) { throw "Numerical configuration failed: $($case.Name) tile $($tile.Q)x$($tile.K). Log: $matrixLog" }
-            if (!(Test-Path -LiteralPath $pairJson)) { throw "Numerical result file was not written: $pairJson" }
-            $pairResult = Get-Content -Raw $pairJson | ConvertFrom-Json
-            if ($pairResult.legal_pair_count -ne 1 -or $pairResult.pass_count -ne 1 -or $pairResult.fail_count -ne 0) {
-                throw "Numerical output did not report exactly one passing pair: $($case.Name) tile $($tile.Q)x$($tile.K)"
+    $registryPath = Join-Path $repoRoot "tests\legal_attention_configs.json"
+    $registryScript = Join-Path $repoRoot "scripts\legal_config_registry.py"
+    & $py $registryScript validate --config $registryPath
+    if ($LASTEXITCODE -ne 0) { throw "Legal numerical configuration JSON failed validation." }
+    $registry = Get-Content -Raw -LiteralPath $registryPath | ConvertFrom-Json
+    $cases = @($registry.cases)
+    $tiles = @($registry.tile_candidates)
+    $legalPairs = @(
+        foreach ($case in $cases) {
+            foreach ($tile in $tiles) {
+                if (($case.N % $tile.tile_q) -eq 0 -and ($case.N % $tile.tile_k) -eq 0) {
+                    [pscustomobject]@{ Case = $case; Tile = $tile }
+                }
             }
         }
+    )
+    $totalLegalPairs = $legalPairs.Count
+    if ($totalLegalPairs -lt 1) { throw "The JSON list has no legal numerical configurations." }
+    $pairIndex = 0
+    foreach ($pair in $legalPairs) {
+        $case = $pair.Case
+        $tile = $pair.Tile
+        $pairIndex++
+        $pairLog = Join-Path $logDir ("guided_numerical_{0}_{1}x{2}_{3}.log" -f $stamp,$case.name,$tile.tile_q,$tile.tile_k)
+        $pairJson = Join-Path $logDir ("guided_numerical_{0}_{1}_{2}x{3}.json" -f $stamp,$case.name,$tile.tile_q,$tile.tile_k)
+        Show-WalkthroughStep -Title ("NUMERICAL CONFIGURATION {0}/{1} — {2}, tile {3}x{4}" -f $pairIndex,$totalLegalPairs,$case.name,$tile.tile_q,$tile.tile_k) -Explanation ("Shape B={0}, H={1}, N={2}, D={3}. B is batch size; H is head count; N is sequence length; D is vector width. This individual run checks this workload/tile combination against the independent FP32 NumPy calculation." -f $case.B,$case.H,$case.N,$case.D)
+        Write-Host "TEST SOURCE: $coreTestPath — test_cutile_matches_independent_reference" -ForegroundColor Yellow
+        Write-Host "NUMERICAL RULE: abs(actual - reference) <= 0.02 + 0.02 * abs(reference)"
+        Pause-BeforeExecution -Prompt "Press Enter to run this one numerical configuration."
+        & $py (Join-Path $repoRoot "scripts\mentor_numerical_matrix.py") --config $registryPath --case $case.name --tile-q $tile.tile_q --tile-k $tile.tile_k --output $pairJson 2>&1 | Tee-Object -FilePath $matrixLog -Append
+        $matrixExit = $LASTEXITCODE
+        if ($matrixExit -ne 0) { throw "Numerical configuration failed: $($case.name) tile $($tile.tile_q)x$($tile.tile_k). Log: $matrixLog" }
+        if (!(Test-Path -LiteralPath $pairJson)) { throw "Numerical result file was not written: $pairJson" }
+        $pairResult = Get-Content -Raw $pairJson | ConvertFrom-Json
+        if ($pairResult.legal_pair_count -ne 1 -or $pairResult.pass_count -ne 1 -or $pairResult.fail_count -ne 0) {
+            throw "Numerical output did not report exactly one passing pair: $($case.name) tile $($tile.tile_q)x$($tile.tile_k)"
+        }
     }
-    if ($pairIndex -ne 29) { throw "Expected 29 legal configurations; executed $pairIndex" }
-    Write-Host "GUIDED_NUMERICAL_MATRIX=29 PASSED" -ForegroundColor Green
+    Write-Host ("GUIDED_NUMERICAL_MATRIX={0} PASSED" -f $totalLegalPairs) -ForegroundColor Green
     Write-Host "GUIDED_NUMERICAL_MATRIX_LOG=$matrixLog"
 
     if (!$SkipTileExperiment) {
@@ -265,7 +265,7 @@ try {
     Write-Host ""
     Write-Host "GUIDED_WALKTHROUGH=PASS" -ForegroundColor Green
     Write-Host "GUIDED_TEST_COUNT=48"
-    Write-Host "GUIDED_NUMERICAL_CONFIGURATION_COUNT=29"
+    Write-Host ("GUIDED_NUMERICAL_CONFIGURATION_COUNT={0}" -f $totalLegalPairs)
     Write-Host "LOG_DIR=$logDir"
     Write-Host "Nsight Compute is intentionally deferred to the later profiler session."
 }
