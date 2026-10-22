@@ -91,7 +91,7 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !($gpu -match "RTX 4060")) { throw "Expected the local RTX 4060; found: $gpu" }
           "GPU_INVENTORY=$gpu"
 
-      - name: Compile launch synchronize and verify real cuTile smoke
+      - name: Compile launch synchronize and verify real cuTile runtime
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           $ErrorActionPreference = 'Stop'
@@ -100,7 +100,7 @@ jobs:
           if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
           if (!(Test-Path $py)) { throw "Python path not found" }
           & $py scripts/cutile_smoke.py
-          if ($LASTEXITCODE -ne 0) { throw "Genuine cuTile smoke failed" }
+          if ($LASTEXITCODE -ne 0) { throw "Genuine cuTile runtime check failed" }
 
       - name: Run required core GPU tests with missing cuTile treated as failure
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
