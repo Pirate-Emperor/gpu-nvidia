@@ -112,7 +112,7 @@ if ($runMenu) {
                     }
                     $node = $nodes[$index - 1]
                     Write-Host "PURPOSE: the pytest test name and source function identify the exact behavior being checked." -ForegroundColor Gray
-                    $relative = ($node -split "::")[0] -replace "/", "\"
+                    $relative = ($node -split "::")[0].Replace("/", [string][char]92)
                     $func = (($node -split "::")[1] -split "\[")[0]
                     $source = Join-Path $menuRoot $relative
                     $sourceLines = Get-Content -LiteralPath $source -Encoding utf8
@@ -123,7 +123,7 @@ if ($runMenu) {
                     if ($start -ge 0) {
                         $end = $sourceLines.Count - 1
                         for ($i = $start + 1; $i -lt $sourceLines.Count; $i++) {
-                            if ($sourceLines[$i] -match "^def ") { $end = $i - 1; break }
+                            if ($sourceLines[$i].StartsWith('def ')) { $end = $i - 1; break }
                         }
                         for ($i = $start; $i -le $end; $i++) { Write-Host ("{0,4}: {1}" -f ($i + 1), $sourceLines[$i]) }
                     }
