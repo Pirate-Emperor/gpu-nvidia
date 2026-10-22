@@ -205,6 +205,26 @@ All 36 historical hint trials passed the NumPy mixed-tolerance check. Keep globa
 
 The largest tolerance-envelope ratio was 2.4367% of the allowed envelope; that is not a 2.4367% output error.
 
+### Historical CUDA control ladder (separate from actual cuTile)
+
+The earlier v1/v2/v3/current and v4/v5 ladder used ordinary CUDA C++ control kernels on the A100 path. It is useful to show why optimization hypotheses were accepted or rejected, but those measurements are **not actual cuTile results and should not be ranked against RTX 4060 numbers above**.
+
+Best median per approach in one earlier ladder run (ms):
+
+| Workload | v1 | v2 | v3 | Current CUDA control |
+|---|---:|---:|---:|---:|
+| short D=32 | 0.111 | 0.066 | 0.055 | 0.055 |
+| short D=64 | 0.119 | 0.073 | 0.060 | 0.061 |
+| short multi-head D=64 | 0.385 | 0.102 | 0.077 | 0.081 |
+| medium D=64 | 1.727 | 0.234 | 0.180 | 0.193 |
+| medium D=128 | — | 0.947 | 0.815 | 0.792 |
+| long D=128 | — | 7.188 | 6.556 | 6.131 |
+| longer batched D=128 | — | 22.895 | 26.533 | 25.678 |
+
+The same run measured first-compile wall times of v1 1652 ms, v2 717 ms, v3 1063 ms and current 808 ms. These are compile/JIT-associated times, not steady-state kernel medians. The absolute results varied across workflow runs, so treat them as historical engineering measurements.
+
+v4 (persistent Q fragments in registers) passed 30 correctness tests but had mixed timing; the PTXAS summary showed no resource improvement over its CUDA control predecessor (32 registers, 33,792 bytes shared memory, zero spills; equal 15,136-byte cubin for current/v4). v5 (half2-oriented Q/K loads) passed 30/30 tests, but its gains on long and longer-batched cases were only about 0.3–0.6%, with mixed short-case results. Neither variant was promoted. The detailed row-by-row v5 comparison is in [the experiment report](EXPERIMENT_REPORT.md) and the algorithm/source context is in [the kernel walkthrough](CUTILE_KERNEL_WALKTHROUGH.md).
+
 ## Experiments and paths not to overclaim
 
 - **128×128 tile:** it was slower on the long D=128 workloads, so it was not promoted.
