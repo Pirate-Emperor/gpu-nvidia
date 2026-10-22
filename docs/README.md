@@ -7,6 +7,8 @@ Start with the [Project Two-Pager](PROJECT_TWO_PAGER.md) for the current concise
 0. [Project Two-Pager](PROJECT_TWO_PAGER.md) — compact current status, strongest recorded core result, implementation map and validation gates.
 0. [Complete experiment narrative](../Report.md) — single authoritative record for the course scope, all core tests/results, all benchmark rows, profiler analysis/plots, project/CUDA/library errors, optional objectives and next actions.
 0a. [Automation/run provenance](../RUN_EVIDENCE.md) — separate workflow/runner URLs and infrastructure failures; not part of the technical report.
+0b. [Step-by-step mentor walkthrough](MENTOR_STEP_BY_STEP_WALKTHROUGH.md) — run smoke, the two GPU test files, CLI/oracle, 29 legal numerical configurations, full three-session tile experiment and load-latency hint sweep one stage at a time; Nsight Compute is deferred.
+0c. [cuTile source walkthrough](CUTILE_KERNEL_WALKTHROUGH.md) — how the unfused baseline and fused kernel execute, online-softmax recurrence, rationale behind all 48 test executions, and the recorded experiment decisions.
 
 1. [Rubric-mapped course project checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md) — requirement-by-requirement closure, status, evidence and prioritized remaining work.
 2. [Detailed course project report](COURSE_PROJECT_REPORT_2026-10-19.md) — algorithm derivation, correctness, performance, profiler interpretation, limitations and submission state.
