@@ -77,15 +77,15 @@ nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total,memory.free 
 
 **What to show:** GPU name, driver, compute capability and memory. Check that the active interpreter is `.venv-cutile-windows`.
 
-### Step 2 — genuine cuTile smoke test
+### Step 2 — cuTile runtime check
 
 ```powershell
 & $py .\scripts\cutile_smoke.py
 ```
 
-**Why:** before debugging attention, prove the cuTile compiler/runtime can compile, launch and synchronize a real cuTile kernel on this GPU. This is a tiny vector-add smoke, not evidence of attention correctness or performance.
+**Why:** before debugging attention, prove the cuTile compiler/runtime can compile, launch and synchronize a real cuTile kernel on this GPU. This is a small vector-add runtime check, not evidence of attention correctness or performance.
 
-**Recorded result:** PASS; 4,096 outputs were checked exactly and stream synchronization passed. The script prints `CUTILE_SMOKE=PASS`.
+**Recorded result:** PASS; 4,096 outputs were checked exactly and stream synchronization passed. The script prints `CUTILE_RUNTIME_CHECK=PASS`.
 
 ### Step 3 — run the 34 correctness-file executions by themselves
 
@@ -130,7 +130,7 @@ $outputFile = Join-Path $logDir "mentor_output_$stamp.npy"
 
 **Expected print:** backend, Q/K/V shapes, output shape and output dtype. The recorded output was FP16, finite and correctly shaped.
 
-### Step 7 — use an independent NumPy oracle to check the saved file
+### Step 7 — use an independent NumPy reference to check the saved file
 
 ```powershell
 & $py .\scripts\verify_cli_output.py --input $inputFile --output $outputFile
@@ -316,13 +316,13 @@ The hint experiment checks six values across two workload/tile combinations and 
 
 | Check | Recorded result |
 |---|---|
-| Genuine cuTile smoke | PASS; 4,096 outputs exactly checked |
+| cuTile runtime check | PASS; 4,096 outputs exactly checked |
 | Required attention suite | 48 passed, 0 failed |
 | Independent numerical matrix | 29 legal case/tile pairs; zero tolerance violations |
 | Maximum absolute error | 0.0009765625 |
 | Largest per-configuration P99 absolute error | 0.00048828125 |
 | Largest per-configuration RMSE | 0.000086860741 |
-| CLI output shape/dtype/finiteness and independent NumPy oracle | PASS |
+| CLI output shape/dtype/finiteness and independent NumPy reference | PASS |
 
 The largest tolerance-envelope ratio was 2.4367% of the allowed envelope; that is not a 2.4367% output error.
 
@@ -371,8 +371,8 @@ Use [the code walkthrough](CUTILE_KERNEL_WALKTHROUGH.md) for the line-by-line al
 
 ## Speaking order
 
-1. Show the GPU and cuTile smoke, then run each pytest file separately. Explain why missing cuTile is treated as a failure.
-2. Open baseline.py, then cutile_attention.py, then reference.py. Explain the causal mask, the online-softmax state and why the independent oracle is separate.
+1. Show the GPU and cuTile runtime check, then run each pytest file separately. Explain why missing cuTile is treated as a failure.
+2. Open baseline.py, then cutile_attention.py, then reference.py. Explain the causal mask, the online-softmax state and why the independent reference is separate.
 3. Show every legal numerical row currently registered in the JSON file and the saved CLI reference check.
 4. Show the three-session tile table. Compare median, P90 and baseline drift, not just the lowest median.
 5. Show the latency hint experiment's accuracy gate and noise-aware recommendation. Explain why hint 0 remains the global default.
