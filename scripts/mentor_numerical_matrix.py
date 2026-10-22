@@ -54,7 +54,46 @@ def main() -> int:
         default=Path(".tmp/logs/mentor_legal_numerical_matrix.json"),
         help="JSON path; a sibling CSV is also written",
     )
+    parser.add_argument(
+        "--case",
+        choices=[case.name for case in MANDATORY_CASES],
+        help="restrict the matrix to one named workload",
+    )
+    parser.add_argument("--tile-q", type=int, help="query tile for one configuration")
+    parser.add_argument("--tile-k", type=int, help="key tile for one configuration")
     args = parser.parse_args()
+    selecting_tile = args.tile_q is not None or args.tile_k is not None
+    if selecting_tile and (
+        args.case is None or args.tile_q is None or args.tile_k is None
+    ):
+        parser.error("--case, --tile-q and --tile-k must be supplied together for one configuration")
+
+    selected_cases = tuple(
+        case for case in MANDATORY_CASES
+        if args.case is None or case.name == args.case
+    )
+    selected_tiles = tuple(
+        (tile_q, tile_k) for tile_q, tile_k in TILES
+        if not selecting_tile or (tile_q == args.tile_q and tile_k == args.tile_k)
+    )
+    if selecting_tile and not selected_tiles:
+        parser.error(f"tile {args.tile_q}x{args.tile_k} is not one of the five defined candidates")
+    legal_selected_pairs = [
+        (case, tile_q, tile_k)
+        for case in selected_cases
+        for tile_q, tile_k in selected_tiles
+        if case.N % tile_q == 0 and case.N % tile_k == 0
+    ]
+    if selecting_tile and len(legal_selected_pairs) != 1:
+        parser.error(
+            f"{args.case} at N={selected_cases[0].N} with tile "
+            f"{args.tile_q}x{args.tile_k} is not a legal configuration"
+        )
+    expected_pair_count = (
+        EXPECTED_LEGAL_PAIRS
+        if args.case is None and not selecting_tile
+        else len(legal_selected_pairs)
+    )
 
     try:
         import cupy as cp
@@ -77,15 +116,19 @@ def main() -> int:
     print(f"Oracle: independent full-matrix FP32 NumPy attention")
     print(f"Mixed tolerance: abs(actual - reference) <= {ABS_TOL} + {REL_TOL} * abs(reference)")
     print("Only positive power-of-two tiles that divide N are tested.")
+    if args.case is not None:
+        print(f"FILTER_CASE={args.case}")
+    if selecting_tile:
+        print(f"FILTER_TILE={args.tile_q}x{args.tile_k}")
     print("")
     print(f"{'CASE':25s} {'SHAPE (B,H,N,D)':22s} {'TILE':9s} {'MAX ABS':>12s} {'P99 ABS':>12s} {'RMSE':>12s} {'TOL ENV %':>11s} STATUS")
 
-    for case in MANDATORY_CASES:
+    for case in selected_cases:
         q_np, k_np, v_np = make_inputs(case)
         expected = causal_attention_fp32(q_np, k_np, v_np, output_dtype=np.float16)
         q_gpu, k_gpu, v_gpu = cp.asarray(q_np), cp.asarray(k_np), cp.asarray(v_np)
 
-        for tile_q, tile_k in TILES:
+        for tile_q, tile_k in selected_tiles:
             if case.N % tile_q or case.N % tile_k:
                 continue
 
@@ -184,7 +227,7 @@ def main() -> int:
         "oracle": "independent full-matrix FP32 NumPy attention",
         "tolerance": "abs(actual-reference) <= 0.02 + 0.02*abs(reference)",
         "legal_pair_count": checked_pairs,
-        "expected_legal_pair_count": EXPECTED_LEGAL_PAIRS,
+        "expected_legal_pair_count": expected_pair_count,
         "pass_count": sum(row["status"] == "PASS" for row in rows),
         "fail_count": sum(row["status"] != "PASS" for row in rows),
         "results": rows,
@@ -204,9 +247,9 @@ def main() -> int:
     print(f"JSON={args.output}")
     print(f"CSV={csv_path}")
 
-    if checked_pairs != EXPECTED_LEGAL_PAIRS:
+    if checked_pairs != expected_pair_count:
         print(
-            f"ERROR: legal pair count drifted; expected {EXPECTED_LEGAL_PAIRS}, got {checked_pairs}",
+            f"ERROR: legal pair count drifted; expected {expected_pair_count}, got {checked_pairs}",
             file=sys.stderr,
         )
         return 1
