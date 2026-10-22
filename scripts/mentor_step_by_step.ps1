@@ -235,12 +235,12 @@ if (!$py) { throw "Project cuTile Python not found. Checked: $($pyCandidates -jo
 $logDir = Join-Path $repoRoot ".tmp\logs"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$smokeLog = Join-Path $logDir "walkthrough_smoke_$stamp.log"
+$runtimeLog = Join-Path $logDir "walkthrough_runtime_check_$stamp.log"
 $coreLog = Join-Path $logDir "walkthrough_core_tests_$stamp.log"
 $edgeLog = Join-Path $logDir "walkthrough_edge_tests_$stamp.log"
 $generateLog = Join-Path $logDir "walkthrough_generate_$stamp.log"
 $cliLog = Join-Path $logDir "walkthrough_cli_$stamp.log"
-$oracleLog = Join-Path $logDir "walkthrough_oracle_$stamp.log"
+$referenceLog = Join-Path $logDir "walkthrough_reference_check_$stamp.log"
 $matrixLog = Join-Path $logDir "walkthrough_numerical_matrix_$stamp.log"
 $tileLog = Join-Path $logDir "walkthrough_tile_experiment_$stamp.log"
 $hintLog = Join-Path $logDir "walkthrough_latency_hint_experiment_$stamp.log"
@@ -309,16 +309,16 @@ try {
     Invoke-NativeChecked "Structured GPU inventory" "nvidia-smi" @("--query-gpu=name,driver_version,compute_cap,memory.total,memory.free","--format=csv")
 
     Show-Step -Number 2 -Title "Genuine cuTile runtime check" -Why "Separate install/compiler/runtime/device problems from attention-algorithm bugs. This compiles and launches a tiny real cuTile vector-add kernel; it is not an attention speed test." -Command "$py scripts\cutile_smoke.py"
-    Invoke-PythonChecked "Genuine cuTile runtime check" @((Join-Path $repoRoot "scripts\cutile_smoke.py")) $smokeLog
-    if (!(Select-String -Path $smokeLog -SimpleMatch "CUTILE_SMOKE=PASS" -Quiet)) {
-        throw "Runtime check did not report success. Log: $smokeLog"
+    Invoke-PythonChecked "Genuine cuTile runtime check" @((Join-Path $repoRoot "scripts\cutile_smoke.py")) $runtimeLog
+    if (!(Select-String -Path $runtimeLog -SimpleMatch "CUTILE_RUNTIME_CHECK=PASS" -Quiet)) {
+        throw "Runtime check did not report success. Log: $runtimeLog"
     }
 
     $oldRequireCutile = $env:REQUIRE_CUTILE
     try {
         $env:REQUIRE_CUTILE = "1"
 
-        Show-Step -Number 3 -Title "Core correctness suite (34 executions)" -Why "Checks each legal mandatory case/tile pair against an independent FP32 NumPy oracle, plus numerical stability, causal invariance, an exploratory tile and invalid sequence handling." -Command "$py -m pytest -v -ra tests\test_gpu_correctness.py"
+        Show-Step -Number 3 -Title "Core correctness suite (34 executions)" -Why "Checks each legal mandatory case/tile pair against an independent FP32 NumPy reference, plus numerical stability, causal invariance, an exploratory tile and invalid sequence handling." -Command "$py -m pytest -v -ra tests\test_gpu_correctness.py"
         Invoke-PythonChecked "Core correctness tests" @("-m","pytest","-v","-ra",(Join-Path $repoRoot "tests\test_gpu_correctness.py")) $coreLog
 
         Show-Step -Number 4 -Title "Edge-case suite (14 executions)" -Why "Targets invariants that can pass ordinary random comparisons by accident: constant values, uniform-score prefix means, future-key/value isolation, invalid inputs, layout and dimension contracts." -Command "$py -m pytest -v -ra tests\test_gpu_edge_cases.py"
@@ -347,10 +347,10 @@ try {
     if (!(Test-Path -LiteralPath $outputFile)) { throw "CLI did not create $outputFile" }
 
     Show-Step -Number 7 -Title "Independently check CLI output against NumPy" -Why "Verifies output shape, FP16 dtype, finiteness and mixed absolute/relative tolerance against the independent CPU oracle. The kernel is not allowed to generate its own expected answer." -Command "$py scripts\verify_cli_output.py --input <saved-input.npz> --output <saved-output.npy>"
-    Invoke-PythonChecked "CLI versus independent NumPy oracle" @(
+    Invoke-PythonChecked "CLI versus independent NumPy reference" @(
         (Join-Path $repoRoot "scripts\verify_cli_output.py"),
         "--input",$inputFile,"--output",$outputFile
-    ) $oracleLog
+    ) $referenceLog
 
     if (!$SkipNumericalMatrix) {
         $matrixFile = Join-Path $logDir "walkthrough_legal_numerical_matrix_$stamp.json"
@@ -394,7 +394,7 @@ try {
     Write-Host ""
     Write-Host "WALKTHROUGH_CORE=PASS" -ForegroundColor Green
     Write-Host "LOG_DIR=$logDir"
-    Write-Host "SMOKE_LOG=$smokeLog"
+    Write-Host "RUNTIME_CHECK_LOG=$runtimeLog"
     Write-Host "CORE_TEST_LOG=$coreLog"
     Write-Host "EDGE_TEST_LOG=$edgeLog"
     Write-Host "INPUT_NPZ=$inputFile"
