@@ -13,6 +13,7 @@ import json
 import platform
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -20,14 +21,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from cases import MANDATORY_CASES
+from legal_config_registry import DEFAULT_CONFIG_PATH, load_config_data
 from cutile_attention import launch_device
 from reference import causal_attention_fp32, passes_mixed_tolerance
 
-TILES = ((32, 64), (64, 64), (64, 128), (128, 64), (128, 128))
 ABS_TOL = 2e-2
 REL_TOL = 2e-2
-EXPECTED_LEGAL_PAIRS = 29
 
 
 def make_inputs(case):
@@ -55,10 +54,12 @@ def main() -> int:
         help="JSON path; a sibling CSV is also written",
     )
     parser.add_argument(
-        "--case",
-        choices=[case.name for case in MANDATORY_CASES],
-        help="restrict the matrix to one named workload",
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help="editable JSON workload/tile registry (default: tests/legal_attention_configs.json)",
     )
+    parser.add_argument("--case", help="restrict the matrix to one named workload")
     parser.add_argument("--tile-q", type=int, help="query tile for one configuration")
     parser.add_argument("--tile-k", type=int, help="key tile for one configuration")
     args = parser.parse_args()
@@ -68,16 +69,28 @@ def main() -> int:
     ):
         parser.error("--case, --tile-q and --tile-k must be supplied together for one configuration")
 
+    try:
+        cases_data, tiles_data, config_warnings = load_config_data(args.config)
+    except (ValueError, OSError) as exc:
+        parser.error(f"invalid legal-configuration registry: {exc}")
+    all_cases = tuple(SimpleNamespace(**item) for item in cases_data)
+    all_tiles = tuple((item["tile_q"], item["tile_k"]) for item in tiles_data)
+    known_case_names = {case.name for case in all_cases}
+    if args.case is not None and args.case not in known_case_names:
+        parser.error(f"unknown case {args.case!r}; run scripts/legal_config_registry.py list")
     selected_cases = tuple(
-        case for case in MANDATORY_CASES
+        case for case in all_cases
         if args.case is None or case.name == args.case
     )
     selected_tiles = tuple(
-        (tile_q, tile_k) for tile_q, tile_k in TILES
+        (tile_q, tile_k) for tile_q, tile_k in all_tiles
         if not selecting_tile or (tile_q == args.tile_q and tile_k == args.tile_k)
     )
     if selecting_tile and not selected_tiles:
-        parser.error(f"tile {args.tile_q}x{args.tile_k} is not one of the five defined candidates")
+        parser.error(
+            f"tile {args.tile_q}x{args.tile_k} is not in the JSON registry; "
+            "add it through the mentor menu first"
+        )
     legal_selected_pairs = [
         (case, tile_q, tile_k)
         for case in selected_cases
@@ -89,11 +102,7 @@ def main() -> int:
             f"{args.case} at N={selected_cases[0].N} with tile "
             f"{args.tile_q}x{args.tile_k} is not a legal configuration"
         )
-    expected_pair_count = (
-        EXPECTED_LEGAL_PAIRS
-        if args.case is None and not selecting_tile
-        else len(legal_selected_pairs)
-    )
+    expected_pair_count = len(legal_selected_pairs)
 
     try:
         import cupy as cp
@@ -113,6 +122,11 @@ def main() -> int:
     rows = []
     checked_pairs = 0
     print(f"GPU: {gpu_name}")
+    print(f"CONFIGURATION_FILE={args.config}")
+    print(f"REGISTERED_WORKLOADS={len(all_cases)} REGISTERED_TILES={len(all_tiles)}")
+    print(f"EXPECTED_LEGAL_CONFIGURATIONS={expected_pair_count}")
+    for warning in config_warnings:
+        print(f"WARNING: {warning}")
     print(f"Reference: independent full-matrix FP32 NumPy attention")
     print(f"Mixed tolerance: abs(actual - reference) <= {ABS_TOL} + {REL_TOL} * abs(reference)")
     print("Only positive power-of-two tiles that divide N are tested.")
@@ -219,6 +233,10 @@ def main() -> int:
     csv_path = args.output.with_suffix(".csv")
     metadata = {
         "title": "Actual cuTile legal case/tile numerical matrix",
+        "configuration_file": str(args.config),
+        "registered_workload_count": len(all_cases),
+        "registered_tile_candidate_count": len(all_tiles),
+        "config_warnings": config_warnings,
         "gpu": str(gpu_name),
         "python": sys.version.split()[0],
         "platform": platform.platform(),
