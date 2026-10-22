@@ -347,7 +347,7 @@ try {
 
     if (!$SkipNumericalMatrix) {
         $matrixFile = Join-Path $logDir "walkthrough_legal_numerical_matrix_$stamp.json"
-        Show-Step -Number 8 -Title "Run all 29 legal numerical case/tile checks" -Why "Performs a fresh output-versus-NumPy check for every supported case/tile pair. It reports each row and writes JSON/CSV. Divisibility and power-of-two restrictions define the legal matrix; an illegal configuration is not silently counted as a pass." -Command "$py scripts\mentor_numerical_matrix.py --output <matrix.json>"
+        Show-Step -Number 8 -Title "Run every legal numerical configuration from the JSON list" -Why "Checks every supported workload/tile pair in tests\legal_attention_configs.json against the independent NumPy result. The default list contains 29 configurations; adding a workload or tile can increase that count. Invalid pairs are excluded and the registry is checked before execution." -Command "$py scripts\mentor_numerical_matrix.py --config tests\legal_attention_configs.json --output <matrix.json>"
         Invoke-PythonChecked "29-pair numerical matrix" @(
             (Join-Path $repoRoot "scripts\mentor_numerical_matrix.py"),
             "--output",$matrixFile
@@ -364,7 +364,7 @@ try {
             "--output",$tileFile,
             "--warmup","10","--iterations","30","--repeats-per-sample","5"
         )
-        Show-Step -Number 9 -Title "Run the full 7-workload, three-session tile experiment (29 legal rows)" -Why "Changes tile shape while holding each case's seeded Q/K/V fixed. Ten warmups reduce startup effects; 30 CUDA-event samples show the distribution; five launches per sample improve event timing granularity. The driver rotates/reverses tile order across three sessions, and baseline timings bracket each case's tile sweep to expose drift." -Command "$py benchmarks\benchmark_attention_sessions.py --output <aggregate.json> --warmup 10 --iterations 30 --repeats-per-sample 5"
+        Show-Step -Number 9 -Title "Run the three-session performance experiment on the seven standard workloads" -Why "Changes tile shape while holding each case's seeded Q/K/V fixed. Ten warmups reduce startup effects; 30 CUDA-event samples show the distribution; five launches per sample improve event timing granularity. The driver rotates/reverses tile order across three sessions, and baseline timings bracket each case's tile sweep to expose drift." -Command "$py benchmarks\benchmark_attention_sessions.py --output <aggregate.json> --warmup 10 --iterations 30 --repeats-per-sample 5"
         Invoke-PythonChecked "Three-session tile experiment" $tileArgs $tileLog
         if (!(Test-Path -LiteralPath $tileFile)) { throw "Tile experiment did not create $tileFile" }
     }
