@@ -18,7 +18,7 @@ $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $inFile = Join-Path $logDir "mentor_attention_input_$stamp.npz"
 $outFile = Join-Path $logDir "mentor_attention_output_$stamp.npy"
 $testLog = Join-Path $logDir "mentor_tests_$stamp.log"
-$smokeLog = Join-Path $logDir "mentor_smoke_$stamp.log"
+$runtimeLog = Join-Path $logDir "mentor_runtime_check_$stamp.log"
 $cliLog = Join-Path $logDir "mentor_cli_$stamp.log"
 
 function Invoke-Checked {
@@ -41,11 +41,11 @@ Invoke-Checked "NVIDIA GPU inventory" "nvidia-smi" @()
 Invoke-Checked "Structured GPU inventory" "nvidia-smi" @("--query-gpu=name,driver_version,compute_cap,memory.total,memory.free,pci.bus_id","--format=csv")
 
 Write-Host ""
-Write-Host "=== Genuine cuTile smoke ===" -ForegroundColor Cyan
-& $py (Join-Path $repoRoot "scripts\cutile_smoke.py") 2>&1 | Tee-Object -FilePath $smokeLog
-$smokeExit = $LASTEXITCODE
-if ($smokeExit -ne 0) { throw "cuTile smoke failed with exit code $smokeExit. Log: $smokeLog" }
-if (!(Select-String -Path $smokeLog -SimpleMatch "CUTILE_SMOKE=PASS" -Quiet)) { throw "Smoke output lacks CUTILE_SMOKE=PASS. Log: $smokeLog" }
+Write-Host "=== Genuine cuTile runtime check ===" -ForegroundColor Cyan
+& $py (Join-Path $repoRoot "scripts\cutile_smoke.py") 2>&1 | Tee-Object -FilePath $runtimeLog
+$runtimeCheckExit = $LASTEXITCODE
+if ($runtimeCheckExit -ne 0) { throw "cuTile runtime check failed with exit code $runtimeCheckExit. Log: $runtimeLog" }
+if (!(Select-String -Path $runtimeLog -SimpleMatch "CUTILE_RUNTIME_CHECK=PASS" -Quiet)) { throw "Runtime output lacks CUTILE_RUNTIME_CHECK=PASS. Log: $runtimeLog" }
 
 $oldRequireCutile = $env:REQUIRE_CUTILE
 try {
@@ -93,13 +93,13 @@ if ($cliExit -ne 0) { throw "cuTile CLI failed with exit code $cliExit. Log: $cl
 if (!(Test-Path -LiteralPath $outFile)) { throw "CLI did not create expected output: $outFile" }
 
 Write-Host ""
-Write-Host "=== Independently verify saved output with NumPy oracle ===" -ForegroundColor Cyan
+Write-Host "=== Independently verify saved output with NumPy reference ===" -ForegroundColor Cyan
 $verifyArgs = @(
     (Join-Path $repoRoot "scripts\verify_cli_output.py"),
     "--input",$inFile,
     "--output",$outFile
 )
-Invoke-Checked "CLI vs independent NumPy oracle" $py $verifyArgs
+Invoke-Checked "CLI vs independent NumPy reference" $py $verifyArgs
 
 if (!$SkipTileSweep) {
     $benchFile = Join-Path $logDir "mentor_benchmark_$stamp.json"
@@ -179,9 +179,9 @@ if ($WithProfile) {
 
 Write-Host ""
 Write-Host "MENTOR_DEMO_CORE=PASS" -ForegroundColor Green
-Write-Host "SMOKE_LOG=$smokeLog"
+Write-Host "RUNTIME_CHECK_LOG=$runtimeLog"
 Write-Host "TEST_LOG=$testLog"
 Write-Host "CLI_LOG=$cliLog"
 Write-Host "INPUT_NPZ=$inFile"
 Write-Host "OUTPUT_NPY=$outFile"
-Write-Host "Next: show the saved benchmark summary and previously captured NCU report. The default run includes the runtime tile sweep. Add -SkipTileSweep only for a quick smoke/test/CLI check; add -WithProfile for a live NCU attempt."
+Write-Host "Next: show the saved benchmark summary and previously captured NCU report. The default run includes the runtime tile sweep. Add -SkipTileSweep only for a quick runtime/test/CLI check; add -WithProfile for a live NCU attempt."
