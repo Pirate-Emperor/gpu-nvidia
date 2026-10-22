@@ -164,6 +164,15 @@ jobs:
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_step_by_step.ps1 -NoPause -SkipNumericalMatrix -SkipTileExperiment -SkipLatencyHintExperiment
           if ($LASTEXITCODE -ne 0) { throw "Step-by-step mentor core path failed with exit code $LASTEXITCODE" }
 
+      - name: Exercise guided kernel explanation and individual correctness runs
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_step_by_step.ps1 -Guided -NoPause -SkipTileExperiment -SkipLatencyHintExperiment
+          if ($LASTEXITCODE -ne 0) { throw "Guided mentor walkthrough failed with exit code $LASTEXITCODE" }
+
       - name: Run the exact reusable mentor demo script end to end
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
