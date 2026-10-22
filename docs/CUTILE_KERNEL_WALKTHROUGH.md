@@ -2,7 +2,7 @@
 
 **Source:** [`src/cutile_attention.py`](../src/cutile_attention.py)  
 **Comparison baseline:** [`src/baseline.py`](../src/baseline.py)  
-**Independent numerical oracle:** [`src/reference.py`](../src/reference.py)
+**Independent numerical reference:** [`src/reference.py`](../src/reference.py)
 
 This walkthrough explains the code that actually executes on the native Windows RTX 4060. It intentionally excludes Nsight Compute; the profiler demonstration is a separate session.
 
@@ -135,7 +135,7 @@ There are **48 parameterized test executions** across two files, not 48 distinct
 |---|---:|---|
 | Constant (V), for (D=32,64,128) | 3 | A weighted average of a constant vector must return that same vector, regardless of attention weights. |
 | Zero logits | 1 | Equal scores imply uniform probabilities over the causal prefix; the output should be the prefix average of (V). |
-| Four tile choices compared to the oracle and each other | 1 | Detects tile-dependent logic or numerical divergence. |
+| Four tile choices compared to the independent reference and each other | 1 | Detects tile-dependent logic or numerical divergence. |
 | Future (V) mutation | 1 | Future values must not influence earlier outputs. |
 | Future (K) mutation | 1 | Future keys must not influence earlier outputs. |
 | NaN, (+\infty), and (-\infty) rejection | 3 | Invalid values must be rejected before they corrupt kernel arithmetic. |
