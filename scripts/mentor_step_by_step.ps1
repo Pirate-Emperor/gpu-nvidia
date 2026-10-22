@@ -73,6 +73,7 @@ if ($runMenu) {
         Write-Host "10. Run the three-session tile performance experiment (seven standard workloads)"
         Write-Host "11. Run the load-latency hint experiment"
         Write-Host "12. Open the formal submission report"
+        Write-Host "13. Run the configuration-registry unit tests (CPU-only validation)"
         Write-Host " 0. Exit"
         $choice = Read-Host "Select a mode"
         try {
@@ -204,6 +205,12 @@ if ($runMenu) {
                     $report = Join-Path $menuRoot "docs\SUBMISSION_REPORT_2026-10-22.md"
                     if (Test-Path -LiteralPath $report) { Invoke-Item $report }
                     else { Write-Host "Report was not found at $report" -ForegroundColor Yellow }
+                }
+                "13" {
+                    $log = Join-Path $menuLogDir ("legal_registry_tests_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
+                    & $menuPy -m pytest -v -ra tests\test_legal_config_registry.py 2>&1 | Tee-Object -FilePath $log
+                    if ($LASTEXITCODE -eq 0) { Write-Host "CONFIG_REGISTRY_TESTS=PASS; LOG=$log" -ForegroundColor Green }
+                    else { Write-Host "CONFIG_REGISTRY_TESTS=FAIL; LOG=$log" -ForegroundColor Red }
                 }
                 "0" { return }
                 default { Write-Host "Choose one of the displayed menu numbers." -ForegroundColor Yellow }
