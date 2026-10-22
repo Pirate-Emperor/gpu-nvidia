@@ -15,6 +15,7 @@ on:
       - "scripts/mentor_demo.ps1"
       - "scripts/mentor_step_by_step.ps1"
       - "scripts/mentor_guided.ps1"
+      - "scripts/legal_config_registry.py"
       - "scripts/mentor_numerical_matrix.py"
       - "benchmarks/**"
       - "run_attention.py"
@@ -153,7 +154,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Legal numerical matrix failed" }
           if (!(Test-Path $matrix)) { throw "Numerical matrix output is missing" }
           $report = Get-Content -Raw $matrix | ConvertFrom-Json
-          if ($report.legal_pair_count -ne 29 -or $report.pass_count -ne 29 -or $report.fail_count -ne 0) { throw "Numerical matrix did not report 29/29 PASS" }
+          if ($report.expected_legal_pair_count -lt 29) { throw "The registry must retain the 29 original configurations" }
+          if ($report.legal_pair_count -ne $report.expected_legal_pair_count -or $report.pass_count -ne $report.expected_legal_pair_count -or $report.fail_count -ne 0) { throw "Numerical matrix did not pass every configuration recorded in the JSON registry" }
 
       - name: Exercise one-by-one mentor walkthrough core path
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
