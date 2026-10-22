@@ -13,6 +13,8 @@ on:
       - "scripts/generate_inputs.py"
       - "scripts/verify_cli_output.py"
       - "scripts/mentor_demo.ps1"
+      - "scripts/mentor_step_by_step.ps1"
+      - "scripts/mentor_numerical_matrix.py"
       - "benchmarks/**"
       - "run_attention.py"
 
@@ -116,6 +118,32 @@ jobs:
           if (!(Test-Path $outFile)) { throw "CLI exited successfully but the NPY output file is missing" }
           & $py scripts\verify_cli_output.py --input "$inFile" --output "$outFile"
           if ($LASTEXITCODE -ne 0) { throw "Independent NumPy output verification failed" }
+
+      - name: Check all 29 legal cuTile numerical configurations
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          $work = Join-Path $root ".tmp\logs"
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          $matrix = Join-Path $work "validation_legal_numerical_matrix.json"
+          & $py scripts\mentor_numerical_matrix.py --output $matrix
+          if ($LASTEXITCODE -ne 0) { throw "Legal numerical matrix failed" }
+          if (!(Test-Path $matrix)) { throw "Numerical matrix output is missing" }
+          $report = Get-Content -Raw $matrix | ConvertFrom-Json
+          if ($report.legal_pair_count -ne 29 -or $report.pass_count -ne 29 -or $report.fail_count -ne 0) { throw "Numerical matrix did not report 29/29 PASS" }
+
+      - name: Exercise one-by-one mentor walkthrough core path
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_step_by_step.ps1 -NoPause -SkipNumericalMatrix -SkipTileExperiment -SkipLatencyHintExperiment
+          if ($LASTEXITCODE -ne 0) { throw "Step-by-step mentor core path failed with exit code $LASTEXITCODE" }
 
       - name: Run the exact reusable mentor demo script end to end
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
