@@ -230,8 +230,10 @@ try {
         $pairIndex++
         $pairLog = Join-Path $logDir ("guided_numerical_{0}_{1}x{2}_{3}.log" -f $stamp,$case.name,$tile.tile_q,$tile.tile_k)
         $pairJson = Join-Path $logDir ("guided_numerical_{0}_{1}_{2}x{3}.json" -f $stamp,$case.name,$tile.tile_q,$tile.tile_k)
-        Show-WalkthroughStep -Title ("NUMERICAL CONFIGURATION {0}/{1} — {2}, tile {3}x{4}" -f $pairIndex,$totalLegalPairs,$case.name,$tile.tile_q,$tile.tile_k) -Explanation ("Shape B={0}, H={1}, N={2}, D={3}. B is batch size; H is head count; N is sequence length; D is vector width. This individual run checks this workload/tile combination against the independent FP32 NumPy calculation." -f $case.B,$case.H,$case.N,$case.D)
-        Write-Host "TEST SOURCE: $coreTestPath — test_cutile_matches_independent_reference" -ForegroundColor Yellow
+        $pairTitle = 'NUMERICAL CONFIGURATION ' + $pairIndex + '/' + $totalLegalPairs + ' - ' + $case.name + ', tile ' + $tile.tile_q + 'x' + $tile.tile_k
+        $pairExplanation = 'Shape B=' + $case.B + ', H=' + $case.H + ', N=' + $case.N + ', D=' + $case.D + '. B is batch size; H is head count; N is sequence length; D is vector width. This run checks this workload/tile combination against the independent FP32 NumPy calculation.'
+        Show-WalkthroughStep -Title $pairTitle -Explanation $pairExplanation
+        Write-Host "TEST SOURCE: $coreTestPath - test_cutile_matches_independent_reference" -ForegroundColor Yellow
         Write-Host "NUMERICAL RULE: abs(actual - reference) <= 0.02 + 0.02 * abs(reference)"
         Pause-BeforeExecution -Prompt "Press Enter to run this one numerical configuration."
         & $py (Join-Path $repoRoot "scripts\mentor_numerical_matrix.py") --config $registryPath --case $case.name --tile-q $tile.tile_q --tile-k $tile.tile_k --output $pairJson 2>&1 | Tee-Object -FilePath $matrixLog -Append
