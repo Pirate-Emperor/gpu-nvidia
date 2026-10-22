@@ -14,6 +14,7 @@ on:
       - "scripts/verify_cli_output.py"
       - "scripts/mentor_demo.ps1"
       - "scripts/mentor_step_by_step.ps1"
+      - "scripts/mentor_guided.ps1"
       - "scripts/mentor_numerical_matrix.py"
       - "benchmarks/**"
       - "run_attention.py"
@@ -53,6 +54,22 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) { throw "Source commit mismatch: $head" }
           "VALIDATED_SOURCE_SHA=$head"
           "WORKSPACE=$root"
+
+      - name: Parse mentor PowerShell scripts
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($relative in @('scripts\mentor_step_by_step.ps1','scripts\mentor_guided.ps1')) {
+            $file = Join-Path $env:GITHUB_WORKSPACE $relative
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell syntax validation failed for $relative"
+            }
+            "POWERSHELL_PARSE_PASS=$relative"
+          }
 
       - name: Locate existing project-local cuTile environment
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
