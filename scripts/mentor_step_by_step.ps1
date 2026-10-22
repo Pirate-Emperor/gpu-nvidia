@@ -138,15 +138,13 @@ try {
 
     if (!$SkipTileExperiment) {
         $tileFile = Join-Path $logDir "walkthrough_full_tile_sweep_$stamp.json"
-        $tiles = @("32x64","64x64","64x128","128x64","128x128")
         $tileArgs = @(
-            (Join-Path $repoRoot "benchmarks\benchmark_attention.py"),
+            (Join-Path $repoRoot "benchmarks\benchmark_attention_sessions.py"),
             "--output",$tileFile,
-            "--warmup","10","--iterations","30","--repeats-per-sample","5",
-            "--tiles"
-        ) + $tiles
-        Show-Step -Number 9 -Title "Run the full 7-workload tile experiment (up to 29 legal rows)" -Why "Changes tile shape while holding each case's seeded Q/K/V fixed. Ten warmups reduce startup effects; 30 CUDA-event samples show the distribution; five launches per sample improve event timing granularity. Baseline timings bracket each case's tile sweep to expose drift." -Command "$py benchmarks\benchmark_attention.py --output <sweep.json> --warmup 10 --iterations 30 --repeats-per-sample 5 --tiles 32x64 64x64 64x128 128x64 128x128"
-        Invoke-PythonChecked "Full tile sweep" $tileArgs $tileLog
+            "--warmup","10","--iterations","30","--repeats-per-sample","5"
+        )
+        Show-Step -Number 9 -Title "Run the full 7-workload, three-session tile experiment (29 legal rows)" -Why "Changes tile shape while holding each case's seeded Q/K/V fixed. Ten warmups reduce startup effects; 30 CUDA-event samples show the distribution; five launches per sample improve event timing granularity. The driver rotates/reverses tile order across three sessions, and baseline timings bracket each case's tile sweep to expose drift." -Command "$py benchmarks\benchmark_attention_sessions.py --output <aggregate.json> --warmup 10 --iterations 30 --repeats-per-sample 5"
+        Invoke-PythonChecked "Three-session tile experiment" $tileArgs $tileLog
         if (!(Test-Path -LiteralPath $tileFile)) { throw "Tile experiment did not create $tileFile" }
     }
     else {
