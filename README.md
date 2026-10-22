@@ -11,6 +11,8 @@ Use this order to understand the project and decide what to do next.
 |---|---|
 | **What remains to do / completion gates** | [TODO checklist](docs/TODO_CHECKLIST.md) |
 | **Two-page project summary and current gates** | [Project two-pager](docs/PROJECT_TWO_PAGER.md) |
+| **One-by-one mentor demo: every command and why it exists** | [Step-by-step walkthrough](docs/MENTOR_STEP_BY_STEP_WALKTHROUGH.md) |
+| **Kernel, baseline, tests, legal tiles and experiment explanations** | [cuTile source walkthrough](docs/CUTILE_KERNEL_WALKTHROUGH.md) |
 | Rubric-mapped course checklist | [Course project checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) |
 | **Complete experiment narrative** | [Root Report.md](Report.md) |
 | Automation-only workflow provenance | [Run evidence (separate file)](RUN_EVIDENCE.md) |
