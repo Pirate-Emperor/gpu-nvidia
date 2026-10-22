@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$NoPause,
+    [switch]$Guided,
     [switch]$SkipNumericalMatrix,
     [switch]$SkipTileExperiment,
     [switch]$SkipLatencyHintExperiment
@@ -69,6 +70,17 @@ function Invoke-NativeChecked {
     & $Exe @Arguments
     $code = $LASTEXITCODE
     if ($code -ne 0) { throw "$Label failed with exit code $code" }
+}
+
+if ($Guided) {
+    $guidedScript = Join-Path $repoRoot "scripts\mentor_guided.ps1"
+    if (!(Test-Path -LiteralPath $guidedScript)) { throw "Guided mode script not found: $guidedScript" }
+    $guidedArgs = @()
+    if ($NoPause) { $guidedArgs += "-NoPause" }
+    if ($SkipTileExperiment) { $guidedArgs += "-SkipTileExperiment" }
+    if ($SkipLatencyHintExperiment) { $guidedArgs += "-SkipLatencyHintExperiment" }
+    & $guidedScript @guidedArgs
+    return
 }
 
 Push-Location $repoRoot
