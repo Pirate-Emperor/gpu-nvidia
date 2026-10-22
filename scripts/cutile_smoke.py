@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Compile, launch, and verify a tiny genuine NVIDIA cuTile kernel.
 
-This is an environment smoke test, not a surrogate CUDA kernel and not an
+This is an environment/runtime check, not a surrogate CUDA kernel and not an
 attention correctness/performance result. It makes no system changes.
 """
 
@@ -23,7 +23,7 @@ def distribution_version(name: str) -> str:
 
 
 def main() -> int:
-    print("CUTILE_SMOKE=START")
+    print("CUTILE_RUNTIME_CHECK=START")
     print(f"OS={platform.platform()}")
     print(f"ARCH={platform.machine()}")
     print(f"PYTHON={sys.version.split()[0]}")
@@ -128,7 +128,7 @@ def main() -> int:
     print(f"TILE_SIZE={tile_size}")
     print("GPU_SYNCHRONIZE=PASS")
     print("OUTPUT_CHECK=PASS")
-    print("CUTILE_SMOKE=PASS")
+    print("CUTILE_RUNTIME_CHECK=PASS")
     return 0
 
 
