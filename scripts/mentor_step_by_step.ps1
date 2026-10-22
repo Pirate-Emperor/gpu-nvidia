@@ -92,10 +92,10 @@ try {
     Invoke-NativeChecked "NVIDIA GPU inventory" "nvidia-smi" @()
     Invoke-NativeChecked "Structured GPU inventory" "nvidia-smi" @("--query-gpu=name,driver_version,compute_cap,memory.total,memory.free","--format=csv")
 
-    Show-Step -Number 2 -Title "Genuine cuTile runtime smoke" -Why "Separate install/compiler/runtime/device problems from attention-algorithm bugs. This compiles and launches a tiny real cuTile vector-add kernel; it is not an attention speed test." -Command "$py scripts\cutile_smoke.py"
-    Invoke-PythonChecked "Genuine cuTile smoke" @((Join-Path $repoRoot "scripts\cutile_smoke.py")) $smokeLog
+    Show-Step -Number 2 -Title "Genuine cuTile runtime check" -Why "Separate install/compiler/runtime/device problems from attention-algorithm bugs. This compiles and launches a tiny real cuTile vector-add kernel; it is not an attention speed test." -Command "$py scripts\cutile_smoke.py"
+    Invoke-PythonChecked "Genuine cuTile runtime check" @((Join-Path $repoRoot "scripts\cutile_smoke.py")) $smokeLog
     if (!(Select-String -Path $smokeLog -SimpleMatch "CUTILE_SMOKE=PASS" -Quiet)) {
-        throw "Smoke output did not contain CUTILE_SMOKE=PASS. Log: $smokeLog"
+        throw "Runtime check did not report success. Log: $smokeLog"
     }
 
     $oldRequireCutile = $env:REQUIRE_CUTILE
