@@ -242,7 +242,7 @@ def main() -> int:
     passed = metadata["pass_count"]
     failed = metadata["fail_count"]
     print("")
-    print(f"LEGAL_PAIRS={checked_pairs} EXPECTED={EXPECTED_LEGAL_PAIRS}")
+    print(f"LEGAL_PAIRS={checked_pairs} EXPECTED={expected_pair_count}")
     print(f"NUMERICAL_MATRIX={passed} passed / {failed} failed")
     print(f"JSON={args.output}")
     print(f"CSV={csv_path}")
