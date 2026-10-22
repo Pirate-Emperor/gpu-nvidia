@@ -346,7 +346,7 @@ try {
     ) $cliLog
     if (!(Test-Path -LiteralPath $outputFile)) { throw "CLI did not create $outputFile" }
 
-    Show-Step -Number 7 -Title "Independently check CLI output against NumPy" -Why "Verifies output shape, FP16 dtype, finiteness and mixed absolute/relative tolerance against the independent CPU oracle. The kernel is not allowed to generate its own expected answer." -Command "$py scripts\verify_cli_output.py --input <saved-input.npz> --output <saved-output.npy>"
+    Show-Step -Number 7 -Title "Independently check CLI output against NumPy" -Why "Verifies output shape, FP16 dtype, finiteness and mixed absolute/relative tolerance against the independent CPU reference. The kernel is not allowed to generate its own expected answer." -Command "$py scripts\verify_cli_output.py --input <saved-input.npz> --output <saved-output.npy>"
     Invoke-PythonChecked "CLI versus independent NumPy reference" @(
         (Join-Path $repoRoot "scripts\verify_cli_output.py"),
         "--input",$inputFile,"--output",$outputFile
