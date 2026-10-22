@@ -24,6 +24,37 @@ permissions:
   contents: read
 
 jobs:
+  script-validation:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Parse mentor PowerShell scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            'scripts\mentor_step_by_step.ps1',
+            'scripts\mentor_guided.ps1',
+            'scripts\mentor_demo.ps1'
+          )
+          foreach ($relative in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $relative), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell syntax validation failed for $relative"
+            }
+            "POWERSHELL_PARSE_PASS=$relative"
+          }
+      - name: Compile Python experiment and registry scripts
+        run: python -m py_compile scripts/legal_config_registry.py scripts/mentor_numerical_matrix.py benchmarks/benchmark_attention_sessions.py benchmarks/benchmark_attention.py benchmarks/benchmark_load_latency_hints.py
+      - name: Validate the editable JSON configuration
+        run: python scripts/legal_config_registry.py validate --config tests/legal_attention_configs.json
+
   validate:
     if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, windows, x64]
