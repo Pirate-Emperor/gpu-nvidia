@@ -13,6 +13,7 @@ Use this order to understand the project and decide what to do next.
 | **Two-page project summary and current gates** | [Project two-pager](docs/PROJECT_TWO_PAGER.md) |
 | **One-by-one mentor demo: every command and why it exists** | [Step-by-step walkthrough](docs/MENTOR_STEP_BY_STEP_WALKTHROUGH.md) |
 | **Kernel, baseline, tests, legal tiles and experiment explanations** | [cuTile source walkthrough](docs/CUTILE_KERNEL_WALKTHROUGH.md) |
+| **Interactive mentor menu and expandable numerical test list** | [JSON configuration registry](tests/legal_attention_configs.json) · [Registry editor](scripts/legal_config_registry.py) · [Menu script](scripts/mentor_step_by_step.ps1) |
 | Rubric-mapped course checklist | [Course project checklist](docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md) |
 | **Complete experiment narrative** | [Root Report.md](Report.md) |
 | **Formal course submission report (22 October 2026)** | [Submission report](docs/SUBMISSION_REPORT_2026-10-22.md) |
