@@ -104,7 +104,14 @@ jobs:
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors) {
-              $errors | ForEach-Object { Write-Error $_.Message }
+              $sourceLines = Get-Content -LiteralPath $file
+              foreach ($parseError in $errors) {
+                $lineNumber = $parseError.Extent.StartLineNumber
+                $columnNumber = $parseError.Extent.StartColumnNumber
+                $lineText = $sourceLines[$lineNumber - 1]
+                Write-Host ("PARSE_ERROR={0}:{1}:{2}: {3}" -f $relative, $lineNumber, $columnNumber, $parseError.Message)
+                Write-Host ("SOURCE_LINE={0}" -f $lineText)
+              }
               throw "PowerShell syntax validation failed for $relative"
             }
             "POWERSHELL_PARSE_PASS=$relative"
