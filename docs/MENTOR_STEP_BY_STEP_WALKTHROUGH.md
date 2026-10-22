@@ -11,25 +11,47 @@ From PowerShell in the repository root:
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\mentor_step_by_step.ps1
 ```
 
-The script pauses before each stage so you can read the purpose and command, press Enter, and watch that stage execute. The verbose pytest output shows the individual tests rather than only one aggregate PASS. It saves separate timestamped logs and result JSON/CSV files under `.tmp\logs`.
+The script opens an interactive menu. It has separate options for the standard demonstration, code-by-code explanation with tests, all 48 required tests, one selected required test, one numerical configuration, all configured numerical configurations, editing and validating the configuration file, and the two performance experiments. Test and result files are written under `.tmp\logs`.
 
-The default walkthrough runs the 48 tests as two verbose test-file executions, then runs the 29-pair numerical matrix, the full seven-workload/three-session tile experiment and the three-session latency-hint experiment.
+Choose **2** in the menu for guided source-and-test mode. It displays sections of `src/cutile_attention.py`, explains what each section does, then runs a related test. It subsequently displays and runs each of the 48 required test executions separately. Finally, it runs every legal numerical configuration registered in the JSON file, one at a time. If additional workloads or tile candidates have been registered, the guided numerical section includes them automatically.
 
-For the **guided source-and-test mode**, use:
+To start guided mode directly without opening the menu:
 
 ```powershell
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\mentor_step_by_step.ps1 -Guided
 ```
 
-Guided mode shows each relevant section of `src/cutile_attention.py`, explains what that section does, then runs an evidence test before continuing. It next shows and runs each of the 48 parameterized GPU test executions separately. It then runs each of the 29 legal case/tile numerical comparisons separately. This is intentionally much more interactive than the standard mode.
-
-To focus on tests and code without running the longer timing experiments:
+To omit the longer performance experiments in guided mode:
 
 ```powershell
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\mentor_step_by_step.ps1 -Guided -SkipTileExperiment -SkipLatencyHintExperiment
 ```
 
-The options `-NoPause`, `-SkipNumericalMatrix`, `-SkipTileExperiment` and `-SkipLatencyHintExperiment` belong to the standard mode; guided mode individually executes the 29 matrix rows by design. `-NoPause` removes guided prompts too, but it does **not** skip the 48 individual tests or 29 individual numerical checks. Skipping a stage does not turn its evidence green. Neither mode runs Nsight Compute.
+The standard timing experiment still measures the seven fixed benchmark workloads and five timing tile choices. The editable JSON list expands numerical accuracy checks; adding a workload does not automatically include it in the performance timing experiment. Neither mode runs Nsight Compute.
+
+## Extend the legal numerical test list
+
+The file `tests/legal_attention_configs.json` is the editable list used by the numerical validation matrix. The initial file contains seven workloads and five tile candidates, which produce 29 supported workload/tile combinations.
+
+Use main-menu option **7** to add a workload or a tile candidate. The interactive editor checks each entry before saving:
+- Tile dimensions must be positive powers of two.
+- The head dimension must be 32, 64 or 128, and value dimension must equal the head dimension.
+- Batch size, head count and sequence length must be positive integers.
+- A workload must have at least one tile for which the sequence length divides evenly by both tile dimensions.
+- A tile must apply to at least one registered workload.
+- Duplicate names and duplicate tile pairs are rejected.
+
+Invalid entries produce a warning and prompt for a correction; they are not saved. Large workloads also generate a memory warning because the independent full-matrix NumPy reference can require substantial memory. Main-menu option **8** checks and lists the current file; option **9** opens it in Notepad. Validate the file after manual edits.
+
+Choose main-menu option **6** to test every legal combination in the file, including additional entries, and option **5** to run one pair or all tiles for a chosen workload. The fixed 48-test suite remains separate and retains its original count. The numerical matrix may exceed 29 rows when the registry is extended.
+
+A direct list/validation command is:
+
+```powershell
+$py = ".\.venv-cutile-windows\Scripts\python.exe"
+& $py .\scripts\legal_config_registry.py list
+& $py .\scripts\legal_config_registry.py validate
+```
 
 ## Stage-by-stage commands and what each one proves
 
