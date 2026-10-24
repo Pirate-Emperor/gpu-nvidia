@@ -56,3 +56,14 @@ Generate and check a CLI output:
 ~~~
 
 The runtime check confirms compilation and launch. The 48 tests cover attention correctness; the 29-case numerical matrix is a separate check.
+
+## Project tracking files
+
+- docs/TODO_CHECKLIST.md
+- docs/README.md
+- docs/EXPERIMENT_REPORT.md
+- docs/CUTILE_RTX4060_RESULTS_2026-10-19.md
+- docs/TESTING_CONTRACT.md
+- docs/TEST_MATRIX.md
+- docs/PROGRESS.md
+- results/STATUS.md
