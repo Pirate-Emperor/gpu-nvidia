@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated PyTorch CUDA GEMM probe for comparing installed CUDA wheel builds.
-
-Each operation runs in a separate child process so a failing cuBLAS handle or
-CUDA context cannot poison the remaining cases. The parent always writes JSON
-and exits successfully; workflow policy can then decide whether to gate on it.
-"""
+"""Check basic CUDA PyTorch operations before running the SDPA comparison."""
 from __future__ import annotations
 
 import argparse

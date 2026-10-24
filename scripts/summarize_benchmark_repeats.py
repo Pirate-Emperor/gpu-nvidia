@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate repeated cuTile benchmark JSON sessions into auditable CSV/JSON.
-
-This tool reads only the explicitly supplied benchmark reports and writes its
-summary to the requested project-local paths. It does not invoke GPU code.
-"""
+"""Summarise repeated benchmark sessions and timing spread."""
 
 from __future__ import annotations
 
