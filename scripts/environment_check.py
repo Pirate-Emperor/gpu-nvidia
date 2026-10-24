@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only environment audit for the A100 cuTile project."""
+"""Read-only audit of the A100 CUDA environment."""
 
 from __future__ import annotations
 

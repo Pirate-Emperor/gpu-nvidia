@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only preflight for the cuTile/A100 project.
-
-This script never installs packages, changes driver state, or modifies the host.
-It is intended to expose hidden cluster prerequisites before a cuTile run.
-"""
+"""Read-only preflight for the cuTile environment and host setup."""
 
 from __future__ import annotations
 
