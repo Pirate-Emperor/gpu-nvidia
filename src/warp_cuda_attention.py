@@ -1,10 +1,4 @@
-"""Warp-level fused CUDA attention variant.
-
-Each warp owns one causal query row. Warp shuffle reductions compute Q·K,
-while each lane accumulates one or more V/output dimensions. This is an
-independent CUDA implementation of the same streaming attention algorithm;
-it deliberately does not depend on cuTile.
-"""
+"""Warp-level fused causal attention in ordinary CUDA C++."""
 
 from __future__ import annotations
 

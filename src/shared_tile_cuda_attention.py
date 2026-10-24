@@ -1,13 +1,4 @@
-"""Shared-memory tiled fused CUDA attention (promoted v3).
-
-This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns a small query tile; each warp owns one query row, four QK
-scores are computed per inner iteration, K/V are staged in shared-memory
-tiles, and a fused online-softmax recurrence is performed without
-materializing scores or probabilities in global memory.
-
-It is intentionally independent of cuTile.
-"""
+"""Shared-memory tiled causal attention in ordinary CUDA C++ (v3)."""
 
 from __future__ import annotations
 
