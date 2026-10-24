@@ -1,8 +1,4 @@
-"""Independent CPU references for optional attention extensions.
-
-These routines use NumPy only, never call cuTile or CUDA, and are suitable as
-oracles for grouped-query/multi-query and packed variable-length semantics.
-"""
+"""NumPy references for GQA/MQA and packed attention."""
 from __future__ import annotations
 
 import numpy as np

@@ -1,9 +1,4 @@
-"""PyTorch bridge to the fused cuTile forward kernel.
-
-The forward call invokes the native cuTile kernel. The optional backward uses
-an explicit FP32 PyTorch reference formula and materializes the score/probability
-matrix; it is a correctness-oriented integration, not a fused backward kernel.
-"""
+"""PyTorch bridge: cuTile forward, reference-only FP32 backward."""
 from __future__ import annotations
 
 import math

@@ -1,14 +1,4 @@
-"""Custom fused CUDA baseline without cuTile.
-
-This kernel is deliberately written as ordinary CUDA C++ and compiled by CuPy.
-One CUDA block owns one causal query row. Threads cooperate to compute each
-Q·K score, then each active output thread streams the corresponding V component
-through the stable online-softmax recurrence.
-
-This is NOT the course cuTile kernel. It is an independent algorithmic/low-level
-reference implementation that lets us validate the fused attention mathematics
-and memory/synchronization strategy before the cuTile runtime is available.
-"""
+"""Fused causal attention baseline in ordinary CUDA C++ (not cuTile)."""
 
 from __future__ import annotations
 
