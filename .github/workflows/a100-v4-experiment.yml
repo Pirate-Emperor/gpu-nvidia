@@ -3,6 +3,7 @@ name: A100 shared-tile v4 experiment
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "src/variants/shared_tile_v4.py"
       - "tests/test_gpu_kernel_v4.py"

@@ -3,6 +3,7 @@ name: A100 tile PTXAS resource report
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "src/shared_tile_cuda_attention.py"
       - "src/variants/shared_tile_v1.py"
