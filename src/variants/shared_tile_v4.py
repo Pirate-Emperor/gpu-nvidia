@@ -1,16 +1,4 @@
-"""Experimental shared-memory tiled fused CUDA attention v4.
-
-This variant keeps each warp row's Q fragments in registers across all K tiles,
-then uses the same fused online-softmax path as the current kernel.
-
-This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns a small query tile; each warp owns one query row, four QK
-scores are computed per inner iteration, K/V are staged in shared-memory
-tiles, and a fused online-softmax recurrence is performed without
-materializing scores or probabilities in global memory.
-
-It is intentionally independent of cuTile.
-"""
+"""Shared-memory CUDA experiment: keep query fragments in registers."""
 
 from __future__ import annotations
 

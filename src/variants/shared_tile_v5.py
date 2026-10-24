@@ -1,13 +1,4 @@
-"""Experimental shared-memory tiled fused CUDA attention v5 using half2 QK loads.
-
-This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns a small query tile; each warp owns one query row, four QK
-scores are computed per inner iteration, K/V are staged in shared-memory
-tiles, and a fused online-softmax recurrence is performed without
-materializing scores or probabilities in global memory.
-
-It is intentionally independent of cuTile.
-"""
+"""Shared-memory CUDA experiment: half2 QK loads."""
 
 from __future__ import annotations
 
