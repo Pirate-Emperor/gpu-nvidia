@@ -1,42 +1,39 @@
-# Exhaustive Test Plan
+# Test plan
 
-## Oracle validation
-- Independent scalar FP64 causal-attention oracle for small tensors.
-- Vectorized FP32 reference is compared against the scalar oracle for N=1..12, D={1,2,3,4,8}, Dv={1,2,5}, and B/H combinations {(1,1),(1,2),(2,1)}.
-- Online-softmax reference is compared against the scalar oracle for N=1..16, multiple D/Dv pairs, and every legal query/key tile pair formed from divisors of N.
-- Explicit regression covers an entirely future K-tile, which previously exposed an online-softmax NaN-state bug.
+## Reference checks
 
-## Deterministic mathematical invariants
-- Causality: future K/V changes cannot alter earlier query rows.
-- Query locality: changing query row i cannot alter rows before i.
-- Batch/head isolation: batched execution agrees with independently sliced execution.
-- Single-token identity: output equals V for N=1.
-- Constant-V invariance: output equals the constant V tensor.
-- Zero-logit prefix mean: equal logits produce the arithmetic mean of the causal prefix.
-- Identical-key reduction: repeated keys produce prefix means.
-- Common-key-shift invariance: adding a common key vector preserves softmax probabilities within FP16 rounding.
-- Affine value transform: output follows the same affine transformation within FP16 rounding.
-- Convex-hull property: each output coordinate lies within the causal prefix value range.
-- Extreme finite logits: output remains finite and stable.
+- Compare the vectorised FP32 attention reference against a scalar FP64 reference for small tensors (N=1–12).
+- Compare the tiled online-softmax reference against the scalar reference for N=1–16 and every legal tile pair.
+- Keep a regression for a fully future K tile; it previously exposed an invalid online-softmax state.
 
-## GPU non-cuTile coverage
-- Ordinary CUDA baselines are tested independently against the mathematical oracle.
-- Block-row, warp-row, and shared-tile implementations are cross-validated.
-- Shared-tile coverage spans D={32,64,128}, N={64,128,256}, tile_k={32,64}, plus batch/head isolation, tile-size invariance, zero logits, constant V, extreme logits, causal future-K/V invariance, nonfinite rejection, and no-partial-query-tile validation.
-- Both exposed A100 devices are exercised for native CUDA execution and cross-device consistency.
-- Historical v1 and optimized v2 shared-tile implementations are regression-tested against each other and the oracle.
+## Mathematical properties
 
-## Contract/error coverage
-- dtype, rank, contiguity, finite-input, batch/head, sequence, D, Dv, and tile-divisibility validation.
-- Required D values {32,64,128}.
-- Invalid and non-divisible tile configurations.
+- Changing future K/V values cannot change earlier outputs.
+- Changing query row i cannot change rows before i.
+- Batched output agrees with separate batch/head slices.
+- For N=1, output equals V.
+- Constant V stays constant.
+- Zero scores give the average of each causal prefix.
+- Repeated keys give causal-prefix means.
+- Adding a common key vector preserves probabilities within FP16 rounding.
+- Affine transformations of V are preserved within FP16 rounding.
+- Output coordinates stay within the allowed value range.
+- Large finite inputs produce finite output.
 
-## What 'exhaustive' means here
-The CPU mathematical/reference layer is exhaustively enumerated over a deliberately bounded small state space, including every legal tiling for N=1..16. GPU coverage is broad deterministic coverage over the required production dimensions plus adversarial cases; it is not every possible B,H,N,D combination. Full numerical claims must be based on the frozen GPU matrix and recorded raw results.
+## GPU coverage
 
-## Future enhancement test buckets
-- Tensor-core MMA variants.
-- Alternative tile shapes and autotuning.
-- Longer sequences and larger batch/head combinations.
-- BF16/FP8 only as optional extensions after the mandatory FP16 path is stable.
-- GQA/MQA, variable-length inputs, backward, and dropout remain outside the mandatory project scope.
+- Check each ordinary CUDA implementation against both references.
+- Cross-check block-row, warp-row and shared-tile variants.
+- Cover D={32,64,128}, N={64,128,256} and tile_k={32,64} where legal.
+- Check batch/head isolation, tile agreement, causal invariance, constant values, zero logits, extreme values, invalid inputs and non-divisible shapes.
+- Keep cross-device checks separate from cuTile validation.
+
+## Input-contract checks
+
+Reject invalid dtype, rank, contiguity, batch/head dimensions, sequence lengths, D, Dv, non-finite values and illegal tile divisibility before launching a kernel.
+
+## What “exhaustive” means here
+
+The CPU reference tests enumerate a bounded small state space. GPU tests cover the required dimensions and selected edge cases; they do not cover every possible shape.
+
+Autotuning, BF16/FP8, backward, GQA/MQA, packed sequences and dropout are separate extensions, not part of the required FP16 forward path.
