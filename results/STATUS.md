@@ -1,6 +1,8 @@
-# Current Result Snapshot
+# Result snapshot
 
-## Current main status — 20 October 2026
+**Current note — 24 October 2026:** the last complete native GPU run predates the later kernel compaction. Recheck current main before treating the timings and profiles below as current.
+
+## Historical snapshot — 20 October 2026
 
 - **Latest completed full native pass:** [RTX 4060 validation #39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438), commit `bf5a6233e195c2ced647b4e20b5b2d914da60e85`, artifact [#12264746195](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438/artifacts/12264746195). Passed actual cuTile smoke; 48 core tests; 3 GQA/MQA/packed-varlen tests; 29 numerical configurations; CLI/NumPy oracle; three controlled benchmark sessions; 36 accuracy-gated latency-hint trials; and two native NCU captures.
 - **Current detailed results:** [CUTILE_RTX4060_RESULTS_2026-10-20.md](../docs/CUTILE_RTX4060_RESULTS_2026-10-20.md) lists all 29 tile/workload medians, P90s, session ranges, accuracy maxima, baseline-drift warnings and hint data. Long D=128 / 64×64 measured 0.267059 ms (16.49×); longer-batched D=128 / 64×128 measured 0.915558 ms (18.69×), both versus the intentionally unfused FP32 CuPy baseline.
