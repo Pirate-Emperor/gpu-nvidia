@@ -3,6 +3,7 @@ name: A100 Nsight access smoke test
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "scripts/ncu_smoke.cu"
       - ".github/workflows/a100-ncu-access.yml"

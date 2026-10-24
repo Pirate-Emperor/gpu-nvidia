@@ -3,6 +3,7 @@ name: A100 native CUDA Nsight profile
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "src/shared_tile_cuda_attention.py"
       - "benchmarks/profile_shared_tile.py"

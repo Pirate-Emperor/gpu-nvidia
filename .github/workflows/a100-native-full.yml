@@ -3,6 +3,7 @@ name: A100 full non-cuTile suite
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "src/reference.py"
       - "src/online_reference.py"
