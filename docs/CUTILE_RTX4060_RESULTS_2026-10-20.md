@@ -2,7 +2,7 @@
 
 **Primary evidence:** [completed native validation run #39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438), source commit `bf5a6233e195c2ced647b4e20b5b2d914da60e85`. **Raw artifact:** [#12264746195](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438/artifacts/12264746195), 194,711 bytes, SHA-256 `e3eaf4ae1e88d2547d2034dfe333db86b70f69e2f2d6c71b0d67b7c8bdde0c32`.
 
-This page supersedes the 19 October result snapshot for the measurements below. It records actual NVIDIA cuTile execution on the Windows RTX 4060; the Linux A100 ordinary-CUDA runner is not used as evidence for these numbers.
+This page supersedes the 19 October result snapshot for the measurements below. It records actual NVIDIA cuTile execution on the Windows RTX 4060; the Linux A100 ordinary-CUDA runner is not used as evidence for these numbers. The kernel was compacted after the recorded run; rerun current main before treating these results as current-source validation.
 
 ## Outcome
 
