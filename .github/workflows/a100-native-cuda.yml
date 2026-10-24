@@ -4,6 +4,7 @@ name: A100 native CUDA baselines
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "src/custom_cuda_attention.py"
       - "src/naive_cuda_attention.py"

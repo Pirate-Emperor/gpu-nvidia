@@ -3,6 +3,7 @@ name: A100 shared-tile version benchmark
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "src/shared_tile_cuda_attention.py"
       - "src/variants/**"
