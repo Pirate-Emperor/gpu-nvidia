@@ -1,143 +1,38 @@
-# Test Matrix and Validation Ledger
+# Test matrix
 
-This file records test coverage and the latest known execution state. For the consolidated approaches, exact outcomes, and measured comparisons, see [docs/EXPERIMENT_REPORT.md](EXPERIMENT_REPORT.md).
+This file separates previously recorded results from the checks still needed on current main.
 
-## Current actual-cuTile validation — 2026-10-19
+## Core coverage
 
-| Gate | Result | Evidence |
-|---|---|---|
-| Genuine cuTile runtime smoke | PASS | Actual vector-add cuTile kernel compiled/launched and exact-checked 4,096 outputs. |
-| Required attention suite | PASS: 48 passed / 0 failed | [Run #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), REQUIRE_CUTILE=1. |
-| Independent numerical diagnostics | PASS: 29 case/tile configurations | Zero mixed-tolerance violations; maximum absolute error 0.0009765625. |
-| CLI / reference | PASS | FP16 output verified against independent NumPy oracle. |
-| Controlled benchmark | PASS with noise caveats | Three sessions, five tile configs, 10 warmups, 30 CUDA-event samples × five launches/sample. |
-| Nsight Compute profiling | PASS: two basic reports + two scheduler/warp-state reports | [Profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066); [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). Reports captured on RTX 4060; no counter-permission error. |
+| Check | Coverage |
+|---|---|
+| Reference comparisons | 29 legal workload/tile combinations |
+| GPU correctness suite | 48 test executions across correctness and edge-case files |
+| CLI output | Saved FP16 result compared with the independent NumPy reference |
+| Runtime | Genuine cuTile kernel compile, launch and result check |
+| Performance | Three historical timing sessions; five tile choices on seven workloads |
+| Profiling | Two historical cuTile configurations, with resource and scheduler data |
 
-Full numerical results and all three raw benchmark sessions: [detailed result report](CUTILE_RTX4060_RESULTS_2026-10-19.md), [artifact 12148414465](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910/artifacts/12148414465).
+## Last complete native run
 
-## Historical non-cuTile and pre-validation records (retained for context)
+[Run #39422402438](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39422402438) on commit bf5a623 passed the core tests, numerical matrix and CLI checks. The numerical matrix had zero tolerance violations and maximum absolute error 0.0009765625. The run also recorded three timing sessions and two Nsight Compute configurations.
 
-| Workflow | Result | Important boundary |
-|---|---|---|
-| [A100 native CUDA #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415) | 133 passed, 1 skipped | Actual ordinary CUDA kernels on A100/R550; no cuTile claim. |
-| [A100 full non-cuTile #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082) | 907 passed, 52 skipped | Broad non-cuTile regression. |
-| [CPU/reference #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931) | 763 passed, 68 skipped | Latest successful CPU/reference suite, on pre-handoff main SHA afe530b; GPU-only tests skip in hosted CPU environment. |
-| [v4 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37760982099) | 30 passed | Experimental variant; not promoted. |
-| [v5 isolated A100 tests](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37761585734) | 30 passed | Experimental half2 variant; performance inconclusive. |
-| [v5 paired benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163) | Correctness 30/30 + 3 paired repeats/case/tile | Order alternated; v5 remains unpromoted after mixed/noisy results. |
-| [PTXAS resource report #5](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38054963187) | v1/v2/v3/current/v4/v5 compiled; zero spills | v5 added to resource comparison; compile-time evidence only. |
-| [Nsight Systems timeline #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950) | Two warmed surrogate `.nsys-rep` traces plus CUDA API/kernel summaries uploaded ([artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954)) | CUDA API/kernel timeline only; not actual-cuTile or Nsight Compute counters. |
+The kernel was compacted after this run. Current main needs a fresh native check before these results can be treated as validation of the current source.
 
+## Performance limits
 
-**Historical evidence note:** these older runs predate the successful local cuTile execution documented above; do not treat their old status as the current state.
+The benchmark uses an unfused FP32 CuPy baseline. Its speedups do not compare against FlashAttention or optimized PyTorch SDPA. Some long-specialization first-call timings were not measured from a clean cache. Those values must remain open until measured properly.
 
-## 1. Reference / CPU tests
+## Nsight Compute
 
-| Test class | Coverage | Expected property | Latest state |
-|---|---|---|---|
-| Shape/dtype contract | rank-4, FP16, contiguous, matching B/H/N/D | invalid inputs rejected | PASS |
-| Required head dimensions | D=32, 64, 128 | all required dimensions execute in oracle | PASS |
-| Causal semantics | future K/V mutations | earlier outputs unchanged | PASS |
-| Query locality | changing q[r] | earlier rows unchanged | PASS |
-| N=1 | single-token attention | output exactly V0 | PASS |
-| Zero logits | uniform causal probabilities | prefix mean of V | PASS / expanded |
-| Constant V | arbitrary Q/K | output exactly constant V | PASS / expanded |
-| Extreme logits | large finite scores | no NaN/Inf; stable softmax | PASS / expanded |
-| Convex-hull invariant | arbitrary finite values | each output lies within prefix V range | PASS / expanded |
-| Batch/head isolation | B>1, H>1 | independent per-head behavior | PASS / expanded |
-| Online-softmax recurrence | multiple legal tile sizes | matches independent FP32 oracle | PASS |
-| Numerical metric tests | abs/rel mixed tolerance | boundary behavior verified | PASS |
-| I/O contract | exact NPZ keys / NPY output | reproducible CLI data path | PASS |
-| Generator contract | deterministic seeded inputs | valid required configurations | PASS |
-| Project structure | required source/tests/docs/workflows | deliverables remain present | PASS |
+The saved profiles show high register/shared-memory use and low achieved occupancy for the two sampled configurations. Scheduler data shows few eligible warps in many cycles. These are leads for another experiment, not proof of a single bottleneck. The next capture should include Details and Raw views as well as occupancy, memory, scheduler and warp-state sections.
 
-The self-hosted A100 runner has previously completed the CPU/reference suite successfully; the repository records the exact suite result in `docs/PROGRESS.md`.
+## Next checks
 
-## 2. GPU cuTile correctness matrix
+- [ ] Current main: runtime, 48 GPU tests and CLI check.
+- [ ] Clean-cache JIT measurements for long specializations.
+- [ ] Compatible framework attention comparison.
+- [ ] Matched before/after profile for one kernel change.
+- [ ] Final report and contribution notes.
 
-The A100 GPU suite is intentionally broader than the minimum course matrix.
-
-### Frozen representative cases
-
-- `short_d32`: B=1, H=1, N=64, D=32
-- `short_d64`: B=1, H=1, N=64, D=64
-- `short_multihead_d64`: B=1, H=4, N=128, D=64
-- `medium_d64`: B=1, H=8, N=256, D=64
-- `medium_d128`: B=1, H=8, N=512, D=128
-- `long_d128`: B=1, H=16, N=1024, D=128
-- `longer_batched_d128`: B=2, H=8, N=2048, D=128
-
-### Required GPU checks
-
-| Check | Coverage | Current state |
-|---|---|---|
-| Independent FP32 reference comparison | all mandatory cases | BLOCKED by R550 runtime gate |
-| D=32 / 64 / 128 | mandatory cases + targeted edge tests | BLOCKED |
-| Two tile configurations | 64x64 and 128x128 | BLOCKED |
-| Asymmetric legal tile configurations | targeted 32x64 and 64x32 | BLOCKED |
-| Small-logit stability | dedicated test | BLOCKED |
-| Large-logit stability | dedicated test | BLOCKED |
-| NaN / Inf rejection before launch | dedicated validation tests | BLOCKED |
-| Non-contiguous input rejection | dedicated validation test | BLOCKED |
-| Causal future-V invariance | dedicated test | BLOCKED |
-| Causal future-K invariance | dedicated test | BLOCKED |
-| Constant-V exactness | D=32/64/128 | BLOCKED |
-| Zero-logit prefix means | D=64 | BLOCKED |
-| Tile-to-tile numerical agreement | 64x64 vs 128x128 | BLOCKED |
-| Multiple B/H | B=2 and multi-head cases | BLOCKED |
-| Custom block-row CUDA | D=32/64/128 + causal/edge/stability cases | PASS; A100 native run #44 |
-| Custom warp-row CUDA | D=32/64/128 + causal/edge/stability cases | PASS; A100 native run #44 |
-| Cross-implementation agreement | block-row vs warp-row | PASS; native CUDA suite |
-| Shared-memory tiled CUDA (current) | tile_k=16/32/64, D=32/64/128, causality/stability/long sequences | PASS; native run #44 and broad run #52 |
-| Shared-tile v4 experimental | differential tests, future-K/V invariance, long-sequence smoke | PASS; 30/30 in dedicated workflow |
-| Shared-tile v5 experimental | differential tests, future-K/V invariance, long-sequence smoke, tile_k=16/32/64 | PASS; 30/30 in dedicated workflow; performance inconclusive |
-
-## 3. GPU baseline ladder
-
-Every executable GPU implementation has a separate correctness path:
-
-1. NumPy FP32 mathematical oracle.
-2. Tiled NumPy online-softmax oracle.
-3. Unfused CuPy score/probability materialization baseline.
-4. Scalar CUDA baseline.
-5. Custom block-row fused CUDA.
-6. Custom warp-row fused CUDA.
-7. Optional PyTorch SDPA reference.
-8. Fused cuTile kernel.
-
-The two custom CUDA variants are deliberately independent implementations of
-the fused algorithm. They are cross-checked against the mathematical oracle,
-the online recurrence, and each other before they are used as a reference for
-cuTile.
-
-## 4. Performance runs
-
-Native-CUDA surrogate timings have been collected on the A100 using CUDA events, 10 warmups, 30 measured iterations, median/P90, and raw JSON/CSV artifacts. The tile ladder also measures first compilation separately. The current-vs-v5 experiment uses three paired repeats with order alternating by repeat; see [v5 benchmark #4](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055001163). The v5 result remains inconclusive and it is not promoted. See [the experiment report](EXPERIMENT_REPORT.md) for medians and the explicit warning about run-to-run timing variability.
-
-**Current actual-cuTile performance status (2026-10-19): PASS with caveats.** Run #39160827910 executed three benchmark sessions over five tile configurations. Long D=128 at 64×64 measured 0.267059 ms (16.53× vs unfused CuPy, 2.0% session spread); longer batched D=128 at 64×128 measured 0.923034 ms (18.54×, 0.9% spread). See [full results](CUTILE_RTX4060_RESULTS_2026-10-19.md). **Profiling: PASS.** Two actual-cuTile configurations were profiled and inspected in [run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066); reports and metric exports are in [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). The earlier `ERR_NVGPUCTRPERM` refers to the historical A100 attempt, not the RTX 4060.
-
-Required actual-cuTile profiling gate is now **PASS**. Two genuine kernel configurations were captured, and basic resource/occupancy/throughput metrics plus scheduler/warp-state findings were inspected and documented in [the profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md). See [profile artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
-
-Optional follow-up: add a CUDA-enabled PyTorch SDPA comparison if a compatible build can be approved and installed safely in the project venv. The currently reported speedups are versus the deliberately unfused FP32 CuPy baseline, not a vendor-optimized attention kernel.
-
-## 5. Environment gate
-
-**Existing hosted/self-hosted control runner:** NVIDIA A100-SXM4-40GB, SM80, driver R550.90.07. This runner is below NVIDIA's R580+ cuTile Python requirement and remains for ordinary-CUDA surrogate validation only. Prior forward-compatibility attempts did not establish actual cuTile execution.
-
-**Validated actual-cuTile target:** GeForce RTX 4060, CC 8.9, driver 616.92, Windows x64 build 26300, 8,188 MiB VRAM. Run #39160827910 confirmed the installed Python/CuPy/cuTile environment, passed the actual attention matrix and CLI, and produced controlled benchmark artifacts. See [local GPU guide](LOCAL_GPU_WINDOWS.md) and [current result report](CUTILE_RTX4060_RESULTS_2026-10-19.md).
-## 6. Dual-device hardware validation
-
-The actual runner exposes two full A100-SXM4-40GB GPUs through `CUDA_VISIBLE_DEVICES=0,1`.
-The native-CUDA suite therefore includes:
-- one CUDA arithmetic smoke test on device 0 and device 1;
-- one fused-attention execution on device 0 and device 1;
-- a cross-device output agreement test using identical inputs.
-
-This is hardware validation, not a cuTile result. The cuTile workflow remains a
-separate R580-gated execution path.
-
-## 7. Compilation backends
-
-The ordinary CUDA implementations are compiled through CuPy's `nvcc` backend
-with `-arch=sm_80`, using the host's CUDA 12.4 compiler. This intentionally
-avoids the current NVRTC header-discovery failure on the R550 node.
+See [execution evidence](EXECUTION_EVIDENCE_INDEX.md) for run links and artifacts.

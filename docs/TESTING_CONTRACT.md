@@ -1,87 +1,45 @@
-# Correctness Testing Contract
+# Testing contract
 
-## Status
+The GPU kernel is checked against src/reference.py, an independent FP32 NumPy implementation. The reference does not call the cuTile kernel.
 
-This document is the frozen testing contract for the NVIDIA cuTile attention project.
+## Input contract
 
-## Oracle
+- Q, K and V are contiguous FP16 arrays with shape [B,H,N,D].
+- Supported head dimensions are 32, 64 and 128.
+- The required path uses causal self-attention and Dv = D.
+- Sequence lengths must fit the selected query and key tile sizes.
+- NaN, infinity, unsupported dimensions and invalid layouts must be rejected.
 
-The correctness oracle is the independent NumPy implementation in src/reference.py.
+## Numerical check
 
-The oracle:
-- accepts only finite FP16 contiguous Q/K/V;
-- converts inputs to FP32 before arithmetic;
-- explicitly computes QK^T;
-- applies scale 1/sqrt(D);
-- applies an explicit causal upper-triangular mask;
-- performs max-shift softmax;
-- computes P @ V in FP32.
+For each output element:
 
-The optimized cuTile kernel is never used to generate expected outputs.
+abs(actual - reference) <= 0.02 + 0.02 * abs(reference)
 
-## Test categories
+The suite also checks output shape, dtype and finite values. Do not widen the tolerance just to accept a faster kernel.
 
-### 1. Structural contract
-Tests validate rank, dtype, contiguity, batch/head agreement, sequence agreement, Q/K head-dimension agreement, D in {32,64,128}, and Dv == D.
+## What is tested
 
-### 2. Exact causal invariants
-These are deterministic tests. They prove:
-- query row 0 cannot see later keys/values;
-- changing a future V cannot change earlier outputs;
-- changing a future K cannot change earlier outputs;
-- changing query row j cannot change query rows < j.
+- 29 legal workload/tile combinations.
+- One additional tile configuration.
+- Small and large input magnitudes.
+- Constant-value and zero-score properties.
+- Future-key and future-value invariance.
+- Invalid shapes, dimensions, values and memory layouts.
 
-### 3. Numerical stability
-Large finite logits must produce finite outputs.
+The core GPU suite contains 48 executions. The separate 29-row numerical matrix is not part of that count.
 
-### 4. Determinism
-The same input must produce exactly the same oracle output.
+## Run the GPU suite
 
-### 5. Error policy
-Kernel outputs will be checked with both maximum absolute error and maximum relative error. The project proposal's recommended FP16-output starting tolerance is:
+~~~powershell
+$py = ".\.venv-cutile-windows\Scripts\python.exe"
+$env:REQUIRE_CUTILE = "1"
+& $py -m pytest -v -ra tests\test_gpu_correctness.py tests\test_gpu_edge_cases.py
+$testCode = $LASTEXITCODE
+Remove-Item Env:REQUIRE_CUTILE -ErrorAction SilentlyContinue
+if ($testCode -ne 0) { throw "GPU tests failed." }
+~~~
 
-abs_error <= 2e-2 + 2e-2 * abs(reference)
+The REQUIRE_CUTILE flag makes missing GPU dependencies a failure, not a skip.
 
-We will not loosen this merely to make a failing optimization pass. Any final tolerance must be justified by measured numerical behavior.
-
-## Planned GPU/kernel test categories
-
-Once run_attention.py exists, every implementation test will compare the cuTile output against the oracle using the exact same input file:
-- all required head dimensions;
-- sequences equal to and larger than one tile;
-- multiple divisible sequence lengths;
-- multiple batch sizes and head counts;
-- very small and large score magnitudes;
-- invalid/non-divisible shapes rejected before launch;
-- output NaN/Inf rejection.
-
-The course proposal requires these categories.
-
-## Regression policy
-
-Every discovered correctness bug becomes a permanent regression test.
-
-A performance change is accepted only after:
-1. full correctness suite passes;
-2. no NaN/Inf is introduced;
-3. error metrics remain within the frozen tolerance;
-4. invalid inputs are still rejected correctly.
-
-## Test isolation
-
-Tests of the numerical oracle must not depend on cuTile availability.
-
-GPU tests may be skipped when the required GPU/software stack is absent during local development, but the A100 CI/release workflow will treat an unavailable required GPU environment as infrastructure failure rather than success.
-
-## Reproducibility
-
-All generated benchmark/test inputs use explicit seeds.
-
-Benchmark data must record:
-- git commit;
-- GPU;
-- driver;
-- CUDA;
-- cuTile;
-- tile configuration;
-- seed.
+Every kernel change must pass the full suite before timing or profiling. Keep failed tests as regression tests.
