@@ -1,83 +1,51 @@
-# Local GPU Bring-Up — Windows RTX 4060
+# Run cuTile on the Windows RTX 4060
 
-## Current state — 20 October 2026
+The actual cuTile target is the local Windows RTX 4060 (compute capability 8.9, driver 616.92). The Linux A100 with driver R550.90.07 is used for ordinary CUDA C++ comparisons; do not treat those runs as cuTile results.
 
-The earlier native RTX 4060 core snapshot passed [workflow #39163083223](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163083223): genuine cuTile smoke, 48 required attention tests, 29 numerical configurations, CLI/reference verification, and three controlled benchmark sessions. Two actual-cuTile Nsight Compute configurations were captured and inspected in [profile run #39163619066](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066), with reports and metric exports in [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039). Since then, main added optional GQA/MQA, packed-varlen, PyTorch bridge, autotuning and load-latency-hint code and changed the kernel launch signature. **Those results are historical until current main passes a fresh native regression.** The PowerShell startup problem has been fixed; CPU/reference CI passed, while current native SDPA/core regression [#39402053172](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402053172) and NCU run [#39402058064](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39402058064) were queued at the last status check. See the [two-pager](PROJECT_TWO_PAGER.md), [detailed benchmark results](CUTILE_RTX4060_RESULTS_2026-10-19.md), [profile analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md), and [execution evidence index](EXECUTION_EVIDENCE_INDEX.md).
+## Before running
 
-**Inventory received:** 2026-10-18  
-**Purpose:** actual cuTile bring-up on the user's local GPU. This is separate from the existing A100 ordinary-CUDA surrogate evidence.
+Open PowerShell at the repository root and check the environment:
 
-## 1. Observed machine inventory
+~~~powershell
+nvidia-smi
+.\.venv-cutile-windows\Scripts\python.exe --version
+.\.venv-cutile-windows\Scripts\python.exe -c "import numpy, cupy, cuda.tile; print(numpy.__version__, cupy.__version__)"
+~~~
 
-| Item | Observed value | Interpretation |
-|---|---|---|
-| GPU | NVIDIA GeForce RTX 4060 | Actual local-device candidate |
-| Compute capability | 8.9 | Inside NVIDIA cuTile Python's documented 8.x–12.x range |
-| Driver | 616.92 | Newer than the cuTile runtime minimum R580 |
-| Driver-reported CUDA UMD level | 13.4 | Driver support level; **not** proof that the CUDA Toolkit/NVCC is installed |
-| VRAM | 8,188 MiB total, 7,925 MiB free at inventory | Enough to begin smoke/correctness tests; benchmark each case and watch memory use |
-| Driver model | WDDM | Native Windows GPU path |
-| OS | Windows 10 Pro, x64, build 26300 | Windows x86_64 is on NVIDIA's current cuTile support list |
-| NVCC / system Toolkit | `nvcc` not found | Not a blocker if the isolated Python compiler packages install correctly |
-| Python | CPython 3.12.10, 64-bit, in `.venv-cutile-windows` | cuTile packages installed; genuine smoke test passed |
-| WSL2 | Not installed | Not needed for the first attempt |
-| Docker | Not installed | Not needed for the first attempt |
-| Nsight Compute CLI | Installed under standard NVIDIA Program Files location | CLI 2026.3.1.0 found by workflow; two actual-cuTile reports plus scheduler/warp-state diagnostics captured and inspected |
+The recorded environment used Python 3.12.10, NumPy 2.5.4, CuPy 14.2.0 and cuda-tile 1.6.0. Check the versions on the machine before relying on an old report.
 
-## 2. Execution decision
+## Run the checks
 
-**Historical native Windows cuTile smoke and attention correctness passed.** Workflow #39160827910 passed the actual vector-add smoke and the 48-test fused attention matrix under REQUIRE_CUTILE=1 on the earlier source snapshot; the current main branch needs the same regression after its optional additions.
+~~~powershell
+$py = ".\.venv-cutile-windows\Scripts\python.exe"
 
-The successful execution path is the normal native-Windows GitHub Actions self-hosted runner on the same RTX 4060. The repository workflow targets the default `self-hosted`, `windows`, and `x64` labels, so no Docker or WSL setup is needed. This is based on NVIDIA's documented supported platforms: NVIDIA's current [cuTile Python Quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) explicitly supports Windows x86_64, compute capability 8.x–12.x, drivers R580+, and Python 3.10–3.14. The observed GPU/driver/OS satisfy those documented hardware/driver/OS gates. The driver also exceeds the Quickstart's Windows R582.16+ requirement for detailed cuTile profiling.
+& $py scripts\cutile_smoke.py
+if ($LASTEXITCODE -ne 0) { throw "cuTile runtime check failed." }
 
-System NVCC remains absent, but the isolated compiler wheels worked for the earlier actual cuTile tests. An official NVIDIA issue documents an earlier Windows cuTile + CuPy installation failing in NVRTC with `nvrtc-builtins64_131.dll`; the issue is marked closed/waiting-for-feedback, not as a universal fix. See [NVIDIA cuTile Python issue #57](https://github.com/NVIDIA/cutile-python/issues/57). The smoke, actual attention correctness, CLI, controlled benchmarks, and two-configuration Nsight Compute profile gates passed for the historical core snapshot; confirm them again for current main before claiming the newer paths are GPU-validated. See [the profiler analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) and [artifact 12149902039](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39163619066/artifacts/12149902039).
+$env:REQUIRE_CUTILE = "1"
+& $py -m pytest -v -ra tests\test_gpu_correctness.py tests\test_gpu_edge_cases.py
+$testCode = $LASTEXITCODE
+Remove-Item Env:REQUIRE_CUTILE -ErrorAction SilentlyContinue
+if ($testCode -ne 0) { throw "GPU correctness tests failed." }
 
-The setup script deliberately avoids system-wide CUDA Toolkit and driver changes. It installs the TileIR compiler through `cuda-tile[tileiras]` and asks current CuPy to install matched CUDA component wheels through `cupy-cuda13x[ctk]`. CuPy documents this [component-wheel installation path](https://docs.cupy.dev/en/stable/install.html); NVIDIA requires the `nvidia-cuda-tileiras`, `nvidia-cuda-nvcc` and `nvidia-nvvm` versions to match major.minor when using the cuTile extra.
+& $py scripts\generate_inputs.py --output .tmp\sample.npz --batch 1 --heads 1 --seq 64 --head-dim 32 --seed 20261024
+if ($LASTEXITCODE -ne 0) { throw "Input generation failed." }
 
-## 3. Original bootstrap sequence for reproduction (already passed in the current environment)
+& $py run_attention.py --input .tmp\sample.npz --output .tmp\output.npy --backend cutile --tile-q 64 --tile-k 64
+if ($LASTEXITCODE -ne 0) { throw "cuTile CLI failed." }
 
-To reproduce from a clean project checkout, use the ordinary repository-scoped self-hosted runner shown by GitHub as Online and run the workflow on main. The tested workflow creates or reuses the project-local Python venv, installs the pinned dependencies there, runs the genuine smoke test and required attention tests, writes numerical diagnostics, validates CLI output against the independent NumPy oracle, and then benchmarks five legal tile configurations across three alternating-order sessions. The complete successful evidence is run #39160827910 and artifact 12148414465.
+& $py scripts\verify_cli_output.py --input .tmp\sample.npz --output .tmp\output.npy
+if ($LASTEXITCODE -ne 0) { throw "CLI output check failed." }
+~~~
 
-1. Install **64-bit CPython 3.12** for the current Windows user from [Python for Windows](https://www.python.org/downloads/windows/). Enable the Python Launcher, then open a new PowerShell and check `py -3.12 --version`. Use a supported 3.10–3.14 CPython build; 3.12 aligns with the repository's existing CI version.
-2. Check out the private `xemptynothing/gpu-nvidia` repository into a project-only working directory. If Git for Windows is available, run `git clone https://github.com/xemptynothing/gpu-nvidia.git` and then `cd gpu-nvidia`; otherwise use GitHub Desktop or install Git for Windows. Authenticate through your normal browser/Git Credential Manager flow; do not paste a PAT or any credential into chat. Do not put personal documents or credentials in the project directory.
-3. From the repository root, run:
-   
-       .\scripts\setup_cutile_windows.ps1
+The runtime check tests compilation and launch. The 48-test suite checks attention behaviour. The CLI check compares the saved output with the independent NumPy calculation.
 
-   This creates `.venv-cutile-windows`, installs CPU/test and pinned CuPy/cuTile requirements there, and runs the real smoke. The checked-in setup script now keeps pip cache, temp files and logs inside project-root .cache/.tmp. It does not install drivers, system Toolkit, WSL2, Docker, Nsight Compute, or a GitHub runner.
-4. Require the log to show both `OUTPUT_CHECK=PASS` and `CUTILE_SMOKE=PASS`. The smoke launches a real `cuda.tile` vector-add kernel, synchronizes the GPU, and compares all 4,096 values with a known NumPy result. An import-only pass does not qualify.
-5. Only after smoke succeeds, run the actual attention correctness suite without allowing missing dependencies to become skips:
+## Nsight Compute
 
-       $env:REQUIRE_CUTILE = "1"
-       .\.venv-cutile-windows\Scripts\python.exe -m pytest -q tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py
-       $testExit = $LASTEXITCODE
-       Remove-Item Env:REQUIRE_CUTILE
-       if ($testExit -ne 0) { throw "Required cuTile correctness tests failed" }
+After correctness passes, run the profiler workflow or use benchmarks/profile_fused.py with ncu. Save the original report files, metric exports and GUI captures. Include Summary, Details, Raw, Occupancy, Memory, Scheduler and Warp State views when available.
 
-   The new `REQUIRE_CUTILE=1` mode makes missing CuPy/cuTile an error while allowing an RTX 4060 (not an A100) to run the suite. Save the console output and exact `git rev-parse HEAD` with the result.
-6. If correctness passes, exercise the required CLI with a small case. These commands keep generated inputs/outputs in the project-local temporary directory:
-   
-       $py = ".\\.venv-cutile-windows\\Scripts\\python.exe"
-       $work = Join-Path (Get-Location) ".tmp\\logs"
-       $input = Join-Path $work "attention_cli_input.npz"
-       $output = Join-Path $work "attention_cli_output.npy"
-       & $py scripts\\generate_inputs.py --output $input --batch 1 --heads 1 --seq 64 --head-dim 32
-       if ($LASTEXITCODE -ne 0) { throw "Input generation failed" }
-       & $py run_attention.py --input $input --output $output --backend cutile --tile-q 64 --tile-k 64
-       if ($LASTEXITCODE -ne 0) { throw "Attention CLI failed" }
-       $env:ATTENTION_INPUT = $input
-       $env:ATTENTION_OUTPUT = $output
-       $env:PYTHONPATH = Join-Path (Get-Location) "src"
-       & $py -c "import os,numpy as np; from attention_io import load_attention_npz; from reference import causal_attention_fp32; q,k,v=load_attention_npz(os.environ['ATTENTION_INPUT']); expected=causal_attention_fp32(q,k,v,output_dtype=np.float16); actual=np.load(os.environ['ATTENTION_OUTPUT']); assert actual.shape==expected.shape and actual.dtype==np.float16 and np.isfinite(actual).all(); np.testing.assert_allclose(actual,expected,rtol=2e-2,atol=2e-2); print('CLI_OUTPUT_CHECK=PASS')"
-       $checkExit = $LASTEXITCODE
-       Remove-Item Env:ATTENTION_INPUT,Env:ATTENTION_OUTPUT,Env:PYTHONPATH -ErrorAction SilentlyContinue
-       if ($checkExit -ne 0) { throw "CLI output/reference check failed" }
+Use profiler counters to form a hypothesis, then test it with a code change, full correctness rerun and repeated unprofiled timing. NCU measurements include profiler overhead and should not replace normal timing results.
 
-   Do not benchmark or profile a kernel that has not passed correctness. Use at least 10 warmups, at least 30 CUDA-event samples, cold/JIT separate, median/P90, throughput, and raw results.
-7. Before detailed profiling, install/locate Nsight Compute and verify non-admin profiling access. The driver meets the documented version threshold, but the profiler binary and counter permission have not yet been checked.
+## Current status
 
-## 4. Optional Dockerized Actions runner (not used for successful cuTile attention validation)
-
-Docker/WSL2 are not prerequisites for this project because native Windows cuTile attention already passed. The Docker runner design is retained only as an optional future isolation route. Do not install or configure Docker as part of the remaining task unless the project owner asks for that separate route. If used later, keep the no-host-mount/no-Docker-socket/non-root constraints from [CUTILE_DOCKER_RUNNER.md](CUTILE_DOCKER_RUNNER.md); those controls reduce exposure but are not a perfect security boundary.
-
-No driver upgrade or machine-wide CUDA Toolkit installation is performed by project scripts.
+The last full native run is #39422402438 on commit bf5a623. The kernel changed after that run, so run the checks above on current main before citing the older results as current.
