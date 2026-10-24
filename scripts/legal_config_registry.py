@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Maintain the editable workload/tile registry used by the mentor numerical matrix."""
+"""Edit and validate the workload/tile list for the numerical tests."""
 
 from __future__ import annotations
 

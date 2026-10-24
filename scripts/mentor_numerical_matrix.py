@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Run the 29 legal cuTile attention case/tile pairs against an independent NumPy reference.
-
-This is a numerical validation matrix, not a timing benchmark. It reports one
-row per legal specialization and exits non-zero on any contract/tolerance failure.
-"""
+"""Compare legal cuTile workload/tile pairs against the independent NumPy reference."""
 from __future__ import annotations
 
 import argparse
