@@ -2,6 +2,10 @@
 
 This file is the durable experiment log for the project. Record what was tested, what passed, what failed, and what remains blocked.
 
+## Current status note — 24 October 2026
+
+The last complete RTX 4060 run is #39422402438 on commit bf5a623. It passed the 48 core GPU tests, 29 numerical configurations, CLI check, three timing sessions and two Nsight Compute configurations. The kernel was compacted after that run, so current main still needs a fresh native GPU pass. Treat the dated entries below as history, and check the [current README](../README.md) and [evidence index](EXECUTION_EVIDENCE_INDEX.md) before quoting a result.
+
 ## 2026-10-05 / 2026-10-06 — Foundation
 
 ### Repository foundation
