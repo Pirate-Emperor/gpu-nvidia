@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Create per-case cuTile accuracy diagnostics against the independent FP32 oracle.
-
-This is a GPU experiment/report, not a replacement for pytest. It reruns every
-divisible mandatory case/tile configuration and records element-wise errors.
-All generated inputs stay in memory; only the JSON report is written.
-"""
+"""Report per-case cuTile error against the independent FP32 NumPy calculation."""
 
 from __future__ import annotations
 

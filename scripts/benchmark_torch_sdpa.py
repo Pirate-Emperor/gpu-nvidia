@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Compare the validated cuTile kernel with CUDA PyTorch scaled-dot-product attention.
-
-Uses the exact frozen project inputs/cases, independently checks both outputs
-against the FP32 NumPy oracle, records the PyTorch SDPA backend operator when
-available, and reports cold/first-call time separately from steady-state CUDA
-event timing. Every metric remains an experiment, not an assumed framework win.
-"""
+"""Compare cuTile with CUDA PyTorch SDPA. Check both outputs against NumPy and record the backend and cold/steady timings."""
 from __future__ import annotations
 
 import argparse

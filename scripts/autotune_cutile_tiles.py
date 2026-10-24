@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Correctness-gated cuTile tile autotuner for the frozen workload matrix.
-
-The script records every legal tile trial and every session sample. It chooses
-a specialization only when the repeated median advantage exceeds the configured
-noise margin and both candidates' observed session spread; otherwise it returns
-the stable 64x64 default and labels the result inconclusive.
-"""
+"""Try legal tile pairs. Recommend a tile only when repeated timings clear the noise threshold."""
 from __future__ import annotations
 
 import argparse
