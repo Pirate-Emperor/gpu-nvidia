@@ -110,3 +110,5 @@ The [course checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md), [test matrix](TE
 **What do the NCU results say?** Resource use and scheduler data suggest limited occupancy and latency hiding. More than one counter is needed to identify the bottleneck.
 
 **Are all performance requirements closed?** No. Current-source GPU validation, clean-cache JIT timing, the framework comparison and another measured profiler-guided improvement remain open.
+
+See Report.md for the full measurement tables, failed attempts and detailed history.
