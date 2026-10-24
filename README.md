@@ -19,6 +19,7 @@ The last complete RTX 4060 run, on commit bf5a623, passed the 48 core GPU tests,
 The kernel was compacted after that run. Treat the old measurements as historical until the current source passes a fresh native GPU run.
 
 The timing baseline is the unfused FP32 CuPy implementation, not FlashAttention or an optimized PyTorch attention backend.
+The ordinary CUDA C++ controls are not actual NVIDIA cuTile runs.
 
 ## Remaining course work
 
