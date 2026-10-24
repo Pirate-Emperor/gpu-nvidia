@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Capture genuine Nsight Compute GUI-window screenshots on interactive Windows.
 
-Launch the installed ncu-ui against each native report, enumerate the visible
-window, use Windows PrintWindow to capture that application window only, reject
-blank captures, and write PNGs plus a manifest. If no usable interactive desktop
-exists, record skips rather than synthesizing screenshots. Standard library only.
+Launch the installed ncu-ui against each native report, capture the Summary,
+Details and Raw views from the real application window, and save PNGs plus a
+manifest. Details captures include several scroll positions for the metrics.
+If no usable desktop exists, record skips instead of creating fake screenshots.
 """
 from __future__ import annotations
 
@@ -83,6 +83,12 @@ gdi32.SelectObject.argtypes = [HDC, HGDIOBJ]
 gdi32.SelectObject.restype = HGDIOBJ
 gdi32.DeleteObject.argtypes = [HGDIOBJ]
 BI_RGB, DIB_RGB_COLORS, PW_RENDERFULLCONTENT, SW_MAXIMIZE = 0, 0, 2, 3
+MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_WHEEL = 0x0002, 0x0004, 0x0800
+user32.SetCursorPos.argtypes = [ctypes.c_int, ctypes.c_int]
+user32.SetCursorPos.restype = wintypes.BOOL
+user32.mouse_event.argtypes = [
+    wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p
+]
 
 
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
@@ -233,6 +239,37 @@ def _capture(hwnd, destination):
         user32.ReleaseDC(HWND(0), screen_dc)
 
 
+def _click_relative(hwnd, x_offset: int, y_offset: int, pause: float = 1.2):
+    """Click a stable report-tab position relative to the maximized NCU window."""
+    rect = RECT()
+    if not user32.GetWindowRect(HWND(hwnd), ctypes.byref(rect)):
+        raise RuntimeError("GetWindowRect failed before GUI navigation")
+    x, y = rect.left + x_offset, rect.top + y_offset
+    if not user32.SetCursorPos(x, y):
+        raise RuntimeError("Could not move pointer to Nsight report tab")
+    time.sleep(0.15)
+    user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, None)
+    time.sleep(0.05)
+    user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, None)
+    time.sleep(pause)
+
+
+def _scroll_report(hwnd, notches: int = 4):
+    """Scroll the active report Details page to capture further metric rows."""
+    rect = RECT()
+    if not user32.GetWindowRect(HWND(hwnd), ctypes.byref(rect)):
+        raise RuntimeError("GetWindowRect failed before Details scroll")
+    x = rect.left + max(900, (rect.right - rect.left) // 2)
+    y = rect.top + max(500, (rect.bottom - rect.top) // 2)
+    if not user32.SetCursorPos(x, y):
+        raise RuntimeError("Could not move pointer to the Details panel")
+    delta = ctypes.c_uint32((-120 * notches) & 0xFFFFFFFF).value
+    user32.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, delta, None)
+    time.sleep(1.0)
+
+
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ncu-exe", type=Path, required=True)
@@ -276,14 +313,37 @@ def main():
                 user32.ShowWindow(HWND(window["hwnd"]), SW_MAXIMIZE)
                 user32.SetForegroundWindow(HWND(window["hwnd"]))
                 time.sleep(2)
-                dest = output_dir / (report.stem.replace(".", "_") + ".png")
-                width, height, colours = _capture(window["hwnd"], dest)
-                manifest["captures"].append({
-                    "report": str(report), "window_title": window["title"],
-                    "screenshot": str(dest), "width": width, "height": height,
-                    "sampled_distinct_colours": colours,
-                })
-                print(f"NCU_SNAPSHOT_CAPTURED={dest} {width}x{height}")
+                stem = report.stem.replace(".", "_")
+
+                def save_view(view_name: str, destination: Path):
+                    width, height, colours = _capture(window["hwnd"], destination)
+                    manifest["captures"].append({
+                        "report": str(report), "window_title": window["title"],
+                        "view": view_name, "screenshot": str(destination),
+                        "width": width, "height": height,
+                        "sampled_distinct_colours": colours,
+                    })
+                    print(f"NCU_SNAPSHOT_CAPTURED={destination} view={view_name} {width}x{height}")
+
+                # Preserve the existing summary image for older report links.
+                save_view("summary", output_dir / (stem + ".png"))
+
+                # Main report tabs: Summary, Details, Source, Context, Comments, Raw.
+                # The Details page has several scroll positions so more than its
+                # headline rows are visible in the screenshot set.
+                _click_relative(window["hwnd"], 151, 182)
+                save_view("details-01", output_dir / (stem + "-details-01.png"))
+                for page in (2, 3):
+                    _scroll_report(window["hwnd"], notches=4)
+                    save_view(
+                        f"details-{page:02d}",
+                        output_dir / (stem + f"-details-{page:02d}.png"),
+                    )
+
+                # Raw contains the collected metric names/values. It is useful
+                # beside the easier-to-read Details page when checking claims.
+                _click_relative(window["hwnd"], 451, 182)
+                save_view("raw", output_dir / (stem + "-raw.png"))
             except Exception as exc:
                 manifest["skipped"].append({"report": str(report), "reason": f"{type(exc).__name__}: {exc}"})
                 print(f"NCU_SNAPSHOT_SKIPPED={report}: {type(exc).__name__}: {exc}")
@@ -294,7 +354,7 @@ def main():
     (output_dir / "capture-manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     md = ["# Nsight Compute GUI screenshot manifest", "", f"Status: {manifest['status']}", ""]
     md.extend(
-        f"- {x['screenshot']} — {x['window_title']}, {x['width']}x{x['height']}; report {x['report']}."
+        f"- {x['screenshot']} ({x.get('view', 'summary')}) — {x['window_title']}, {x['width']}x{x['height']}; report {x['report']}."
         for x in manifest["captures"]
     )
     if manifest["skipped"]:
