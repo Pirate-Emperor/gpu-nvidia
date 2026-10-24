@@ -1,15 +1,17 @@
 # Fused Attention with cuTile — Experiment Report
 
-**Updated:** 2026-10-19 (actual-cuTile Nsight Compute reports captured and inspected; historical benchmark numbers unchanged)  
-**Repository:** [SpryzenHell/gpu-nvidia](https://github.com/SpryzenHell/gpu-nvidia)  
+**Updated:** 19 October 2026; measurements below are a historical snapshot.  
+**Repository:** [xemptynothing/gpu-nvidia](https://github.com/xemptynothing/gpu-nvidia)  
 **Core kernel snapshot covered:** `4485bdce5ed462dfbf495b8129efce91b4124585`; the paired v5 benchmark uses code at `caeb6e79e4237222d021782a3a9bdb72d6c4ca7f` (documentation updates are committed afterward)
 
 
-## Current verified result — 2026-10-19 actual cuTile attention on RTX 4060
+> **Current source note, 24 October 2026:** the last complete native GPU run is #39422402438 on commit bf5a623. The kernel was compacted after that run. Re-run current main before using these measurements as current results.
+
+## Historical verified result — 2026-10-19 actual cuTile attention on RTX 4060
 
 The previous runner-discovery table below documents failures before the project venv existed. It is historical and superseded by [successful workflow #39160827910](https://github.com/xemptynothing/gpu-nvidia/actions/runs/39160827910), commit 12120f8a67a1fbd6f9cd83bd8f2f8bf7b31ce428.
 
-| Gate | Current result | Evidence |
+| Gate | Recorded result | Evidence |
 |---|---|---|
 | Genuine cuTile smoke | PASS | Vector-add compile/launch, synchronization and exact output validation passed. |
 | Attention correctness | PASS | 48 passed / 0 failed with REQUIRE_CUTILE=1. |
