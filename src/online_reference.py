@@ -1,9 +1,4 @@
-"""Independent tiled online-softmax attention reference.
-
-This is intentionally implemented with NumPy loops rather than cuTile. It is
-used to validate the mathematical recurrence before GPU-kernel debugging.
-It must never be used as the expected output for the GPU tests.
-"""
+"""NumPy reference for tiled online-softmax attention."""
 
 from __future__ import annotations
 

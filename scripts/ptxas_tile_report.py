@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile preserved shared-tile kernels with NVCC/PTXAS resource reporting."""
+"""Collect PTXAS resource usage for the shared-tile CUDA variants."""
 
 from __future__ import annotations
 

@@ -11,15 +11,18 @@ from reference import (
     passes_mixed_tolerance,
 )
 
-if os.environ.get("REQUIRE_A100") == "1":
+if (
+    os.environ.get("REQUIRE_A100") == "1"
+    or os.environ.get("REQUIRE_CUTILE") == "1"
+):
     try:
         import cupy as cp
     except ImportError as exc:
-        pytest.fail(f"CuPy is required for A100 tests: {exc}", pytrace=False)
+        pytest.fail(f"CuPy is required for required cuTile GPU tests: {exc}", pytrace=False)
     try:
         import cuda.tile as ct
     except ImportError as exc:
-        pytest.fail(f"cuTile is required for A100 tests: {exc}", pytrace=False)
+        pytest.fail(f"cuTile is required for required cuTile GPU tests: {exc}", pytrace=False)
 else:
     cp = pytest.importorskip("cupy")
     ct = pytest.importorskip("cuda.tile")
@@ -74,8 +77,11 @@ def make_inputs(case, mode="normal"):
 
 # These two are the mandatory course comparison points.
 # 128x128 remains an exploratory/resource-stress configuration below.
-TILE_CONFIGS = ((64, 64), (32, 64))
-EXPLORATORY_TILE_CONFIGS = ((64, 32), (128, 128))
+# Candidate configurations are all checked against the FP32 oracle across
+# every frozen case for which both sequence dimensions divide the tile.
+# Keep 64x32 as the additional exploratory shape.
+TILE_CONFIGS = ((32, 64), (64, 64), (64, 128), (128, 64), (128, 128))
+EXPLORATORY_TILE_CONFIGS = ((64, 32),)
 
 GPU_CORRECTNESS_CONFIGS = tuple(
     (case, tile_q, tile_k)
@@ -93,7 +99,8 @@ def gpu_config_id(config):
 @pytest.mark.parametrize(
     "case,tile_q,tile_k",
     GPU_CORRECTNESS_CONFIGS,
-    ids=gpu_config_id,
+    # pytest's ids callable is invoked per scalar argument, not per full tuple.
+    ids=[gpu_config_id(config) for config in GPU_CORRECTNESS_CONFIGS],
 )
 def test_cutile_matches_independent_reference(case, tile_q, tile_k):
     require_a100()
@@ -120,7 +127,8 @@ def test_cutile_matches_independent_reference(case, tile_q, tile_k):
 @pytest.mark.parametrize(
     "tile_q,tile_k",
     EXPLORATORY_TILE_CONFIGS,
-    ids=lambda x: f"tile{x[0]}x{x[1]}",
+    # Provide one ID per pair; pytest id functions receive scalar values.
+    ids=[f"tile{tile_q}x{tile_k}" for tile_q, tile_k in EXPLORATORY_TILE_CONFIGS],
 )
 def test_cutile_exploratory_tile_configuration(tile_q, tile_k):
     require_a100()
@@ -154,7 +162,8 @@ def test_cutile_numerical_stability(mode):
 
 def test_cutile_causal_future_value_invariance():
     require_a100()
-    q, k, v = make_inputs(MANDATORY_CASES[1])
+    # N=128 makes the future-token mutation real (rather than a no-op slice).
+    q, k, v = make_inputs(MANDATORY_CASES[2])
     out1 = forward(q, k, v, tile_q=64, tile_k=64)
 
     v2 = v.copy()

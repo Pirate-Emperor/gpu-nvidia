@@ -1,63 +1,28 @@
-# Prompt for the next ChatGPT conversation
+# Project handoff
 
-Continue the ongoing project in the private GitHub repository **SpryzenHell/gpu-nvidia**.
+Continue the cuTile attention project in xemptynothing/gpu-nvidia.
 
-**Before doing anything else, read these repository documents from main:**
-1. docs/CHAT_HANDOFF_2026-10-18.md
-2. README.md
-3. docs/TODO_CHECKLIST.md
-4. docs/EXPERIMENT_REPORT.md
-5. docs/TEST_MATRIX.md
-6. results/STATUS.md
+Start with README.md, docs/TODO_CHECKLIST.md, docs/COURSE_PROJECT_COMPLETION_CHECKLIST.md, Report.md and docs/EXECUTION_EVIDENCE_INDEX.md. Check the current main commit and workflow results before using older numbers.
 
-Do not ask me to repeat project history or known results. First inspect the current main HEAD because the handoff documentation commit will advance it.
+## Project
 
-## Primary objective
+- Main kernel: src/cutile_attention.py
+- GPU target: Windows RTX 4060, compute capability 8.9
+- A100 work: ordinary CUDA C++ comparisons, not cuTile
+- Correctness suite: 48 GPU test executions
+- Separate numerical matrix: 29 legal case/tile combinations
+- Benchmark reference: deliberately unfused FP32 CuPy
 
-Complete the actual NVIDIA cuTile fused causal attention implementation—not just ordinary CUDA surrogates. Follow the project's frozen scope: FP16 Q/K/V, FP32 accumulation, causal online softmax, D=32/64/128, no global N×N score/probability matrix, at least two tile configurations, rigorous independent-reference correctness, measured comparisons, separate JIT timing, and two successful actual-cuTile hardware profiles.
+## Status
 
-## Immediate local-GPU/runner task
+The last complete native GPU run is #39422402438 on commit bf5a623. It passed the core tests, numerical matrix, CLI check, three benchmark sessions and two Nsight Compute configurations. The kernel was compacted afterward; confirm a fresh native run for current main before relying on the old result.
 
-I am planning to provide my local GPU inventory. The commands are:
+## Open work
 
-    nvidia-smi
-    nvidia-smi --query-gpu=name,uuid,driver_version,compute_cap,memory.total,memory.free,pci.bus_id --format=csv
-    nvcc --version
+1. Revalidate current main on the RTX 4060.
+2. Measure clean-cache first-call/JIT time for long specializations.
+3. Complete a compatible framework attention comparison and record the backend.
+4. Use detailed Nsight Compute evidence to choose one change, then test correctness, timing and the matching profile.
+5. Finish the report and record actual team contributions.
 
-First use the currently documented facts; do not invent my local GPU specs or assume the OS/driver/toolkit. Help choose Windows-native vs WSL2/Linux after the output is available. Design a secure, project-only GitHub Actions runner:
-- dedicated non-admin/non-root account;
-- preferably disposable VM or tightly isolated GPU-enabled container;
-- only this project's workspace writable/mounted;
-- no sudo/administrator membership, no privileged container, no host Docker socket, no personal home/SSH/browser/cloud credential mounts, no unrelated files;
-- minimal outbound network, no inbound remote shell, only the needed GPU compute interface;
-- private-repository runner, trusted/manual workflows first, no untrusted pull-request execution, minimal workflow token permissions, ephemeral/disposable lifecycle.
-
-The GitHub runner must authenticate to receive jobs, but registration/connection credentials must stay local and must never be pasted into chat or exposed to workflow code. Do not request passwords, PATs, runner tokens, or sudo credentials. Be clear that connecting an Actions runner does not give ChatGPT a live shell; Actions workflows execute on that runner.
-
-## Known technical state — do not lose this
-
-- Available project runner: gpu-project on scn21-mn; two full visible A100-SXM4-40GB GPUs (SM80/CC 8.0), R550.90.07, CUDA Toolkit 12.4.131, GCC 11.4.0, Nsight Compute 2024.1.1.0, Nsight Systems 2023.4.4.54, Fabric Manager active, non-root, no passwordless sudo.
-- Actual cuTile target src/cutile_attention.py has not completed a verified compile + launch + correctness run. The current cuTile gate needs R580+; R580.126.09+ is noted for detailed cuTile Nsight Compute stats.
-- CUDA 13.4 compatibility attempt failed with insufficient-driver and then system-driver-mismatch/error 803; CUDA 13.0 attempt produced no verified actual-cuTile run; the cuTile 1.2.0 package wasn't reachable in the configured package index. Do not repeat these without a materially different supported environment.
-- Latest broad A100 ordinary-CUDA/non-cuTile regression: **907 passed / 52 skipped / 0 failed**, [run #52](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056264082).
-- Latest CPU/reference suite on pre-handoff main SHA afe530bc090c779ebe5d741dcf7ae544985570d1: **763 passed / 68 skipped / 0 failed**, [run #340](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38056390931).
-- Native CUDA earlier: **133 passed / 1 skipped**, [run #44](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/37756646415).
-- Shared-tile v4 and v5 each passed 30 targeted tests but remain unpromoted. The paired current-vs-v5 benchmark shows mixed short-case results and only ~0.3–0.6% long/batched gains. Keep the 21-combination result table from the handoff and do not claim a general speedup.
-- PTXAS compiled v1/v2/v3/current/v4/v5 for SM80 with zero reported spills; v5 cubin 15,520 B vs current 15,136 B. This is compile-time evidence only.
-- Nsight Systems successfully captured two **ordinary-CUDA surrogate** traces and summaries: [run #2](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950), [artifact](https://github.com/SpryzenHell/gpu-nvidia/actions/runs/38055834950/artifacts/11671075954). Trace durations include JIT/profiling overhead and are not steady-state benchmark latencies.
-- Nsight Compute hardware counter collection is blocked by ERR_NVGPUCTRPERM; no useful profile was captured. Do not use privileged workarounds.
-- Relevant files and detailed historical benchmark values are in docs/CHAT_HANDOFF_2026-10-18.md.
-
-## Work style and acceptance requirements
-
-Do real experiments; keep progress updates concise; run targeted correctness before broad regressions; preserve v1–v5 and all failed/negative results; do not overclaim. Use the GitHub connector to inspect/edit this repository; push documentation/code commits to main for this project unless risky work requires an isolated branch. Do not overwrite historical variants. Update README/TODO/test matrix/progress/status as evidence changes. Never assume a test is successful because it was skipped.
-
-End technical updates with:
-
-    TEST:
-    WHY:
-    EXPECTED:
-    ACTUAL:
-    DECISION/NEXT:
-
-**Start now** by reading the handoff and inspecting the current repository head/workflows; then determine whether the safe local GPU runner can be configured from the actual machine inventory. If the machine inventory has not yet been supplied in this conversation, continue work that does not depend on guessing it and state exactly which local-only input is still needed.
+Keep code changes small. Run correctness before timing. Do not call a timing improvement real unless it exceeds the observed variation. Keep old evidence, but label it by source commit and date.

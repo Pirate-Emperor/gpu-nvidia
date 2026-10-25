@@ -1,12 +1,4 @@
-"""Shared-memory tiled fused CUDA attention.
-
-This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns one query row, K/V are staged in a fixed shared-memory tile,
-and the fused online-softmax recurrence is performed without materializing
-scores or probabilities in global memory.
-
-It is intentionally independent of cuTile.
-"""
+"""Shared-memory CUDA baseline: one query row per block."""
 
 from __future__ import annotations
 

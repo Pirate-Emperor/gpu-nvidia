@@ -1,12 +1,4 @@
-"""Shared-memory tiled fused CUDA attention.
-
-This is the closest ordinary-CUDA analogue to the tile-oriented project kernel:
-one block owns a small query tile; v3 computes four QK scores per loop iteration, each warp owns one query row, K/V are staged
-in shared-memory tiles, and a fused online-softmax recurrence is performed
-without materializing scores or probabilities in global memory.
-
-It is intentionally independent of cuTile.
-"""
+"""Shared-memory CUDA baseline: four QK scores per iteration."""
 
 from __future__ import annotations
 

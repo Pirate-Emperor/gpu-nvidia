@@ -3,10 +3,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = (
+    ".gitignore",
     "README.md",
     "docs/README.md",
     "docs/TODO_CHECKLIST.md",
     "docs/EXPERIMENT_REPORT.md",
+    "docs/CUTILE_RTX4060_RESULTS_2026-10-19.md",
     "results/STATUS.md",
     "benchmarks/benchmark_v5.py",
     "scripts/ptxas_tile_report.py",
@@ -31,6 +33,17 @@ REQUIRED_FILES = (
     "src/warp_cuda_attention.py",
     "src/shared_tile_cuda_attention.py",
     "scripts/cutile_sanity_check.py",
+    "scripts/cutile_smoke.py",
+    "scripts/cutile_accuracy_report.py",
+    "scripts/summarize_benchmark_repeats.py",
+    "scripts/setup_cutile_windows.ps1",
+    "scripts/start_cutile_docker_runner.ps1",
+    "docker/cutile-runner/Dockerfile",
+    "docker/cutile-runner/entrypoint.sh",
+    "docker/cutile-runner/compose.yml",
+    "docs/CUTILE_DOCKER_RUNNER.md",
+    ".github/workflows/cutile-rtx4060-docker.yml",
+    "docs/LOCAL_GPU_WINDOWS.md",
     "src/torch_reference.py",
     "src/cutile_attention.py",
     "benchmarks/benchmark_attention.py",
@@ -92,6 +105,7 @@ def test_root_readme_links_project_tracking_and_evidence():
         "docs/TODO_CHECKLIST.md",
         "docs/README.md",
         "docs/EXPERIMENT_REPORT.md",
+        "docs/CUTILE_RTX4060_RESULTS_2026-10-19.md",
         "docs/TESTING_CONTRACT.md",
         "docs/TEST_MATRIX.md",
         "docs/PROGRESS.md",
@@ -109,3 +123,38 @@ def test_supported_cutile_profile_workflow_gates_profiles_on_correctness():
     assert "tests/test_gpu_edge_cases.py" in workflow
     assert "medium_d128_t64x64" in workflow
     assert "longer_batched_d128_t64x32" in workflow
+
+
+def test_cutile_runner_and_native_windows_workflow_contract():
+    compose = (ROOT / "docker/cutile-runner/compose.yml").read_text()
+    entrypoint = (ROOT / "docker/cutile-runner/entrypoint.sh").read_text()
+    launcher = (ROOT / "scripts/start_cutile_docker_runner.ps1").read_text()
+    workflow = (ROOT / ".github/workflows/cutile-rtx4060-docker.yml").read_text()
+    smoke = (ROOT / "scripts/cutile_smoke.py").read_text()
+    assert "gpus: all" in compose
+    assert "no-new-privileges:true" in compose
+    assert "cap_drop:" in compose and "ALL" in compose
+    assert "/var/run/docker.sock" not in compose
+    assert "privileged: true" not in compose
+    assert "--ephemeral" not in entrypoint
+    assert "--disableupdate" in entrypoint
+    assert "unset RUNNER_TOKEN" in entrypoint
+    assert "${RUNNER_TOKEN-}" in compose
+    assert "${RUNNER_NAME:-cutile-rtx4060-runner}" in compose
+    assert "[string]$RunnerToken" in launcher
+    assert "registration-token" not in launcher
+    assert "gh workflow run" not in launcher
+    assert "docker image inspect $GpuProbeImage" in launcher
+    assert "workflow_dispatch:" in workflow
+    assert "self-hosted, windows, x64" in workflow
+    assert "github.ref == 'refs/heads/main'" in workflow
+    assert "contents: read" in workflow
+    assert "REQUIRE_CUTILE" in workflow
+    assert "benchmarks/benchmark_attention.py" in workflow
+    assert "scripts/verify_cli_output.py" in workflow
+    assert "scripts/cutile_accuracy_report.py" in workflow
+    assert "scripts/summarize_benchmark_repeats.py" in workflow
+    assert "session1.json" in workflow and "session2.json" in workflow and "session3.json" in workflow
+    assert "sudo " not in workflow.lower()
+    assert "runasadministrator" not in workflow.lower()
+    assert "global ct" in smoke, "cuTile smoke kernel annotations need module-global ct resolution"

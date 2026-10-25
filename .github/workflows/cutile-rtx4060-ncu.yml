@@ -1,0 +1,269 @@
+name: RTX 4060 actual cuTile Nsight Compute profiles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-rtx4060-ncu.yml"
+      - "src/cutile_attention.py"
+      - "benchmarks/profile_fused.py"
+      - "benchmarks/benchmark_load_latency_hints.py"
+      - "scripts/capture_ncu_screenshots.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ncu-profiles:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 30
+    steps:
+      # Preserve existing NCU reports, but fetch the source pinned to this commit
+      # through the Contents API to avoid relying on a fresh git/TLS checkout.
+      - name: Fetch NCU capture source pinned to this commit
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Root = $env:GITHUB_WORKSPACE
+          $Paths = @(
+            'src\contract.py','src\reference.py','src\cutile_attention.py',
+            'tests\cases.py','benchmarks\profile_fused.py',
+            'benchmarks\benchmark_load_latency_hints.py','scripts\capture_ncu_screenshots.py'
+          )
+          $Headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          foreach ($Relative in $Paths) {
+            $ApiPath = $Relative.Replace('\','/')
+            Write-Host "FETCHING_SOURCE=$ApiPath REF=$env:GITHUB_SHA"
+            $Uri = 'https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/{0}?ref={1}' -f $ApiPath, $env:GITHUB_SHA
+                        try {
+              $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
+            } catch {
+              $StatusCode = 'n/a'
+              if ($_.Exception.Response -and $_.Exception.Response.StatusCode) { $StatusCode = [int]$_.Exception.Response.StatusCode }
+              throw "GitHub contents fetch failed: path='$ApiPath' ref='$env:GITHUB_SHA' status=$StatusCode uri='$Uri' error=$($_.Exception.Message)"
+            }
+            if ($Item.type -ne 'file' -or -not $Item.content) { throw "No source content returned for $ApiPath" }
+            $Destination = Join-Path $Root $Relative
+            New-Item -ItemType Directory -Force -Path (Split-Path $Destination -Parent) | Out-Null
+            [System.IO.File]::WriteAllBytes($Destination,[Convert]::FromBase64String($Item.content))
+          }
+          "SOURCE_COMMIT=$env:GITHUB_SHA" | Set-Content -Encoding utf8 cutile-ncu-source-fetch.log
+          "SOURCE_FILES_FETCHED=$($Paths.Count)" | Add-Content -Encoding utf8 cutile-ncu-source-fetch.log
+          # Keep this workflow's prior native .ncu-repz/.ncu-rep files in the workspace.
+
+
+      - name: Recover or capture and export two cuTile Nsight Compute reports
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Project-local Python is missing: $Py" }
+
+          $NcuPath = $null
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          if ($NcuCommand) { $NcuPath = $NcuCommand.Source }
+          if (-not $NcuPath) {
+            $SearchRoots = @()
+            if ($env:ProgramFiles) { $SearchRoots += (Join-Path $env:ProgramFiles 'NVIDIA Corporation') }
+            if ($env:LOCALAPPDATA) { $SearchRoots += (Join-Path $env:LOCALAPPDATA 'NVIDIA Corporation') }
+            foreach ($SearchRoot in $SearchRoots) {
+              if (-not (Test-Path $SearchRoot)) { continue }
+              $InstallDirs = Get-ChildItem -Path $SearchRoot -Directory -Filter 'Nsight Compute*' -ErrorAction SilentlyContinue
+              foreach ($InstallDir in $InstallDirs) {
+                $Found = Get-ChildItem -Path $InstallDir.FullName -Filter 'ncu.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($Found) { $NcuPath = $Found.FullName; break }
+              }
+              if ($NcuPath) { break }
+            }
+          }
+          if (-not $NcuPath) { throw 'Nsight Compute CLI was not found in PATH or NVIDIA install folders.' }
+
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          "PROJECT_ROOT=$ProjectRoot" | Tee-Object -FilePath cutile-ncu-profile-status.log
+          "PYTHON_EXE=$Py" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          "NCU_PATH=$NcuPath" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          & $NcuPath --version 2>&1 | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute CLI --version failed.' }
+
+          $MediumBase = 'results/cutile-profile-medium'
+          $LongBase = 'results/cutile-profile-long-batched'
+          $MediumExists = (Test-Path "$MediumBase.ncu-repz") -or (Test-Path "$MediumBase.ncu-rep")
+          $LongExists = (Test-Path "$LongBase.ncu-repz") -or (Test-Path "$LongBase.ncu-rep")
+          if ($MediumExists -and $LongExists) {
+            'REUSED_EXISTING_PROFILES=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          } else {
+            'REUSED_EXISTING_PROFILES=False; generating any missing report(s).' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            if (-not $MediumExists) {
+              & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o $MediumBase $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
+              if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute capture failed for medium_d128 64x64.' }
+            }
+            if (-not $LongExists) {
+              & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o $LongBase $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
+              if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute capture failed for longer_batched_d128 64x128.' }
+            }
+          }
+
+          $MediumReport = @("$MediumBase.ncu-repz", "$MediumBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $LongReport = @("$LongBase.ncu-repz", "$LongBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $MediumReport -or -not $LongReport) { throw 'Both profiler reports must exist before exporting.' }
+
+          foreach ($Item in @(
+            @{ Label = 'medium'; Report = $MediumReport; Base = $MediumBase },
+            @{ Label = 'long-batched'; Report = $LongReport; Base = $LongBase }
+          )) {
+            "REPORT=$($Item.Report)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            "REPORT_BYTES=$((Get-Item $Item.Report).Length)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            & $NcuPath --import $Item.Report --page details 2>&1 | Tee-Object -FilePath "$($Item.Base)-details.txt"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export details for $($Item.Label)." }
+            & $NcuPath --import $Item.Report --page raw --csv 2>&1 | Tee-Object -FilePath "$($Item.Base)-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export raw metrics for $($Item.Label)." }
+          }
+
+          # Collect scheduler and warp-state stall reasons in dedicated reports.
+          # These sections are distinct from the basic throughput/resource report.
+          $MediumStallBase = 'results/cutile-profile-medium-stalls'
+          $LongStallBase = 'results/cutile-profile-long-batched-stalls'
+          & $NcuPath --section SchedulerStats --section WarpStateStats --launch-skip 6 --launch-count 1 --force-overwrite -o $MediumStallBase $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium-stalls.log
+          if ($LASTEXITCODE -ne 0) { throw 'Scheduler/warp-state profile failed for medium_d128 64x64.' }
+          & $NcuPath --section SchedulerStats --section WarpStateStats --launch-skip 6 --launch-count 1 --force-overwrite -o $LongStallBase $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched-stalls.log
+          if ($LASTEXITCODE -ne 0) { throw 'Scheduler/warp-state profile failed for longer_batched_d128 64x128.' }
+
+          $MediumStallReport = @("$MediumStallBase.ncu-repz", "$MediumStallBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $LongStallReport = @("$LongStallBase.ncu-repz", "$LongStallBase.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $MediumStallReport -or -not $LongStallReport) { throw 'Both scheduler/warp-state reports must exist before exporting.' }
+
+          foreach ($Item in @(
+            @{ Label = 'medium-stalls'; Report = $MediumStallReport; Base = $MediumStallBase },
+            @{ Label = 'long-batched-stalls'; Report = $LongStallReport; Base = $LongStallBase }
+          )) {
+            "STALL_REPORT=$($Item.Report)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            "STALL_REPORT_BYTES=$((Get-Item $Item.Report).Length)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+            & $NcuPath --import $Item.Report --page details 2>&1 | Tee-Object -FilePath "$($Item.Base)-details.txt"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export stall details for $($Item.Label)." }
+            & $NcuPath --import $Item.Report --page raw --csv 2>&1 | Tee-Object -FilePath "$($Item.Base)-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Could not export raw stall metrics for $($Item.Label)." }
+          }
+
+          # Profile candidate latency hints on the same two workloads. These
+          # captures are a comparison, not an assumed optimization win.
+          $HintProfiles = @(
+            @{ Label = 'medium-latency4'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 4 },
+            @{ Label = 'medium-latency8'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 8 },
+            @{ Label = 'medium-latency10'; Case = 'medium_d128'; TQ = 64; TK = 64; Latency = 10 },
+            @{ Label = 'long-batched-latency4'; Case = 'longer_batched_d128'; TQ = 64; TK = 128; Latency = 4 },
+            @{ Label = 'long-batched-latency8'; Case = 'longer_batched_d128'; TQ = 64; TK = 128; Latency = 8 }
+          )
+          foreach ($Hint in $HintProfiles) {
+            $Base = "results/cutile-profile-$($Hint.Label)"
+            $Log = "cutile-profile-$($Hint.Label).log"
+            & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o $Base $Py benchmarks/profile_fused.py --case $Hint.Case --tile-q $Hint.TQ --tile-k $Hint.TK --warmup 5 --load-latency $Hint.Latency 2>&1 | Tee-Object -FilePath $Log
+            if ($LASTEXITCODE -ne 0) {
+              "HINT_PROFILE_FAILED=$($Hint.Label)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+              throw "Nsight Compute capture failed for hint profile $($Hint.Label)."
+            }
+            $Report = @("$Base.ncu-repz", "$Base.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $Report) { throw "Expected native report missing for $($Hint.Label)." }
+            & $NcuPath --import $Report --page details 2>&1 | Tee-Object -FilePath "$Base-details.txt"
+            if ($LASTEXITCODE -ne 0) { throw "Detail export failed for $($Hint.Label)." }
+            & $NcuPath --import $Report --page raw --csv 2>&1 | Tee-Object -FilePath "$Base-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Raw metric export failed for $($Hint.Label)." }
+            "HINT_PROFILE=$($Hint.Label) REPORT=$Report BYTES=$((Get-Item $Report).Length)" | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+          }
+
+                    'PROFILE_REPORTS_CREATED=True' | Tee-Object -FilePath cutile-ncu-profile-status.log -Append
+
+      - name: Capture genuine Nsight Compute GUI window screenshots
+        if: always()
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Project Python not found: $Py" }
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          $NcuPath = if ($NcuCommand) { $NcuCommand.Source } else { $null }
+          if (-not $NcuPath) {
+            $Roots = @()
+            if ($env:ProgramFiles) { $Roots += (Join-Path $env:ProgramFiles 'NVIDIA Corporation') }
+            foreach ($Root in $Roots) {
+              if (-not (Test-Path $Root)) { continue }
+              $Found = Get-ChildItem -Path $Root -Filter ncu.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($Found) { $NcuPath = $Found.FullName; break }
+            }
+          }
+          if (-not $NcuPath) { throw 'Could not locate ncu.exe for the screenshot helper.' }
+          $Reports = @(Get-ChildItem results -Filter 'cutile-profile-*.ncu-repz' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          if (-not $Reports) {
+            $Reports = @(Get-ChildItem results -Filter 'cutile-profile-*.ncu-rep' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          }
+          if (-not $Reports) {
+            'NCU_GUI_SNAPSHOTS=SKIPPED; no native report files found.' | Tee-Object -FilePath cutile-ncu-screenshot-status.log
+            New-Item -ItemType Directory -Force -Path results/profiler-screenshots | Out-Null
+          } else {
+            $NcuCaptureArgs = @('scripts/capture_ncu_screenshots.py','--ncu-exe',$NcuPath,'--output-dir','results/profiler-screenshots','--reports') + $Reports
+            & $Py @NcuCaptureArgs 2>&1 | Tee-Object -FilePath cutile-ncu-screenshot-status.log
+            if ($LASTEXITCODE -ne 0) { throw 'The screenshot helper failed.' }
+          }
+
+      - name: Upload actual-cuTile reports and metric exports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-rtx4060-ncu-profiles
+          path: |
+            cutile-ncu-profile-status.log
+            cutile-ncu-screenshot-status.log
+            cutile-ncu-source-fetch.log
+            results/profiler-screenshots/**
+            cutile-profile-medium.log
+            cutile-profile-long-batched.log
+            cutile-profile-medium-stalls.log
+            cutile-profile-long-batched-stalls.log
+            results/cutile-profile-medium-stalls.ncu-repz
+            results/cutile-profile-medium-stalls.ncu-rep
+            results/cutile-profile-medium-stalls-details.txt
+            results/cutile-profile-medium-stalls-raw.csv
+            results/cutile-profile-long-batched-stalls.ncu-repz
+            results/cutile-profile-long-batched-stalls.ncu-rep
+            results/cutile-profile-long-batched-stalls-details.txt
+            results/cutile-profile-long-batched-stalls-raw.csv
+            results/cutile-profile-medium.ncu-repz
+            results/cutile-profile-medium.ncu-rep
+            results/cutile-profile-medium-details.txt
+            results/cutile-profile-medium-raw.csv
+            results/cutile-profile-long-batched.ncu-repz
+            results/cutile-profile-long-batched.ncu-rep
+            results/cutile-profile-long-batched-details.txt
+            results/cutile-profile-long-batched-raw.csv
+            cutile-profile-medium-latency4.log
+            results/cutile-profile-medium-latency4.ncu-repz
+            results/cutile-profile-medium-latency4.ncu-rep
+            results/cutile-profile-medium-latency4-details.txt
+            results/cutile-profile-medium-latency4-raw.csv
+            cutile-profile-medium-latency8.log
+            results/cutile-profile-medium-latency8.ncu-repz
+            results/cutile-profile-medium-latency8.ncu-rep
+            results/cutile-profile-medium-latency8-details.txt
+            results/cutile-profile-medium-latency8-raw.csv
+            cutile-profile-medium-latency10.log
+            results/cutile-profile-medium-latency10.ncu-repz
+            results/cutile-profile-medium-latency10.ncu-rep
+            results/cutile-profile-medium-latency10-details.txt
+            results/cutile-profile-medium-latency10-raw.csv
+            cutile-profile-long-batched-latency4.log
+            results/cutile-profile-long-batched-latency4.ncu-repz
+            results/cutile-profile-long-batched-latency4.ncu-rep
+            results/cutile-profile-long-batched-latency4-details.txt
+            results/cutile-profile-long-batched-latency4-raw.csv
+            cutile-profile-long-batched-latency8.log
+            results/cutile-profile-long-batched-latency8.ncu-repz
+            results/cutile-profile-long-batched-latency8.ncu-rep
+            results/cutile-profile-long-batched-latency8-details.txt
+            results/cutile-profile-long-batched-latency8-raw.csv
+          if-no-files-found: error

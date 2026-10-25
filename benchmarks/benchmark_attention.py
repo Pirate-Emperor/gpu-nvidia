@@ -7,6 +7,8 @@ import argparse
 import csv
 import importlib.metadata
 import json
+import os
+import platform
 import subprocess
 import sys
 import time
@@ -40,7 +42,19 @@ def make_inputs(case, cp):
     return cp.asarray(q), cp.asarray(k), cp.asarray(v)
 
 
-def timed_gpu(fn, cp, warmup: int, iterations: int) -> tuple[float, float]:
+def timed_gpu(
+    fn,
+    cp,
+    warmup: int,
+    iterations: int,
+    repeats_per_sample: int,
+) -> tuple[float, float]:
+    """Measure 30+ event samples, each averaging several identical invocations.
+
+    A short kernel can be near the timer resolution and one event sample is
+    sensitive to scheduling noise. Grouping 5 calls per event makes each
+    reported sample longer while preserving per-invocation latency.
+    """
     stream = cp.cuda.get_current_stream()
     for _ in range(warmup):
         fn()
@@ -51,10 +65,12 @@ def timed_gpu(fn, cp, warmup: int, iterations: int) -> tuple[float, float]:
         start = cp.cuda.Event()
         end = cp.cuda.Event()
         start.record(stream)
-        fn()
+        for _repeat in range(repeats_per_sample):
+            fn()
         end.record(stream)
         end.synchronize()
-        samples.append(float(cp.cuda.get_elapsed_time(start, end)))
+        elapsed = float(cp.cuda.get_elapsed_time(start, end))
+        samples.append(elapsed / repeats_per_sample)
 
     samples = np.asarray(samples, dtype=np.float64)
     return float(np.median(samples)), float(np.percentile(samples, 90))
@@ -80,13 +96,24 @@ def parse_tile(value: str) -> tuple[int, int]:
     return q, k
 
 
-def run_case(case, cp, tiles, warmup, iterations):
+def run_case(
+    case, cp, tiles, warmup, iterations, repeats_per_sample, seen_specializations
+):
     q, k, v = make_inputs(case, cp)
     q32 = q.astype(cp.float32)
     k32 = k.astype(cp.float32)
     v32 = v.astype(cp.float32)
     output_bytes = case.B * case.H * case.N * case.Dv * np.dtype(np.float16).itemsize
     rows = []
+    baseline_call = lambda: baseline_launch_device(q32, k32, v32)
+
+    # Bracket the tile sweep with unfused-baseline measurements. This avoids
+    # timing the same baseline separately after every tile and lets us detect
+    # drift during the session rather than confounding it with tile order.
+    baseline_before_ms, baseline_before_p90 = timed_gpu(
+        baseline_call, cp, warmup=warmup, iterations=iterations,
+        repeats_per_sample=repeats_per_sample,
+    )
 
     for tile_q, tile_k in tiles:
         if case.N % tile_q or case.N % tile_k:
@@ -95,14 +122,17 @@ def run_case(case, cp, tiles, warmup, iterations):
         fused_call = lambda: cutile_launch_device(
             q, k, v, tile_q=tile_q, tile_k=tile_k
         )
-        baseline_call = lambda: baseline_launch_device(q32, k32, v32)
-
-        jit_ms = cold_start_ms(fused_call, cp)
+        specialization = (tile_q, tile_k, case.D, case.Dv)
+        if specialization in seen_specializations:
+            # Each benchmark process reports first-call timing only once per
+            # specialization. This can still be a compiler-cache hit.
+            jit_ms = None
+        else:
+            jit_ms = cold_start_ms(fused_call, cp)
+            seen_specializations.add(specialization)
         fused_ms, fused_p90 = timed_gpu(
-            fused_call, cp, warmup=warmup, iterations=iterations
-        )
-        baseline_ms, baseline_p90 = timed_gpu(
-            baseline_call, cp, warmup=warmup, iterations=iterations
+            fused_call, cp, warmup=warmup, iterations=iterations,
+            repeats_per_sample=repeats_per_sample,
         )
 
         rows.append(
@@ -113,20 +143,44 @@ def run_case(case, cp, tiles, warmup, iterations):
                 "N": case.N,
                 "D": case.D,
                 "Dv": case.Dv,
+                "seed": case.seed,
                 "tile_q": tile_q,
                 "tile_k": tile_k,
                 "jit_ms": jit_ms,
                 "fused_median_ms": fused_ms,
                 "fused_p90_ms": fused_p90,
-                "baseline_median_ms": baseline_ms,
-                "baseline_p90_ms": baseline_p90,
-                "speedup_vs_unfused": baseline_ms / fused_ms,
+                "baseline_before_median_ms": baseline_before_ms,
+                "baseline_before_p90_ms": baseline_before_p90,
+                "baseline_median_ms": None,
+                "baseline_p90_ms": None,
+                "speedup_vs_unfused": None,
                 "fused_output_GiB_s": output_bytes / fused_ms / 2**30 * 1000.0,
-                "baseline_output_GiB_s": output_bytes / baseline_ms / 2**30 * 1000.0,
+                "baseline_output_GiB_s": None,
                 "iterations": iterations,
                 "warmup": warmup,
+                "repeats_per_sample": repeats_per_sample,
+                "measured_launches": iterations * repeats_per_sample,
             }
         )
+
+    baseline_after_ms, baseline_after_p90 = timed_gpu(
+        baseline_call, cp, warmup=warmup, iterations=iterations,
+        repeats_per_sample=repeats_per_sample,
+    )
+    baseline_ms = (baseline_before_ms + baseline_after_ms) / 2.0
+    baseline_p90 = (baseline_before_p90 + baseline_after_p90) / 2.0
+    baseline_bracket_drift_pct = (
+        100.0 * abs(baseline_after_ms - baseline_before_ms) / baseline_ms
+        if baseline_ms > 0 else 0.0
+    )
+    for row in rows:
+        row["baseline_after_median_ms"] = baseline_after_ms
+        row["baseline_after_p90_ms"] = baseline_after_p90
+        row["baseline_bracket_drift_pct"] = baseline_bracket_drift_pct
+        row["baseline_median_ms"] = baseline_ms
+        row["baseline_p90_ms"] = baseline_p90
+        row["speedup_vs_unfused"] = baseline_ms / row["fused_median_ms"]
+        row["baseline_output_GiB_s"] = output_bytes / baseline_ms / 2**30 * 1000.0
 
     del q, k, v, q32, k32, v32
     cp.get_default_memory_pool().free_all_blocks()
@@ -136,10 +190,12 @@ def run_case(case, cp, tiles, warmup, iterations):
 def environment_metadata(cp, gpu_name):
     metadata = {
         "gpu": gpu_name,
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
         "cupy": cp.__version__,
         "cuda_runtime_version": int(cp.cuda.runtime.runtimeGetVersion()),
         "cutile": importlib.metadata.version("cuda-tile"),
-        "compilation_mode": "JIT excluded from steady-state timing; cold-start reported separately",
+        "compilation_mode": "First-call wall time is reported once per (tile_q, tile_k, D, Dv) specialization; it may include a compiler-cache hit. Steady-state CUDA-event timing excludes that first call.",
     }
     try:
         result = subprocess.run(
@@ -155,6 +211,17 @@ def environment_metadata(cp, gpu_name):
         metadata["nvidia_smi"] = result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         metadata["nvidia_smi"] = None
+    try:
+        metadata["git_head_observed"] = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT,
+            capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        metadata["git_head_observed"] = None
+    metadata["git_commit"] = os.environ.get("GITHUB_SHA") or metadata["git_head_observed"]
+    metadata["git_commit_source"] = (
+        "GITHUB_SHA" if os.environ.get("GITHUB_SHA") else "git rev-parse HEAD"
+    )
     return metadata
 
 
@@ -167,12 +234,12 @@ def main() -> int:
         help="JSON output path; a sibling CSV is also written",
     )
     parser.add_argument("--warmup", type=int, default=10)
-    parser.add_argument("--iterations", type=int, default=50)
+    parser.add_argument("--iterations", type=int, default=30)
     parser.add_argument(
         "--tiles",
         nargs="+",
         type=parse_tile,
-        default=[(64, 64), (128, 128)],
+        default=[(32, 64), (64, 64)],
         metavar="QxK",
     )
     parser.add_argument(
@@ -181,10 +248,11 @@ def main() -> int:
         choices=[case.name for case in MANDATORY_CASES],
         help="benchmark only the selected case; repeat the option for multiple cases",
     )
+    parser.add_argument("--repeats-per-sample", type=int, default=5, help="GPU launches inside each CUDA-event sample")
     args = parser.parse_args()
 
-    if args.warmup < 1 or args.iterations < 30:
-        parser.error("--warmup must be >= 1 and --iterations must be >= 30")
+    if args.warmup < 1 or args.iterations < 30 or args.repeats_per_sample < 1:
+        parser.error("--warmup must be >= 1, --iterations >= 30, and --repeats-per-sample >= 1")
 
     try:
         import cupy as cp
@@ -208,6 +276,7 @@ def main() -> int:
         selected_cases = tuple(case for case in MANDATORY_CASES if case.name in selected_names)
 
     all_rows = []
+    seen_specializations = set()
     for case in selected_cases:
         all_rows.extend(
             run_case(
@@ -216,6 +285,8 @@ def main() -> int:
                 args.tiles,
                 warmup=args.warmup,
                 iterations=args.iterations,
+                repeats_per_sample=args.repeats_per_sample,
+                seen_specializations=seen_specializations,
             )
         )
 
@@ -224,10 +295,14 @@ def main() -> int:
         return 2
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    metadata = environment_metadata(cp, gpu_name)
     payload = {
-        "environment": environment_metadata(cp, gpu_name),
+        "environment": metadata,
         "warmup": args.warmup,
         "iterations": args.iterations,
+        "repeats_per_sample": args.repeats_per_sample,
+        "timed_launches_per_configuration": args.iterations * args.repeats_per_sample,
+        "baseline_measurement": "baseline median/P90 is the average of measurements bracketed around the tile sweep",
         "tiles": [{"tile_q": q, "tile_k": k} for q, k in args.tiles],
         "results": all_rows,
     }
@@ -240,16 +315,56 @@ def main() -> int:
         writer.writerows(all_rows)
 
     print(f"GPU: {gpu_name}")
-    print(f"Results: {args.output}")
-    print(f"CSV: {csv_path}")
+    print(f"Python: {metadata['python']} | CuPy: {metadata['cupy']} | cuTile: {metadata['cutile']}")
+    print(
+        f"Protocol: warmup={args.warmup}, samples={args.iterations}, "
+        f"launches/sample={args.repeats_per_sample}, "
+        f"timed launches/config={args.iterations * args.repeats_per_sample}"
+    )
+    print("Baseline: deliberately unfused FP32 CuPy attention; not FlashAttention/optimized SDPA")
+    print(f"Results JSON: {args.output}")
+    print(f"Results CSV:  {csv_path}")
+    print("")
+    print(
+        f"{'CASE':24s} {'TILE':9s} {'MEDIAN ms':>11s} {'P90 ms':>10s} "
+        f"{'BASE ms':>10s} {'SPEEDUP':>9s} {'DRIFT %':>9s} {'FIRST CALL':>16s}"
+    )
     for row in all_rows:
-        print(
-            f"{row['case']:24s} tile={row['tile_q']}x{row['tile_k']} "
-            f"fused={row['fused_median_ms']:.3f} ms "
-            f"baseline={row['baseline_median_ms']:.3f} ms "
-            f"speedup={row['speedup_vs_unfused']:.2f}x "
-            f"jit={row['jit_ms']:.1f} ms"
+        first_call = (
+            f"{row['jit_ms']:.1f} ms"
+            if row["jit_ms"] is not None
+            else "cached/already compiled"
         )
+        print(
+            f"{row['case']:24s} "
+            f"{row['tile_q']}x{row['tile_k']:<5d} "
+            f"{row['fused_median_ms']:11.4f} "
+            f"{row['fused_p90_ms']:10.4f} "
+            f"{row['baseline_median_ms']:10.4f} "
+            f"{row['speedup_vs_unfused']:8.2f}x "
+            f"{row['baseline_bracket_drift_pct']:8.2f}% "
+            f"{first_call:>16s}"
+        )
+    print("")
+    print("BEST MEDIAN TILE PER CASE (for this measured sweep only):")
+    for case_name in dict.fromkeys(row["case"] for row in all_rows):
+        case_rows = [row for row in all_rows if row["case"] == case_name]
+        best = min(case_rows, key=lambda row: row["fused_median_ms"])
+        spread = max(row["fused_median_ms"] for row in case_rows) - min(
+            row["fused_median_ms"] for row in case_rows
+        )
+        print(
+            f"  {case_name}: {best['tile_q']}x{best['tile_k']} "
+            f"median={best['fused_median_ms']:.4f} ms, "
+            f"P90={best['fused_p90_ms']:.4f} ms; "
+            f"within-case tile spread={100.0 * spread / best['fused_median_ms']:.2f}%"
+        )
+    if any(row["baseline_bracket_drift_pct"] > 5.0 for row in all_rows):
+        print(
+            "WARNING: at least one baseline bracket drifted by >5%; "
+            "treat speedup for those rows as noisy and repeat the sweep."
+        )
+    print("NOTE: first-call wall time may be a compiler-cache hit; it is not a clean-cache JIT measurement.")
     return 0
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exhaustive read-only GPU/node inventory for the project's self-hosted A100 runner."""
+"""Read-only inventory of the self-hosted A100 node."""
 from __future__ import annotations
 
 import os

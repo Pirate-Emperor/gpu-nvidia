@@ -1,20 +1,19 @@
 # Documentation index
 
-Start here for the project's current state and evidence.
+Read these first:
 
-## Read in this order
+- [README](../README.md) — project summary and run commands.
+- [Project two-pager](PROJECT_TWO_PAGER.md) — problem, kernel and status.
+- [Course checklist](COURSE_PROJECT_COMPLETION_CHECKLIST.md) — required deliverables.
+- [TODO checklist](TODO_CHECKLIST.md) — remaining work.
+- [Kernel walkthrough](CUTILE_KERNEL_WALKTHROUGH.md) — how the kernel runs.
+- [Mentor walkthrough](MENTOR_STEP_BY_STEP_WALKTHROUGH.md) — command-by-command demo.
+- [Testing contract](TESTING_CONTRACT.md) — input and numerical rules.
+- [Test matrix](TEST_MATRIX.md) — coverage and recorded results.
+- [Baseline ladder](BASELINE_LADDER.md) — comparison implementations.
+- [Environment](ENVIRONMENT.md) — supported hardware and software.
+- [NCU analysis](CUTILE_NCU_PROFILE_ANALYSIS_2026-10-19.md) — saved profile measurements.
+- [Execution evidence](EXECUTION_EVIDENCE_INDEX.md) — workflow runs and artifacts.
+- [Experiment report](EXPERIMENT_REPORT.md) and [full report](../Report.md) — results and history.
 
-1. [TODO checklist](TODO_CHECKLIST.md) — completed gates, current blockers, prioritized next tasks, and definition of done.
-2. [Experiment report](EXPERIMENT_REPORT.md) — concise end-to-end history of approaches, tests, benchmark results, failures, environment experiments, and decisions.
-3. [Testing contract](TESTING_CONTRACT.md) — correctness oracle, tolerances, invariants, and regression rules.
-4. [Test matrix](TEST_MATRIX.md) — test categories, coverage, and current pass/skip/block status.
-5. [CUDA variants](CUDA_VARIANTS.md) — implementation-level differences between ordinary-CUDA versions.
-6. [Baseline ladder](BASELINE_LADDER.md) — role of each reference and implementation.
-7. [Environment](ENVIRONMENT.md) — A100/R550 constraints, compatibility findings, and profiling access.
-8. [Admin checklist](ADMIN_CHECKLIST.md) — external cluster-side prerequisites.
-9. [Progress log](PROGRESS.md) — dated chronological notes.
-10. [Results storage conventions](../results/README.md) and [current status snapshot](../results/STATUS.md).
-
-## One-line status
-
-**The ordinary-CUDA A100 surrogate has passed its broad regression suite and isolated v4/v5 correctness tests. Actual cuTile execution remains blocked by the R550 driver prerequisite. Nsight Compute hardware counters are permission-blocked.** Native-CUDA performance measurements are surrogate results, not cuTile results.
+The last complete native GPU run predates the kernel compaction. Check the current workflow before calling older measurements current.

@@ -37,10 +37,16 @@ def main() -> int:
     parser.add_argument("--tile-q", type=int, default=64)
     parser.add_argument("--tile-k", type=int, default=64)
     parser.add_argument("--warmup", type=int, default=5)
+    parser.add_argument(
+        "--load-latency", type=int, default=0,
+        help="cuTile DRAM load latency hint: 0=compiler inference, 1..10=explicit hint",
+    )
     args = parser.parse_args()
 
     if args.warmup < 1:
         parser.error("--warmup must be >= 1")
+    if args.load_latency != 0 and not 1 <= args.load_latency <= 10:
+        parser.error("--load-latency must be 0 or an integer from 1 to 10")
 
     case = next(case for case in MANDATORY_CASES if case.name == args.case)
     if case.N % args.tile_q or case.N % args.tile_k:
@@ -60,21 +66,21 @@ def main() -> int:
     stream = cp.cuda.get_current_stream()
 
     # The first call is intentionally outside the profiled steady-state region.
-    launch_device(q, k, v, tile_q=args.tile_q, tile_k=args.tile_k)
+    launch_device(q, k, v, tile_q=args.tile_q, tile_k=args.tile_k, load_latency=args.load_latency)
     stream.synchronize()
 
     for _ in range(args.warmup):
-        launch_device(q, k, v, tile_q=args.tile_q, tile_k=args.tile_k)
+        launch_device(q, k, v, tile_q=args.tile_q, tile_k=args.tile_k, load_latency=args.load_latency)
     stream.synchronize()
 
     print(
         f"Ready for profiling: case={case.name} "
         f"B={case.B} H={case.H} N={case.N} D={case.D} "
-        f"tile={args.tile_q}x{args.tile_k}"
+        f"tile={args.tile_q}x{args.tile_k} load_latency={args.load_latency}"
     )
 
     # Exactly one steady-state fused launch for Nsight Compute.
-    launch_device(q, k, v, tile_q=args.tile_q, tile_k=args.tile_k)
+    launch_device(q, k, v, tile_q=args.tile_q, tile_k=args.tile_k, load_latency=args.load_latency)
     stream.synchronize()
     return 0
 

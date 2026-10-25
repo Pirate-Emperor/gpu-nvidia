@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only audit of whether the current node can upgrade the host NVIDIA driver."""
+"""Read-only check of driver-update access and host state."""
 
 from __future__ import annotations
 

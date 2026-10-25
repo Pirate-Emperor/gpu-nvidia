@@ -3,6 +3,7 @@ name: A100 driver access audit
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/a100-driver-access.yml"
       - "scripts/driver_access_check.py"

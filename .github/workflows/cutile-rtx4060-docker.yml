@@ -1,0 +1,317 @@
+# Final validation rerun for the report/checklist handoff on 2026-10-19; behavior unchanged.
+name: RTX 4060 native Windows cuTile validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-rtx4060-docker.yml"
+      - "src/**"
+      - "tests/**"
+      - "benchmarks/**"
+      - "scripts/**"
+      - "run_attention.py"
+      - "requirements-dev.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cutile-validation:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 180
+    steps:
+      - name: Checkout project source
+        uses: actions/checkout@v4
+
+      - name: Install project dependencies only into the project-local venv
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $TempRoot = Join-Path $ProjectRoot '.tmp'
+          $PipCache = Join-Path $ProjectRoot '.cache\pip'
+          $CupyCache = Join-Path $ProjectRoot '.cache\cupy'
+          $CudaCache = Join-Path $ProjectRoot '.cache\cuda'
+          New-Item -ItemType Directory -Force -Path $TempRoot,$PipCache,$CupyCache,$CudaCache | Out-Null
+          $env:TEMP = $TempRoot
+          $env:TMP = $TempRoot
+          $env:PIP_CACHE_DIR = $PipCache
+          $env:CUPY_CACHE_DIR = $CupyCache
+          $env:CUDA_CACHE_PATH = $CudaCache
+
+          # Persist project-local cache/temp paths to later workflow steps.
+          $EnvLines = @(
+            "TEMP=$TempRoot",
+            "TMP=$TempRoot",
+            "PIP_CACHE_DIR=$PipCache",
+            "CUPY_CACHE_DIR=$CupyCache",
+            "CUDA_CACHE_PATH=$CudaCache"
+          )
+          $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          $EnvContent = [string]::Join([Environment]::NewLine, $EnvLines) + [Environment]::NewLine
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, $EnvContent, $Utf8NoBom)
+
+          $NvidiaSmi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
+          if (-not $NvidiaSmi) { $NvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue }
+          if (-not $NvidiaSmi) { throw 'nvidia-smi is unavailable; stopping without installing tools.' }
+          $GpuInventory = & $NvidiaSmi.Source --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader
+          if ($LASTEXITCODE -ne 0) { throw 'GPU inventory failed.' }
+          $GpuInventory | Tee-Object -FilePath cutile-environment.log
+          "WORKFLOW_SHA=$env:GITHUB_SHA" | Tee-Object -FilePath cutile-environment.log -Append
+          $ObservedGitHead = & git -C $PWD rev-parse HEAD 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            "CHECKOUT_GIT_HEAD=$ObservedGitHead" | Tee-Object -FilePath cutile-environment.log -Append
+          } else {
+            "CHECKOUT_GIT_HEAD=<unavailable>" | Tee-Object -FilePath cutile-environment.log -Append
+          }
+          if (-not ($GpuInventory -match 'RTX 4060')) { throw "Expected the local RTX 4060 runner; found: $GpuInventory" }
+
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Expected project-local venv missing: $Py" }
+          "PROJECT_ROOT=$ProjectRoot" | Tee-Object -FilePath cutile-environment.log -Append
+          "PYTHON_EXE=$Py" | Tee-Object -FilePath cutile-environment.log -Append
+          "TEMP=$env:TEMP" | Tee-Object -FilePath cutile-environment.log -Append
+          "PIP_CACHE_DIR=$env:PIP_CACHE_DIR" | Tee-Object -FilePath cutile-environment.log -Append
+          "CUPY_CACHE_DIR=$env:CUPY_CACHE_DIR" | Tee-Object -FilePath cutile-environment.log -Append
+          "CUDA_CACHE_PATH=$env:CUDA_CACHE_PATH" | Tee-Object -FilePath cutile-environment.log -Append
+          & $Py --version 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Project venv Python failed.' }
+
+          # Only the already-approved project Python dependencies are installed.
+          # pip cache and temporary download/extraction files stay under ProjectRoot.
+          $PreviousErrorPreference = $ErrorActionPreference
+          $ErrorActionPreference = 'Continue'
+          & $Py -m pip install --disable-pip-version-check --cache-dir $PipCache -r requirements-dev.txt *> cutile-install.log
+          $RequirementsExit = $LASTEXITCODE
+          Get-Content cutile-install.log | Tee-Object -FilePath cutile-environment.log -Append
+          if ($RequirementsExit -ne 0) {
+            $ErrorActionPreference = $PreviousErrorPreference
+            throw "Installing requirements-dev.txt into project venv failed (exit $RequirementsExit)."
+          }
+
+          # Pin the versions that were previously reported working with the genuine
+          # Windows cuTile smoke; no system-wide install and no tool/dataset downloads.
+          & $Py -m pip install --disable-pip-version-check --cache-dir $PipCache 'cupy-cuda13x[ctk]==14.2.0' 'cuda-tile[tileiras]==1.6.0' *> cutile-gpu-install.log
+          $GpuInstallExit = $LASTEXITCODE
+          Get-Content cutile-gpu-install.log | Tee-Object -FilePath cutile-environment.log -Append
+          $ErrorActionPreference = $PreviousErrorPreference
+          if ($GpuInstallExit -ne 0) { throw "Installing CuPy/cuTile into project venv failed (exit $GpuInstallExit)." }
+
+          & $Py -c "import numpy, cupy, cuda.tile, pytest; import importlib.metadata as m; print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda-tile='+m.version('cuda-tile')); print('pytest='+pytest.__version__)" 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Required GPU package import check failed.' }
+          & $Py -m pip freeze *> cutile-pip-freeze.txt
+          if ($LASTEXITCODE -ne 0) { throw 'pip freeze failed.' }
+          Get-Content cutile-pip-freeze.txt | Tee-Object -FilePath cutile-environment.log -Append
+
+      - name: Compile and launch genuine cuTile smoke kernel
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Py = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          if (-not $Py) { throw 'Python path record is missing.' }
+          $Py = $Py.Substring('PYTHON_EXE='.Length)
+          & $Py scripts/cutile_smoke.py 2>&1 | Tee-Object -FilePath cutile-smoke.log
+          if ($LASTEXITCODE -ne 0) { throw 'Genuine cuTile smoke test failed.' }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'OUTPUT_CHECK=PASS' -Quiet)) { throw 'Smoke output check did not pass.' }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'CUTILE_SMOKE=PASS' -Quiet)) { throw 'cuTile smoke gate did not pass.' }
+
+      - name: Run required actual cuTile attention correctness matrix
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          "REQUIRE_CUTILE=$env:REQUIRE_CUTILE" | Tee-Object -FilePath cutile-pytest.log
+          & $Py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 | Tee-Object -FilePath cutile-pytest.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness matrix failed.' }
+
+      - name: Run optional cuTile GQA/MQA and packed-varlen correctness gates
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          "REQUIRE_CUTILE=$env:REQUIRE_CUTILE" | Tee-Object -FilePath cutile-optional-objectives.log
+          & $Py -m pytest -q tests/test_gpu_optional_attention_objectives.py 2>&1 | Tee-Object -FilePath cutile-optional-objectives.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Optional GQA/MQA/packed-varlen GPU correctness gates failed.' }
+
+      - name: Record numerical error metrics for every mandatory case and tile
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py scripts/cutile_accuracy_report.py --output results/cutile-accuracy.json 2>&1 | Tee-Object -FilePath cutile-accuracy.log
+          if ($LASTEXITCODE -ne 0) { throw 'Independent-reference numerical error report failed.' }
+
+      - name: Exercise CLI and verify output against independent NumPy oracle
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          & $Py scripts/generate_inputs.py --output cutile-cli-input.npz --seq 64 --head-dim 32 --seed 20261018
+          if ($LASTEXITCODE -ne 0) { throw 'Deterministic CLI input generation failed.' }
+          & $Py run_attention.py --input cutile-cli-input.npz --output cutile-cli-output.npy --backend cutile --tile-q 64 --tile-k 64 2>&1 | Tee-Object -FilePath cutile-cli.log
+          if ($LASTEXITCODE -ne 0) { throw 'CLI inference failed.' }
+          & $Py scripts/verify_cli_output.py --input cutile-cli-input.npz --output cutile-cli-output.npy 2>&1 | Tee-Object -FilePath cutile-cli-reference.log
+          if ($LASTEXITCODE -ne 0) { throw 'CLI output mismatches the independent NumPy reference.' }
+
+      - name: Run three controlled benchmark sessions with alternating tile order
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+
+          # Reverse/rotate tile order between sessions to reduce systematic order bias.
+          $TileOrders = @(
+            ,@('32x64','64x64','64x128','128x64','128x128')
+            ,@('128x128','128x64','64x128','64x64','32x64')
+            ,@('64x64','32x64','128x64','64x128','128x128')
+          )
+          $Session = 1
+          foreach ($TileOrder in $TileOrders) {
+            $Output = "results/cutile-benchmark-session$Session.json"
+            $Log = "cutile-benchmark-session$Session.log"
+            $BenchmarkArgs = @('benchmarks/benchmark_attention.py','--output',$Output,'--warmup','10','--iterations','30','--tiles') + @($TileOrder)
+            "SESSION=$Session TILE_ORDER=$($TileOrder -join ',')" | Tee-Object -FilePath $Log
+            & $Py @BenchmarkArgs 2>&1 | Tee-Object -FilePath $Log -Append
+            if ($LASTEXITCODE -ne 0) { throw "Controlled benchmark session $Session failed." }
+            $Session++
+          }
+
+          & $Py scripts/summarize_benchmark_repeats.py --inputs results/cutile-benchmark-session1.json results/cutile-benchmark-session2.json results/cutile-benchmark-session3.json --json-output results/cutile-benchmark-summary.json --csv-output results/cutile-benchmark-summary.csv 2>&1 | Tee-Object -FilePath cutile-benchmark-summary.log
+          if ($LASTEXITCODE -ne 0) { throw 'Benchmark repeat aggregation failed.' }
+
+      - name: Profile-guided optional load-latency-hint experiment
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py benchmarks/benchmark_load_latency_hints.py --output results/cutile-load-latency-hints.json --warmup 10 --iterations 30 --repeats-per-sample 5 --sessions 3 --minimum-gain-pct 1.0 2>&1 | Tee-Object -FilePath cutile-load-latency-hints.log
+          if ($LASTEXITCODE -ne 0) {
+            'LOAD_LATENCY_EXPERIMENT=FAIL; keep compiler-inferred default pending investigation.' | Tee-Object -FilePath cutile-load-latency-hints.log -Append
+            throw 'Optional load-latency-hint experiment failed; core correctness/benchmark evidence is retained separately.'
+          }
+          'LOAD_LATENCY_EXPERIMENT=PASS' | Tee-Object -FilePath cutile-load-latency-hints.log -Append
+
+      - name: Locate Nsight Compute and capture two genuine cuTile kernels
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $NcuPath = $null
+
+          # Prefer PATH, then inspect the standard NVIDIA installation folders,
+          # and finally the explicitly approved project-local locations.
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          if ($NcuCommand) { $NcuPath = $NcuCommand.Source }
+          if (-not $NcuPath) {
+            $SearchRoots = @()
+            if ($env:ProgramFiles) { $SearchRoots += (Join-Path $env:ProgramFiles 'NVIDIA Corporation') }
+            if (${env:ProgramFiles(x86)}) { $SearchRoots += (Join-Path ${env:ProgramFiles(x86)} 'NVIDIA Corporation') }
+            if ($env:LOCALAPPDATA) { $SearchRoots += (Join-Path $env:LOCALAPPDATA 'NVIDIA Corporation') }
+            foreach ($SearchRoot in $SearchRoots) {
+              if (-not (Test-Path $SearchRoot)) { continue }
+              $InstallDirs = Get-ChildItem -Path $SearchRoot -Directory -Filter 'Nsight Compute*' -ErrorAction SilentlyContinue
+              foreach ($InstallDir in $InstallDirs) {
+                $Found = Get-ChildItem -Path $InstallDir.FullName -Filter 'ncu.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($Found) { $NcuPath = $Found.FullName; break }
+              }
+              if ($NcuPath) { break }
+            }
+          }
+          if (-not $NcuPath) {
+            $NcuCandidates = @(
+              (Join-Path $ProjectRoot 'ncu.exe'),
+              (Join-Path $ProjectRoot '.tools\ncu.exe')
+            )
+            $NcuPath = $NcuCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $NcuPath) {
+            'NCU_NOT_FOUND: checked PATH, standard NVIDIA Nsight Compute install folders, project root, and project .tools.' | Tee-Object -FilePath cutile-profile-status.log
+            exit 0
+          }
+
+          "NCU_PATH=$NcuPath" | Tee-Object -FilePath cutile-profile-status.log
+          & $NcuPath --version 2>&1 | Tee-Object -FilePath cutile-profile-status.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute CLI was found but --version failed.' }
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+
+          # profile_fused.py performs one cold launch + five warmups + one
+          # steady-state launch; collect just that final launch.
+          & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
+          $MediumExit = $LASTEXITCODE
+          if ($MediumExit -ne 0) { "MEDIUM_PROFILE_EXIT=$MediumExit" | Tee-Object -FilePath cutile-profile-status.log -Append }
+
+          & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
+          $LongExit = $LASTEXITCODE
+          if ($LongExit -ne 0) { "LONG_BATCHED_PROFILE_EXIT=$LongExit" | Tee-Object -FilePath cutile-profile-status.log -Append }
+
+          if ($MediumExit -ne 0 -or $LongExit -ne 0) {
+            throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect profile logs for counter-permission errors."
+          }
+          "PROFILE_REPORTS_CREATED=$((Test-Path results/cutile-profile-medium.ncu-repz) -and (Test-Path results/cutile-profile-long-batched.ncu-repz))" | Tee-Object -FilePath cutile-profile-status.log -Append
+          Get-ChildItem results/cutile-profile-*.ncu-rep* -File -ErrorAction SilentlyContinue | ForEach-Object { "PROFILE_FILE=$($_.Name) SIZE=$($_.Length)" } | Tee-Object -FilePath cutile-profile-status.log -Append
+
+      - name: Upload complete run record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-rtx4060-experiment
+          path: |
+            cutile-environment.log
+            cutile-install.log
+            cutile-gpu-install.log
+            cutile-pip-freeze.txt
+            cutile-smoke.log
+            cutile-pytest.log
+            cutile-optional-objectives.log
+            cutile-accuracy.log
+            cutile-cli.log
+            cutile-cli-reference.log
+            cutile-benchmark.log
+            cutile-benchmark-session1.log
+            cutile-benchmark-session2.log
+            cutile-benchmark-session3.log
+            cutile-benchmark-summary.log
+            cutile-profile-status.log
+            cutile-profile-medium.log
+            cutile-profile-long-batched.log
+            cutile-cli-input.npz
+            cutile-cli-output.npy
+            results/cutile-accuracy.json
+            results/cutile-benchmark.json
+            results/cutile-benchmark.csv
+            results/cutile-benchmark-session1.json
+            results/cutile-benchmark-session1.csv
+            results/cutile-benchmark-session2.json
+            results/cutile-benchmark-session2.csv
+            results/cutile-benchmark-session3.json
+            results/cutile-benchmark-session3.csv
+            results/cutile-benchmark-summary.json
+            results/cutile-benchmark-summary.csv
+            cutile-load-latency-hints.log
+            results/cutile-load-latency-hints.json
+            results/cutile-load-latency-hints.csv
+            results/cutile-profile-medium.ncu-rep
+            results/cutile-profile-medium.ncu-repz
+            results/cutile-profile-long-batched.ncu-rep
+            results/cutile-profile-long-batched.ncu-repz
+          if-no-files-found: warn

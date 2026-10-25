@@ -1,0 +1,235 @@
+name: Validate compact cuTile kernel on local runner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/validate-compact-cutile.yml"
+      - "src/cutile_attention.py"
+      - "src/reference.py"
+      - "src/contract.py"
+      - "tests/**"
+      - "scripts/cutile_smoke.py"
+      - "scripts/generate_inputs.py"
+      - "scripts/verify_cli_output.py"
+      - "scripts/mentor_demo.ps1"
+      - "scripts/mentor_step_by_step.ps1"
+      - "scripts/mentor_guided.ps1"
+      - "scripts/legal_config_registry.py"
+      - "scripts/mentor_numerical_matrix.py"
+      - "benchmarks/**"
+      - "run_attention.py"
+
+permissions:
+  contents: read
+
+jobs:
+  script-validation:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Parse mentor PowerShell scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            'scripts\mentor_step_by_step.ps1',
+            'scripts\mentor_guided.ps1',
+            'scripts\mentor_demo.ps1',
+            'scripts\mentor_menu.ps1'
+          )
+          foreach ($relative in $files) {
+            $file = Join-Path $PWD $relative
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors) {
+              $sourceLines = Get-Content -LiteralPath $file
+              foreach ($parseError in $errors) {
+                $lineNumber = $parseError.Extent.StartLineNumber
+                $columnNumber = $parseError.Extent.StartColumnNumber
+                $lineText = $sourceLines[$lineNumber - 1]
+                Write-Host ("PARSE_ERROR={0}:{1}:{2}: {3}" -f $relative, $lineNumber, $columnNumber, $parseError.Message)
+                Write-Host ("SOURCE_LINE={0}" -f $lineText)
+              }
+              throw "PowerShell syntax validation failed for $relative"
+            }
+            "POWERSHELL_PARSE_PASS=$relative"
+          }
+      - name: Compile Python experiment and registry scripts
+        run: python -m py_compile scripts/legal_config_registry.py scripts/mentor_numerical_matrix.py benchmarks/benchmark_attention_sessions.py benchmarks/benchmark_attention.py benchmarks/benchmark_load_latency_hints.py
+      - name: Validate the editable JSON configuration
+        run: python scripts/legal_config_registry.py validate --config tests/legal_attention_configs.json
+
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 20
+    steps:
+      - name: Fetch exact source without external checkout action
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          if (!(Test-Path $root)) { throw "Workspace missing" }
+          if (!(Test-Path (Join-Path $root ".git"))) {
+            git -C $root init
+            if ($LASTEXITCODE -ne 0) { throw "git init failed" }
+          }
+          $remote = git -C $root remote get-url origin 2>$null
+          if ($LASTEXITCODE -ne 0 -or !$remote) {
+            git -C $root remote add origin https://github.com/xemptynothing/gpu-nvidia.git
+            if ($LASTEXITCODE -ne 0) { throw "git remote setup failed" }
+          }
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GH_TOKEN"))
+          git -C $root -c "http.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Fetching the exact source commit failed" }
+          git -C $root checkout --force --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Checking out the exact source commit failed" }
+          $head = git -C $root rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $head -ne $env:GITHUB_SHA) { throw "Source commit mismatch: $head" }
+          "VALIDATED_SOURCE_SHA=$head"
+          "WORKSPACE=$root"
+
+      - name: Parse mentor PowerShell scripts
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($relative in @('scripts\mentor_step_by_step.ps1','scripts\mentor_guided.ps1','scripts\mentor_menu.ps1')) {
+            $file = Join-Path $env:GITHUB_WORKSPACE $relative
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors) {
+              $sourceLines = Get-Content -LiteralPath $file
+              foreach ($parseError in $errors) {
+                $lineNumber = $parseError.Extent.StartLineNumber
+                $columnNumber = $parseError.Extent.StartColumnNumber
+                $lineText = $sourceLines[$lineNumber - 1]
+                Write-Host ("PARSE_ERROR={0}:{1}:{2}: {3}" -f $relative, $lineNumber, $columnNumber, $parseError.Message)
+                Write-Host ("SOURCE_LINE={0}" -f $lineText)
+              }
+              throw "PowerShell syntax validation failed for $relative"
+            }
+            "POWERSHELL_PARSE_PASS=$relative"
+          }
+
+      - name: Locate existing project-local cuTile environment
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidates = @(
+            (Join-Path $env:GITHUB_WORKSPACE ".venv-cutile-windows\Scripts\python.exe"),
+            "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe"
+          )
+          $py = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$py) { throw "Existing project-local cuTile venv not found in the workspace or documented local project root. No packages were installed." }
+          "PYTHON_EXE=$py"
+          & $py --version
+          if ($LASTEXITCODE -ne 0) { throw "Project Python did not run" }
+          nvidia-smi
+          if ($LASTEXITCODE -ne 0) { throw "nvidia-smi failed" }
+          $gpu = nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader
+          if ($LASTEXITCODE -ne 0 -or !($gpu -match "RTX 4060")) { throw "Expected the local RTX 4060; found: $gpu" }
+          "GPU_INVENTORY=$gpu"
+
+      - name: Compile launch synchronize and verify real cuTile runtime
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          & $py scripts/cutile_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Genuine cuTile runtime check failed" }
+
+      - name: Run required core GPU tests with missing cuTile treated as failure
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          & $py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py
+          if ($LASTEXITCODE -ne 0) { throw "Required cuTile tests failed" }
+
+      - name: Run deterministic CLI and independent NumPy verification
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          $work = Join-Path (Get-Location) ".tmp\logs"
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          $inFile = Join-Path $work "mentor_attention_input.npz"
+          $outFile = Join-Path $work "mentor_attention_output.npy"
+          if ([string]::IsNullOrWhiteSpace($inFile) -or [string]::IsNullOrWhiteSpace($outFile)) { throw "Input/output path variable is empty" }
+          & $py scripts\generate_inputs.py --output "$inFile" --batch 1 --heads 1 --seq 64 --head-dim 32 --seed 20261018
+          if ($LASTEXITCODE -ne 0) { throw "Input generation failed" }
+          if (!(Test-Path $inFile)) { throw "Input generator exited successfully but the NPZ file is missing" }
+          & $py run_attention.py --input "$inFile" --output "$outFile" --backend cutile --tile-q 64 --tile-k 64
+          if ($LASTEXITCODE -ne 0) { throw "CLI execution failed" }
+          if (!(Test-Path $outFile)) { throw "CLI exited successfully but the NPY output file is missing" }
+          & $py scripts\verify_cli_output.py --input "$inFile" --output "$outFile"
+          if ($LASTEXITCODE -ne 0) { throw "Independent NumPy output verification failed" }
+
+      - name: Check all 29 legal cuTile numerical configurations
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = $env:GITHUB_WORKSPACE
+          $py = Join-Path $root ".venv-cutile-windows\Scripts\python.exe"
+          if (!(Test-Path $py)) { $py = "C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe" }
+          if (!(Test-Path $py)) { throw "Python path not found" }
+          $work = Join-Path $root ".tmp\logs"
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          $matrix = Join-Path $work "validation_legal_numerical_matrix.json"
+          & $py scripts\mentor_numerical_matrix.py --output $matrix
+          if ($LASTEXITCODE -ne 0) { throw "Legal numerical matrix failed" }
+          if (!(Test-Path $matrix)) { throw "Numerical matrix output is missing" }
+          $report = Get-Content -Raw $matrix | ConvertFrom-Json
+          if ($report.expected_legal_pair_count -lt 29) { throw "The registry must retain the 29 original configurations" }
+          if ($report.legal_pair_count -ne $report.expected_legal_pair_count -or $report.pass_count -ne $report.expected_legal_pair_count -or $report.fail_count -ne 0) { throw "Numerical matrix did not pass every configuration recorded in the JSON registry" }
+
+      - name: Exercise one-by-one mentor walkthrough core path
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_step_by_step.ps1 -NoPause -SkipNumericalMatrix -SkipTileExperiment -SkipLatencyHintExperiment
+          if ($LASTEXITCODE -ne 0) { throw "Step-by-step mentor core path failed with exit code $LASTEXITCODE" }
+
+      - name: Exercise guided kernel explanation and individual correctness runs
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_step_by_step.ps1 -Guided -NoPause -SkipTileExperiment -SkipLatencyHintExperiment
+          if ($LASTEXITCODE -ne 0) { throw "Guided mentor walkthrough failed with exit code $LASTEXITCODE" }
+
+      - name: Run the exact reusable mentor demo script end to end
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_demo.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Reusable mentor demo failed with exit code $LASTEXITCODE" }
+
+      - name: Exercise mentor demo benchmark and Nsight Compute switches
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\mentor_demo.ps1 -SkipTileSweep -WithProfile
+          if ($LASTEXITCODE -ne 0) { throw "Extended mentor demo failed with exit code $LASTEXITCODE" }

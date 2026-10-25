@@ -1,71 +1,34 @@
-# GPU Environment Contract
+# Environment notes
 
-## Host versus user-space
+## Actual cuTile target
 
-The NVIDIA kernel-mode driver is a host property. CUDA Toolkit components and some compatibility libraries can be installed in user space, but a host driver upgrade is a system-level operation.
+- GPU: GeForce RTX 4060, compute capability 8.9.
+- OS: Windows 11 x64.
+- Driver: 616.92.
+- Python: 3.12.10.
+- NumPy: 2.5.4.
+- CuPy: 14.2.0.
+- cuda-tile: 1.6.0.
+- TileIRAS, NVCC and NVVM Python packages: 13.4.92.
 
-Current node observed by the project runner:
+These versions were recorded during the October 2026 validation. Check the installed environment before repeating a run.
 
-- GPU: NVIDIA A100-SXM4-40GB
-- Compute capability: 8.0
-- Driver: R550.90.07
-- Current cuTile production gate: R580+
+## Driver and compiler
 
-## Upgrade path
+cuTile requires a supported GPU and a sufficiently recent NVIDIA driver. The checked setup uses driver 616.92 and a project-local Python environment. The pip TileIRAS/NVCC/NVVM packages supply the compiler path; a system nvcc is not required for this environment.
 
-The clean path is:
+The three compiler packages must use matching major/minor versions. See the [NVIDIA cuTile Python quickstart](https://docs.nvidia.com/cuda/cutile-python/quickstart.html) for current requirements.
 
-1. Cluster administrator upgrades/maintains the node driver to a supported branch.
-2. Reboot/maintenance is performed according to cluster policy.
-3. The project runner re-checks nvidia-smi.
-4. The cuTile environment is installed in an isolated Python environment.
-5. The full correctness suite runs.
-6. Benchmark/profiler workflows run.
+## A100 boundary
 
-The repository does not attempt a host driver mutation automatically.
+The Linux A100 machine has driver R550.90.07. It is used for ordinary CUDA C++ comparisons. Do not describe those runs as cuTile: that driver is below the cuTile driver requirement.
 
-## Forward compatibility
+## Before a GPU run
 
-NVIDIA documents CUDA forward compatibility for supported data-center GPUs through cuda-compat-<major>-<minor> packages. The compatibility package supplies user-space driver components, including libcuda and, for newer CUDA releases, TileIR-related components.
+- Check nvidia-smi and confirm the expected GPU and driver.
+- Use the project virtual environment.
+- Run the cuTile runtime check, then the 48-test suite with REQUIRE_CUTILE=1.
+- Keep logs, benchmark results and profiler reports with the commit and machine details.
+- Do not change the global CUDA installation to solve a project-venv issue.
 
-The project tested cuda-compat-13-4 on the current node without root. The package downloaded and extracted successfully, but loading the compatibility libraries produced CUDA error 803 (system driver mismatch). Therefore that exact configuration is not currently a validated solution.
-
-Official NVIDIA references:
-
-- CUDA Compatibility: https://docs.nvidia.com/deploy/cuda-compatibility/
-- Forward Compatibility: https://docs.nvidia.com/deploy/cuda-compatibility/forward-compatibility.html
-- cuTile Python Quickstart: https://docs.nvidia.com/cuda/cutile-python/quickstart.html
-
-## Read-only access audit
-
-scripts/driver_access_check.py reports:
-
-- current UID/EUID;
-- whether the process is root;
-- whether sudo exists;
-- whether passwordless sudo is available;
-- package-manager availability;
-- nvidia-smi/nvcc discovery.
-
-It performs no installation, upgrade, driver unload, or reboot operation.
-
-
-## Preflight checklist
-
-Before a cuTile execution or profiling run, the project records:
-
-- GPU model, compute capability, memory size, MIG state, compute mode, and persistence mode.
-- NVIDIA driver version. Runtime requires R580+; detailed cuTile profiling requires R580.126.09+.
-- System CUDA Toolkit version if present. NVIDIA's current cuTile quickstart supports a system CUDA Toolkit 13.1+ path; otherwise the project can install the required TileIR compiler components in the Python environment.
-- Python version (project uses Python 3.12 in CI).
-- Nsight Compute path/version.
-- Fabric Manager presence/status on NVSwitch/HGX systems.
-- Linux kernel, glibc, and host compiler information.
-- Relevant CUDA environment variables.
-- The profiling permission situation for the unprivileged GitHub Actions runner.
-
-Run:
-
-    python3 scripts/cutile_sanity_check.py
-
-The script is read-only.
+The full setup history and failed environment experiments remain in Report.md and RUN_EVIDENCE.md.

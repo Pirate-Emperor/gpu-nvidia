@@ -1,9 +1,4 @@
-"""Simple CUDA baseline: one thread computes one output scalar.
-
-This is intentionally straightforward and inefficient. It uses FP16 inputs,
-FP32 score/softmax/value accumulation, and performs two causal key passes per
-output scalar. It is a programming-model baseline, not the project target.
-"""
+"""Simple CUDA baseline: one thread computes each output value."""
 
 from __future__ import annotations
 

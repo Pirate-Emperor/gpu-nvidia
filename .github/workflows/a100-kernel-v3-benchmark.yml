@@ -3,6 +3,7 @@ name: A100 v2 v3 experimental benchmark
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "src/variants/shared_tile_v2.py"
       - "src/variants/shared_tile_v3.py"
