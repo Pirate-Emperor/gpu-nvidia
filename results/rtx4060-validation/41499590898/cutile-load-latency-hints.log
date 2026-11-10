@@ -1,0 +1,32 @@
+[
+  {
+    "case": "medium_d128",
+    "tile_q": 64,
+    "tile_k": 64,
+    "latency_hint": 10,
+    "credible": true,
+    "status": "hint clears noise-aware gain threshold",
+    "gain_pct_vs_default": 7.251265930727481,
+    "required_gain_pct": 2.633604576188249,
+    "median_ms": 0.05631999969482422,
+    "session_range_pct": 0.5454587017701902,
+    "default_median_ms": 0.0607232004404068,
+    "default_session_range_pct": 4.721750450606308
+  },
+  {
+    "case": "longer_batched_d128",
+    "tile_q": 64,
+    "tile_k": 128,
+    "latency_hint": 0,
+    "credible": false,
+    "status": "no hint beats the compiler-inferred default beyond observed spread",
+    "best_candidate_hint": 2,
+    "best_candidate_gain_pct": 0.03354489752587319,
+    "required_gain_pct": 1.0,
+    "default_median_ms": 0.9158656120300293,
+    "default_session_range_pct": 0.3242395752319527
+  }
+]
+LATENCY_HINT_JSON=results\cutile-load-latency-hints.json
+LATENCY_HINT_CSV=results\cutile-load-latency-hints.csv
+LOAD_LATENCY_EXPERIMENT=PASS

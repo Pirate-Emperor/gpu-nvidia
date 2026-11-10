@@ -1,0 +1,247 @@
+name: Publish verified 27-profile NCU horizontal-scroll evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ncu-27-pane-proof-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish-existing-captures:
+    runs-on: [self-hosted, windows, x64, local]
+    timeout-minutes: 30
+    steps:
+      - name: Validate the already-captured 27-profile evidence without recapturing
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Source = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\targeted-horizontal-41479365336'
+          $Screens = Join-Path $Source 'screenshots'
+          $ManifestPath = Join-Path $Screens 'capture-manifest.json'
+          $IndexPath = Join-Path $Source 'pane-index.csv'
+          foreach ($path in @($Source,$Screens,$ManifestPath,$IndexPath)) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Existing capture evidence missing: $path" }
+          }
+
+          $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+          $profiles = @($manifest.profiles)
+          $captures = @($manifest.captures)
+          $failures = @($manifest.failures)
+          if ($manifest.status -ne 'success') { throw "Manifest status is $($manifest.status), not success." }
+          if ($profiles.Count -ne 27) { throw "Expected 27 profiles, found $($profiles.Count)." }
+          if ($captures.Count -ne 216) { throw "Expected 216 pane captures, found $($captures.Count)." }
+          if ($failures.Count -ne 0) { throw "Manifest records $($failures.Count) failures." }
+
+          $expected = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+          foreach ($profile in $profiles) {
+            if (@($profile.modes).Count -ne 2) { throw "Profile $($profile.profile) does not contain both SASS and PTX." }
+            foreach ($mode in @($profile.modes)) {
+              if ($mode.mode -notin @('sass','ptx')) { throw "Unexpected mode $($mode.mode) in $($profile.profile)." }
+              if (@($mode.panels).Count -ne 4) { throw "Profile $($profile.profile)/$($mode.mode) does not contain four panes." }
+              [void]$expected.Add([string]$mode.baseline)
+              foreach ($panel in @($mode.panels)) {
+                [void]$expected.Add([string]$panel.screenshot)
+                [void]$expected.Add([string]$panel.restore_screenshot)
+              }
+            }
+          }
+          if ($expected.Count -ne 486) { throw "Expected 486 distinct baseline/scroll/restore images, derived $($expected.Count)." }
+
+          foreach ($capture in $captures) {
+            if (-not $capture.verified_horizontal_crop_change -or
+                [double]$capture.changed_pixel_fraction -lt 0.001) {
+              throw "Pane did not pass pixel-change validation: $($capture.profile)/$($capture.mode)/$($capture.panel)."
+            }
+            if (-not $capture.restored_to_baseline -or
+                [double]$capture.restore_changed_pixel_fraction -ge 0.001) {
+              throw "Pane did not restore to baseline: $($capture.profile)/$($capture.mode)/$($capture.panel)."
+            }
+          }
+
+          $pngs = @(Get-ChildItem -LiteralPath $Screens -Filter '*.png' -File)
+          if ($pngs.Count -ne 486) { throw "Expected exactly 486 PNGs, found $($pngs.Count)." }
+          $imageRecords = @()
+          foreach ($name in $expected) {
+            $file = Join-Path $Screens $name
+            if (-not (Test-Path -LiteralPath $file)) { throw "Referenced screenshot missing: $name" }
+            $bytes = [System.IO.File]::ReadAllBytes($file)
+            $signature = [BitConverter]::ToString([byte[]]$bytes[0..7])
+            if ($bytes.Length -lt 24 -or $signature -ne '89-50-4E-47-0D-0A-1A-0A') {
+              throw "Invalid PNG signature: $name"
+            }
+            $width = [BitConverter]::ToUInt32([byte[]]@($bytes[19],$bytes[18],$bytes[17],$bytes[16]),0)
+            $height = [BitConverter]::ToUInt32([byte[]]@($bytes[23],$bytes[22],$bytes[21],$bytes[20]),0)
+            if ($width -ne 1936 -or $height -ne 1048) { throw "Unexpected dimensions for $name : $($width)x$($height)" }
+            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            $imageRecords += [pscustomobject]@{
+              name = $name
+              bytes = $bytes.Length
+              width = $width
+              height = $height
+              sha256 = $hash
+            }
+          }
+
+          $Stage = Join-Path $env:RUNNER_TEMP 'ncu-27-horizontal-proof-verified'
+          if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path (Join-Path $Stage 'screenshots') | Out-Null
+          foreach ($name in $expected) {
+            Copy-Item -LiteralPath (Join-Path $Screens $name) -Destination (Join-Path $Stage 'screenshots') -Force
+          }
+          Copy-Item -LiteralPath $ManifestPath -Destination $Stage -Force
+          Copy-Item -LiteralPath $IndexPath -Destination $Stage -Force
+          Copy-Item -LiteralPath (Join-Path $Source 'capture-environment.txt') -Destination $Stage -Force
+
+          $audit = [pscustomobject]@{
+            source_capture_run = 41479365336
+            validation_run = $env:GITHUB_RUN_ID
+            gpu = 'NVIDIA GeForce RTX 4060 / SM89'
+            profile_count = 27
+            pane_capture_count = 216
+            failure_count = 0
+            modes = @('sass','ptx')
+            panes_per_mode = @('left-code','left-metrics','right-code','right-metrics')
+            crop_change_threshold = 0.001
+            restore_change_threshold_exclusive = 0.001
+            image_count = $imageRecords.Count
+            image_dimensions = '1936x1048'
+            all_passed = $true
+            images = $imageRecords
+          }
+          $audit | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $Stage 'integrity-audit.json')
+          "SOURCE_CAPTURE_RUN=41479365336" | Write-Host
+          "PROFILES=27 PANE_CAPTURES=216 FAILURES=0 PNGS=486" | Write-Host
+
+      - name: Publish the 27 existing profile ZIPs and integrity manifest to main
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $Stage = Join-Path $env:RUNNER_TEMP 'ncu-27-horizontal-proof-verified'
+          $ManifestPath = Join-Path $Stage 'capture-manifest.json'
+          $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+          $Profiles = @($manifest.profiles)
+          if ($Profiles.Count -ne 27) { throw "Expected 27 profiles at publication time; found $($Profiles.Count)." }
+
+          $ProfileZipRoot = Join-Path $Stage 'profile-zips'
+          New-Item -ItemType Directory -Force -Path $ProfileZipRoot | Out-Null
+          $ZipRecords = @()
+          foreach ($profile in $Profiles) {
+            $safeName = ([string]$profile.profile) -replace '[^A-Za-z0-9._-]','_'
+            $profileDir = Join-Path $ProfileZipRoot $safeName
+            New-Item -ItemType Directory -Force -Path $profileDir | Out-Null
+            foreach ($mode in @($profile.modes)) {
+              $names = @([string]$mode.baseline)
+              foreach ($panel in @($mode.panels)) {
+                $names += [string]$panel.screenshot
+                $names += [string]$panel.restore_screenshot
+              }
+              foreach ($name in $names) {
+                $source = Join-Path (Join-Path $Stage 'screenshots') $name
+                if (-not (Test-Path -LiteralPath $source)) { throw "ZIP source image missing: $name" }
+                Copy-Item -LiteralPath $source -Destination $profileDir -Force
+              }
+            }
+            $zipPath = Join-Path $ProfileZipRoot ($safeName + '.zip')
+            [System.IO.Compression.ZipFile]::CreateFromDirectory($profileDir,$zipPath,[System.IO.Compression.CompressionLevel]::Fastest,$false)
+            $zipInfo = Get-Item -LiteralPath $zipPath
+            if ($zipInfo.Length -ge 90000000) { throw "Profile ZIP exceeds safe Git blob limit: $($zipInfo.Length) bytes." }
+            $ZipRecords += [pscustomobject]@{ profile=$safeName; path=$zipPath; bytes=$zipInfo.Length }
+          }
+
+          $BaseApi = 'https://api.github.com/repos/xemptynothing/gpu-nvidia'
+          $Headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+            'User-Agent' = 'gpu-nvidia-ncu-pane-publisher'
+          }
+          function Invoke-GitHubApi {
+            param([string]$Method,[string]$Path,[object]$Body=$null)
+            $Uri = "$BaseApi$Path"
+            for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
+              try {
+                if ($null -eq $Body) {
+                  return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -TimeoutSec 180
+                }
+                $Json = $Body | ConvertTo-Json -Depth 60 -Compress
+                return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -Body $Json -ContentType 'application/json; charset=utf-8' -TimeoutSec 180
+              } catch {
+                $Status = 0
+                try { $Status = [int]$_.Exception.Response.StatusCode } catch {}
+                if ($Status -in @(401,403,404,422) -or $Attempt -eq 6) { throw }
+                Write-Warning "GitHub REST $Method $Path attempt $Attempt failed: $($_.Exception.Message)"
+                Start-Sleep -Seconds ([Math]::Min(20, 2 * $Attempt))
+              }
+            }
+          }
+
+          $DestinationRoot = 'docs/ncu/rtx4060/horizontal-proof-2026-11-02'
+          $Entries = @()
+          foreach ($record in $ZipRecords) {
+            $bytes = [System.IO.File]::ReadAllBytes($record.path)
+            $content = [Convert]::ToBase64String($bytes)
+            $blob = Invoke-GitHubApi -Method POST -Path '/git/blobs' -Body @{ content=$content; encoding='base64' }
+            $Entries += @{ path="$DestinationRoot/profiles/$($record.profile).zip"; mode='100644'; type='blob'; sha=$blob.sha }
+          }
+          foreach ($name in @('integrity-audit.json','capture-manifest.json','pane-index.csv','capture-environment.txt')) {
+            $path = Join-Path $Stage $name
+            if (-not (Test-Path -LiteralPath $path)) { throw "Manifest asset missing: $name" }
+            $content = [System.IO.File]::ReadAllText($path,[System.Text.Encoding]::UTF8)
+            $blob = Invoke-GitHubApi -Method POST -Path '/git/blobs' -Body @{ content=$content; encoding='utf-8' }
+            $Entries += @{ path="$DestinationRoot/$name"; mode='100644'; type='blob'; sha=$blob.sha }
+          }
+
+          $readme = @(
+            '# Verified 27-profile Nsight Compute horizontal-pane evidence',
+            '',
+            '- Hardware: NVIDIA GeForce RTX 4060 (SM89)',
+            '- Profiles: 27 of 27',
+            '- SASS and PTX modes: both checked for every profile',
+            '- Panes per mode: left code, left metrics, right code, right metrics',
+            '- Pane movement checks: 216, with 0 recorded failures',
+            '- Captured PNGs: 486 baseline, scrolled, and restored images at 1936x1048',
+            '- Each profile ZIP contains 18 PNG files (two modes × one baseline plus four scroll/restore pairs).',
+            '- Each scroll capture had a measurable pane-local pixel change; each inverse scroll restored the baseline within the recorded threshold.',
+            '',
+            '## Per-profile screenshot archives',
+            ''
+          )
+          foreach ($record in $ZipRecords) {
+            $readme += "- [$($record.profile).zip](profiles/$($record.profile).zip) ($($record.bytes) bytes)"
+          }
+          $readmeContent = [string]::Join([Environment]::NewLine,$readme) + [Environment]::NewLine
+          $readmeBlob = Invoke-GitHubApi -Method POST -Path '/git/blobs' -Body @{ content=$readmeContent; encoding='utf-8' }
+          $Entries += @{ path="$DestinationRoot/README.md"; mode='100644'; type='blob'; sha=$readmeBlob.sha }
+
+          $Committed = $false
+          for ($CommitAttempt = 1; $CommitAttempt -le 4; $CommitAttempt++) {
+            $ref = Invoke-GitHubApi -Method GET -Path '/git/ref/heads/main'
+            $parent = $ref.object.sha
+            $parentCommit = Invoke-GitHubApi -Method GET -Path "/git/commits/$parent"
+            $tree = Invoke-GitHubApi -Method POST -Path '/git/trees' -Body @{ base_tree=$parentCommit.tree.sha; tree=$Entries }
+            $commit = Invoke-GitHubApi -Method POST -Path '/git/commits' -Body @{
+              message='Publish verified 27-profile NCU horizontal-pane screenshots'
+              tree=$tree.sha
+              parents=@($parent)
+            }
+            try {
+              $null = Invoke-GitHubApi -Method PATCH -Path '/git/refs/heads/main' -Body @{ sha=$commit.sha; force=$false }
+              $Committed = $true
+              "PANE_EVIDENCE_COMMIT=$($commit.sha) PROFILE_ZIPS=$($ZipRecords.Count) TOTAL_PNGS=486" | Write-Host
+              break
+            } catch {
+              if ($CommitAttempt -eq 4) { throw }
+              Write-Warning 'Pane evidence ref update raced with another main push; retrying from latest main.'
+              Start-Sleep -Seconds (2 * $CommitAttempt)
+            }
+          }
+          if (-not $Committed) { throw 'Pane evidence commit was not published.' }

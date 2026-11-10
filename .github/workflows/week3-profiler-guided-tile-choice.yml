@@ -1,0 +1,154 @@
+name: Week 3 profiler-guided tile-choice validation (local RTX 4060) # trigger first executable run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/week3-profiler-guided-tile-choice.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: week3-tile-choice-rtx4060
+  cancel-in-progress: false
+
+jobs:
+  tile-choice:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 45
+    steps:
+      - name: Fetch exact source revision via GitHub API
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Workspace = $env:GITHUB_WORKSPACE
+          $Paths = @(
+            'src\contract.py','src\reference.py','src\baseline.py','src\cutile_attention.py',
+            'tests\cases.py','tests\test_gpu_correctness.py',
+            'benchmarks\benchmark_attention.py','benchmarks\profile_fused.py'
+          )
+          $Headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          foreach ($Relative in $Paths) {
+            $ApiPath = $Relative.Replace('\','/')
+            $Uri = 'https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/{0}?ref={1}' -f $ApiPath,$env:GITHUB_SHA
+            $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers -TimeoutSec 120
+            if ($Item.type -ne 'file' -or -not $Item.content) { throw "No source content returned for $ApiPath" }
+            $Destination = Join-Path $Workspace $Relative
+            New-Item -ItemType Directory -Force -Path (Split-Path $Destination -Parent) | Out-Null
+            [System.IO.File]::WriteAllBytes($Destination,[Convert]::FromBase64String($Item.content))
+          }
+          "SOURCE_COMMIT=$env:GITHUB_SHA" | Set-Content -Encoding utf8 (Join-Path $Workspace 'week3-source.txt')
+          "SOURCE_FILES_FETCHED=$($Paths.Count)" | Add-Content -Encoding utf8 (Join-Path $Workspace 'week3-source.txt')
+
+      - name: Verify RTX 4060 and project-local cuTile tools
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Project-local Python is missing: $Py" }
+          $Gpu = nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total,clocks.current.sm,power.limit,power.draw --format=csv,noheader
+          if ($LASTEXITCODE -ne 0 -or $Gpu -notmatch 'RTX 4060') { throw "Expected local RTX 4060; found: $Gpu" }
+          $Ncu = (Get-Command ncu.exe -ErrorAction SilentlyContinue).Source
+          if (-not $Ncu) {
+            $SearchRoot = Join-Path $env:ProgramFiles 'NVIDIA Corporation'
+            $Found = Get-ChildItem -Path $SearchRoot -Filter ncu.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($Found) { $Ncu = $Found.FullName }
+          }
+          if (-not $Ncu) { throw 'Nsight Compute CLI was not found.' }
+          New-Item -ItemType Directory -Force -Path results/week3-tile-choice | Out-Null
+          "PROJECT_ROOT=$ProjectRoot" | Set-Content results/week3-tile-choice/environment.txt
+          "PYTHON_EXE=$Py" | Add-Content results/week3-tile-choice/environment.txt
+          "NCU_PATH=$Ncu" | Add-Content results/week3-tile-choice/environment.txt
+          "GPU=$Gpu" | Add-Content results/week3-tile-choice/environment.txt
+          & $Py --version 2>&1 | Add-Content results/week3-tile-choice/environment.txt
+          & $Ncu --version 2>&1 | Add-Content results/week3-tile-choice/environment.txt
+          "PYTHON_EXE=$Py" | Out-File -Encoding utf8 $env:GITHUB_OUTPUT
+          "NCU_PATH=$Ncu" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Re-run longer-batched cuTile correctness for all legal tile candidates
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          & $Py -m pytest -q tests/test_gpu_correctness.py -k longer_batched_d128 2>&1 | Tee-Object -FilePath results/week3-tile-choice/correctness.log
+          if ($LASTEXITCODE -ne 0) { throw 'The longer-batched cuTile correctness matrix failed.' }
+
+      - name: Record the existing controlled three-session benchmark reference
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ReferencePath = 'results/rtx4060-validation/41511762758/results/cutile-benchmark-summary.json'
+          $Uri = 'https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/' + $ReferencePath + '?ref=' + $env:GITHUB_SHA
+          $Headers = @{ Accept='application/vnd.github+json'; 'X-GitHub-Api-Version'='2022-11-28' }
+          $Item = Invoke-RestMethod -Method Get -Uri $Uri -Headers $Headers
+          if ($Item.type -ne 'file' -or -not $Item.content) { throw 'Previous 29-row current-source benchmark evidence could not be fetched.' }
+          $JsonText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Item.content))
+          $Data = $JsonText | ConvertFrom-Json
+          $Rows = @($Data.results | Where-Object { $_.case -eq 'longer_batched_d128' -and $_.tile_q -eq 64 })
+          if ($Rows.Count -ne 2) { throw "Expected 64x64 and 64x128 rows in current-source benchmark; found $($Rows.Count)." }
+          $Selected = @($Rows | ForEach-Object {
+            [pscustomobject]@{
+              tile=("$($_.tile_q)x$($_.tile_k)")
+              median_ms=$_.fused_median_ms
+              session_range_pct=$_.fused_range_pct_of_median
+              max_baseline_bracket_drift_pct=$_.max_baseline_bracket_drift_pct
+              speedup_vs_unfused=$_.median_speedup_vs_unfused
+              session_inputs=$_.session_inputs
+            }
+          })
+          $Selected | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 results/week3-tile-choice/prior-three-session-benchmark.json
+          @(
+            'Source run: #41511762758',
+            'Case: longer_batched_d128 (B=2,H=8,N=2048,D=128,Dv=128)',
+            'Baseline: deliberately unfused FP32 CuPy',
+            'Protocol: three order-varied sessions, 10 warmups, 30 CUDA-event samples, 5 launches/sample',
+            ($Selected | ConvertTo-Json -Depth 8)
+          ) | Set-Content -Encoding utf8 results/week3-tile-choice/prior-three-session-benchmark.txt
+
+      - name: Capture matched Nsight Compute profiles for both tile choices
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $PWD '..\..\..\..')).Path
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          $Ncu = (Get-Content results/week3-tile-choice/environment.txt | Where-Object { $_ -like 'NCU_PATH=*' } | Select-Object -First 1).Substring(9)
+          foreach ($Tile in @(@{q=64;k=64;name='tile64x64'},@{q=64;k=128;name='tile64x128'})) {
+            $Base = "results/week3-tile-choice/ncu-longer-batched-$($Tile.name)"
+            $Log = "$Base.log"
+            $NcuArgs = @(
+              '--set','basic','--section','SchedulerStats','--section','WarpStateStats','--section','MemoryWorkloadAnalysis',
+              '--launch-skip','6','--launch-count','1','--force-overwrite','-o',$Base,
+              $Py,'benchmarks/profile_fused.py','--case','longer_batched_d128',
+              '--tile-q',[string]$Tile.q,'--tile-k',[string]$Tile.k,'--warmup','5','--load-latency','0'
+            )
+            "PROFILE_START=$($Tile.name) SOURCE=$env:GITHUB_SHA" | Tee-Object -FilePath $Log
+            & $Ncu @NcuArgs 2>&1 | Tee-Object -FilePath $Log -Append
+            if ($LASTEXITCODE -ne 0) { throw "NCU capture failed for $($Tile.name)." }
+            $Report = @("$Base.ncu-repz","$Base.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $Report) { throw "NCU report missing for $($Tile.name)." }
+            & $Ncu --import $Report --page details --csv 2>&1 | Out-File -Encoding utf8 "$Base-details.csv"
+            if ($LASTEXITCODE -ne 0) { throw "NCU details export failed for $($Tile.name)." }
+            & $Ncu --import $Report --page raw --csv 2>&1 | Out-File -Encoding utf8 "$Base-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "NCU raw export failed for $($Tile.name)." }
+            "PROFILE_REPORT=$Report BYTES=$((Get-Item $Report).Length)" | Add-Content results/week3-tile-choice/ncu-pair-status.txt
+          }
+
+      - name: Upload full Week 3 evidence including native NCU reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-week3-tile-choice-${{ github.run_id }}
+          path: |
+            results/week3-tile-choice/**
+            week3-source.txt
+          if-no-files-found: error
+          retention-days: 90

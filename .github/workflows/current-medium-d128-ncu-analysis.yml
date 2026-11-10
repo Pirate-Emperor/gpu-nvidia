@@ -1,0 +1,231 @@
+name: Current medium_d128 Nsight Compute analysis (local RTX 4060) # v2: validate distinct GUI scroll captures
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/current-medium-d128-ncu-analysis.yml"
+      - "scripts/capture_ncu_analysis_screenshots.py"
+      - "scripts/analyze_ncu_raw_metrics.py"
+      - "scripts/build_ncu_report.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  analyze-current-reports:
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout the exact workflow revision
+        uses: actions/checkout@v4
+
+      - name: Locate the exact reports and local tools
+        id: p
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          if (-not (Test-Path $root)) { throw "Local project root missing: $root" }
+          $exp = Join-Path $root 'results\ncu\rtx4060\20261027-230742'
+          $a = Join-Path $exp 'medium_d128_64x64.ncu-repz'
+          $b = Join-Path $exp 'medium_d128_64x128.ncu-repz'
+          foreach ($f in @($a,$b)) { if (-not (Test-Path $f)) { throw "Required report missing: $f" } }
+          $ncu = (Get-Command ncu.exe -ErrorAction SilentlyContinue).Source
+          if (-not $ncu) {
+            foreach ($r in @("$env:ProgramFiles\NVIDIA Corporation","$env:LOCALAPPDATA\NVIDIA Corporation")) {
+              if (Test-Path $r) {
+                $f = Get-ChildItem $r -Filter ncu.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($f) { $ncu = $f.FullName; break }
+              }
+            }
+          }
+          if (-not $ncu) { throw 'ncu.exe not found on local runner' }
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $py)) { throw "Python environment missing: $py" }
+          $out = Join-Path $exp 'ncu-analysis-current'
+          $screens = Join-Path $out 'screenshots'
+          $data = Join-Path $out 'data'
+          New-Item -ItemType Directory -Force -Path $screens,$data | Out-Null
+          "root=$root" | Out-File $env:GITHUB_OUTPUT
+          "exp=$exp" | Add-Content $env:GITHUB_OUTPUT
+          "out=$out" | Add-Content $env:GITHUB_OUTPUT
+          "screens=$screens" | Add-Content $env:GITHUB_OUTPUT
+          "data=$data" | Add-Content $env:GITHUB_OUTPUT
+          "ncu=$ncu" | Add-Content $env:GITHUB_OUTPUT
+          "py=$py" | Add-Content $env:GITHUB_OUTPUT
+          "NCU=$ncu" | Set-Content (Join-Path $out 'environment.txt')
+          & $ncu --version 2>&1 | Add-Content (Join-Path $out 'environment.txt')
+          Get-Item $a,$b | Select-Object FullName,Length,LastWriteTime | Format-List | Out-File (Join-Path $out 'input-report-inventory.txt')
+
+      - name: Export available details, raw metrics, and TileIR/SASS
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          NCU: 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          EXP: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742'
+          DATA: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current\data'
+          OUT: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($tag in @('medium_d128_64x64','medium_d128_64x128')) {
+            $r = Join-Path $env:EXP "$tag.ncu-repz"
+            & $env:NCU --import $r --page details 2>&1 | Out-File -Encoding utf8 (Join-Path $env:DATA "$tag-details.txt")
+            if ($LASTEXITCODE -ne 0) { throw "Details export failed: $tag" }
+            & $env:NCU --import $r --page raw --csv 2>&1 | Out-File -Encoding utf8 (Join-Path $env:DATA "$tag-raw.csv")
+            if ($LASTEXITCODE -ne 0) { throw "Raw export failed: $tag" }
+            & $env:NCU --import $r --page source --print-source tileir,ptx 2>&1 | Out-File -Encoding utf8 (Join-Path $env:DATA "$tag-source-tileir-ptx.txt")
+            "PTX_EXIT=$LASTEXITCODE TAG=$tag" | Add-Content (Join-Path $env:OUT 'export-status.txt')
+            & $env:NCU --import $r --page source --print-source tileir,sass 2>&1 | Out-File -Encoding utf8 (Join-Path $env:DATA "$tag-source-tileir-sass.txt")
+            "SASS_EXIT=$LASTEXITCODE TAG=$tag" | Add-Content (Join-Path $env:OUT 'export-status.txt')
+          }
+          Get-ChildItem $env:DATA -File | Select-Object Name,Length | Format-Table -AutoSize | Out-File (Join-Path $env:OUT 'data-inventory.txt')
+
+      - name: Restore verified capture artifact when local manifest is incomplete
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OUT: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current'
+          SCREENS: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current\screenshots'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifestPath = Join-Path $env:SCREENS 'capture-manifest.json'
+          $isComplete = $false
+          if (Test-Path $manifestPath) {
+            $m = Get-Content $manifestPath -Raw | ConvertFrom-Json
+            $groups = @{}
+            $allFiles = $true
+            foreach ($c in @($m.captures)) {
+              $tag = [IO.Path]::GetFileName([string]$c.report)
+              if (-not $groups.ContainsKey($tag)) { $groups[$tag] = 0 }
+              $groups[$tag]++
+              if (-not (Test-Path ([string]$c.screenshot))) { $allFiles = $false }
+            }
+            $isComplete = $m.captures.Count -ge 60 -and $groups.Count -eq 2 -and
+              @($groups.Values | Where-Object { $_ -lt 30 }).Count -eq 0 -and
+              @($m.skipped).Count -eq 0 -and $allFiles
+          }
+          if ($isComplete) {
+            Write-Host "Local manifest is already complete; no artifact restore needed."
+            exit 0
+          }
+
+          $archive = Join-Path $env:TEMP 'medium-d128-verified-capture-13042434866.zip'
+          $extract = Join-Path $env:TEMP 'medium-d128-verified-capture-13042434866'
+          if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $extract | Out-Null
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          Invoke-WebRequest -Method Get -Uri 'https://api.github.com/repos/xemptynothing/gpu-nvidia/actions/artifacts/13042434866/zip' -Headers $headers -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $extract -Force
+
+          $sourceManifest = Join-Path $extract 'capture-manifest.json'
+          if (-not (Test-Path $sourceManifest)) { throw 'Verified capture artifact has no capture-manifest.json' }
+          $m = Get-Content $sourceManifest -Raw | ConvertFrom-Json
+          $groups = @{}
+          $missing = @()
+          foreach ($capture in @($m.captures)) {
+            $tag = [IO.Path]::GetFileName([string]$capture.report)
+            if (-not $groups.ContainsKey($tag)) { $groups[$tag] = 0 }
+            $groups[$tag]++
+            $fileName = [IO.Path]::GetFileName([string]$capture.screenshot)
+            if (-not (Test-Path (Join-Path (Join-Path $extract 'screenshots') $fileName))) { $missing += $fileName }
+          }
+          if ($m.captures.Count -ne 64 -or $groups.Count -ne 2 -or @($m.skipped).Count -ne 0 -or $missing.Count -gt 0) {
+            throw "Artifact 13042434866 failed integrity check: captures=$($m.captures.Count), skipped=$(@($m.skipped).Count), missing=$($missing.Count)"
+          }
+
+          New-Item -ItemType Directory -Force -Path $env:OUT,$env:SCREENS,(Join-Path $env:OUT 'data') | Out-Null
+          Copy-Item (Join-Path $extract 'data\*') (Join-Path $env:OUT 'data') -Recurse -Force
+          Copy-Item (Join-Path $extract 'screenshots\*') $env:SCREENS -Recurse -Force
+          Copy-Item $sourceManifest $manifestPath -Force
+          foreach ($file in @('environment.txt','input-report-inventory.txt','export-status.txt','data-inventory.txt','metric-comparison.csv','metric-analysis.md','source-instruction-counts.csv')) {
+            $source = Join-Path $extract $file
+            if (Test-Path $source) { Copy-Item $source (Join-Path $env:OUT $file) -Force }
+          }
+          'RESTORED_ARTIFACT=13042434866' | Set-Content (Join-Path $env:OUT 'capture-restore-status.txt')
+          "CAPTURES=$($m.captures.Count)" | Add-Content (Join-Path $env:OUT 'capture-restore-status.txt')
+          "REPORT_GROUPS=$($groups.Count)" | Add-Content (Join-Path $env:OUT 'capture-restore-status.txt')
+
+      - name: Capture real GUI screenshots from both reports
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ROOT: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          EXP: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742'
+          OUT: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current'
+          SCREENS: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current\screenshots'
+          NCU: 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          PY: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifestPath = Join-Path $env:SCREENS 'capture-manifest.json'
+          if (Test-Path $manifestPath) {
+            $existing = Get-Content $manifestPath -Raw | ConvertFrom-Json
+            $counts = @{}
+            $allFilesExist = $true
+            foreach ($capture in @($existing.captures)) {
+              $tag = [IO.Path]::GetFileName([string]$capture.report)
+              if (-not $counts.ContainsKey($tag)) { $counts[$tag] = 0 }
+              $counts[$tag]++
+              if (-not (Test-Path ([string]$capture.screenshot))) { $allFilesExist = $false }
+            }
+            $complete = $existing.captures.Count -ge 50 -and $counts.Count -eq 2 -and
+              @($counts.Values | Where-Object { $_ -lt 25 }).Count -eq 0 -and
+              @($existing.skipped).Count -eq 0 -and $allFilesExist
+            if ($complete) {
+              "COUNT=$($existing.captures.Count)" | Set-Content (Join-Path $env:OUT 'screenshot-status.txt')
+              'STATUS=reused-verified-complete-capture' | Add-Content (Join-Path $env:OUT 'screenshot-status.txt')
+              Write-Host "Reusing $($existing.captures.Count) verified screenshots from the experiment directory; both report groups and every image file exist."
+              exit 0
+            }
+          }
+          $script = Join-Path $env:ROOT 'scripts\capture_ncu_analysis_screenshots.py'
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $item = Invoke-RestMethod -Method Get -Uri 'https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/scripts/capture_ncu_analysis_screenshots.py?ref=main' -Headers $headers
+          if ($item.type -ne 'file' -or -not $item.content) { throw 'Could not fetch screenshot helper from the current repository revision.' }
+          [IO.File]::WriteAllBytes($script,[Convert]::FromBase64String(($item.content -replace '\s','')))
+          $reports = @((Join-Path $env:EXP 'medium_d128_64x64.ncu-repz'),(Join-Path $env:EXP 'medium_d128_64x128.ncu-repz'))
+          & $env:PY $script --ncu-exe $env:NCU --output-dir $env:SCREENS --reports $reports --wait-seconds 45
+          if ($LASTEXITCODE -ne 0) { throw 'Screenshot capture failed' }
+          $m = Get-Content (Join-Path $env:SCREENS 'capture-manifest.json') -Raw | ConvertFrom-Json
+          "COUNT=$($m.captures.Count)" | Set-Content (Join-Path $env:OUT 'screenshot-status.txt')
+          "STATUS=$($m.status)" | Add-Content (Join-Path $env:OUT 'screenshot-status.txt')
+          $counts = @{}
+          foreach ($c in $m.captures) { $tag = [IO.Path]::GetFileName([string]$c.report); if (-not $counts.ContainsKey($tag)) { $counts[$tag] = 0 }; $counts[$tag]++ }
+          if ($m.captures.Count -lt 50 -or $counts.Count -ne 2 -or @($counts.Values | Where-Object { $_ -lt 25 }).Count -gt 0) { throw "Expected 25 validated screenshots per report (50 total); got $($m.captures.Count): $($counts | ConvertTo-Json -Compress)" }
+
+      - name: Generate the evidence-led README and screenshot register
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          ROOT: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          PY: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
+          OUT: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current'
+          DATA: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current\data'
+          SCREENS: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current\screenshots'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = Join-Path $env:SCREENS 'capture-manifest.json'
+          $scripts = Join-Path $env:GITHUB_WORKSPACE 'scripts'
+          & $env:PY (Join-Path $scripts 'analyze_ncu_raw_metrics.py') --data-dir $env:DATA --out-dir $env:OUT --manifest $manifest
+          if ($LASTEXITCODE -ne 0) { throw "Metric analysis failed with exit code $LASTEXITCODE" }
+          & $env:PY (Join-Path $scripts 'build_ncu_report.py') --out-dir $env:OUT --manifest $manifest
+          if ($LASTEXITCODE -ne 0) { throw "README generation failed with exit code $LASTEXITCODE" }
+          Copy-Item $manifest (Join-Path $env:OUT 'capture-manifest.json') -Force
+          $readme = Join-Path $env:OUT 'README.md'
+          $notes = Join-Path $env:OUT 'screenshot-notes.md'
+          if (-not (Test-Path $readme) -or -not (Test-Path $notes)) { throw 'Expected README or screenshot-notes pointer is missing.' }
+          $readmeText = Get-Content -Raw $readme
+          $imageEmbeds = ([regex]::Matches($readmeText, '!\[[^\]]*\]\(')).Count
+          $registerEntries = ([regex]::Matches($readmeText, '### `medium_d128_.*\.png`')).Count
+          if ($imageEmbeds -gt 12) { throw "README has duplicate image embeds ($imageEmbeds); expected only the key-point image subset." }
+          if ($registerEntries -lt 60) { throw "README has too few screenshot-register entries ($registerEntries)." }
+          if ((Get-Content -Raw $notes) -match '!\[') { throw 'screenshot-notes.md unexpectedly duplicates the image gallery.' }
+          "README_IMAGE_EMBEDS=$imageEmbeds" | Set-Content (Join-Path $env:OUT 'report-validation.txt')
+          "README_REGISTER_ENTRIES=$registerEntries" | Add-Content (Join-Path $env:OUT 'report-validation.txt')
+
+      - name: Upload analysis bundle from the self-hosted runner
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: medium-d128-current-ncu-analysis
+          path: C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\20261027-230742\ncu-analysis-current\
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,65 @@
+name: NCU runner preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ncu-runner-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runner:
+    name: Confirm the local Windows runner can execute
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 20
+    steps:
+      - name: Runner and existing report preflight
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          if (-not (Test-Path -LiteralPath $root)) { throw "Project missing: $root" }
+          $report = Join-Path $root 'results\ncu\rtx4060\legal-matrix-41206212024\long_d128-tq128-tk128-lat0\long_d128-tq128-tk128-lat0.ncu-repz'
+          if (-not (Test-Path -LiteralPath $report)) { throw "Existing report missing: $report" }
+          nvidia-smi --query-gpu=name,driver_version,compute_cap --format=csv
+          if ($LASTEXITCODE -ne 0) { throw 'nvidia-smi failed' }
+          Write-Host "NCU_RUNNER_PREFLIGHT=PASS"
+          Write-Host "PROFILE_RECAPTURE=NO"
+
+      - name: Probe the live Nsight right-view selector and right-metrics pane
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          $helper = Join-Path $root 'scripts\capture_ncu_analysis_screenshots.py'
+          $probe = Join-Path $root 'scripts\probe_ncu_rightmetrics.py'
+          $ncu = 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          $report = Join-Path $root 'results\ncu\rtx4060\legal-matrix-41206212024\long_d128-tq128-tk128-lat0\long_d128-tq128-tk128-lat0.ncu-repz'
+          foreach ($p in @($py,$ncu,$report)) { if (-not (Test-Path -LiteralPath $p)) { throw "Missing: $p" } }
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          foreach ($entry in @(@{Path='scripts/capture_ncu_analysis_screenshots.py';Destination=$helper},@{Path='scripts/probe_ncu_rightmetrics.py';Destination=$probe})) {
+            $uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/$($entry.Path)?ref=$env:GH_SHA"
+            $item = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers
+            if ($item.type -ne 'file' -or -not $item.content) { throw "Could not retrieve $($entry.Path) at $env:GH_SHA" }
+            [IO.File]::WriteAllBytes($entry.Destination,[Convert]::FromBase64String(($item.content -replace '\s','')))
+          }
+          $out = Join-Path $root ('results\ncu\rtx4060\legal-matrix-41206212024\rightmetrics-probe-' + $env:GITHUB_RUN_ID)
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          & $py $probe --ncu $ncu --helper $helper --report $report --out $out
+          if ($LASTEXITCODE -ne 0) { throw "Right-pane probe failed: $LASTEXITCODE" }
+          Write-Host "RIGHT_METRICS_PROBE=COMPLETE"
+
+      - name: Upload targeted right-view probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncu-rightmetrics-probe-${{ github.run_id }}
+          path: C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\rightmetrics-probe-${{ github.run_id }}\
+          if-no-files-found: warn
+          retention-days: 30

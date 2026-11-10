@@ -1,0 +1,205 @@
+name: Focused RTX 4060 CUDA PyTorch SDPA reference comparison
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-sdpa-reference.yml"
+      - "scripts/benchmark_torch_sdpa.py"
+      - "src/torch_reference.py"
+      - "src/reference.py"
+      - "src/cutile_attention.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sdpa-reference:
+    runs-on: [self-hosted, windows, x64, local]
+    timeout-minutes: 60
+    steps:
+      - name: Fetch the exact workflow source commit through GitHub API
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $Workspace = $env:GITHUB_WORKSPACE
+          $Stage = Join-Path $env:RUNNER_TEMP ("sdpa-source-" + $env:GITHUB_SHA)
+          $Archive = Join-Path $env:RUNNER_TEMP ("sdpa-source-" + $env:GITHUB_SHA + ".zip")
+          if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+          if (Test-Path -LiteralPath $Archive) { Remove-Item -LiteralPath $Archive -Force }
+          New-Item -ItemType Directory -Force -Path $Stage | Out-Null
+          $Headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+            'User-Agent' = 'gpu-nvidia-sdpa-reference'
+          }
+          $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/zipball/$env:GITHUB_SHA"
+          $Downloaded = $false
+          for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
+            try {
+              Invoke-WebRequest -Method Get -Uri $Uri -Headers $Headers -OutFile $Archive -TimeoutSec 120 -MaximumRedirection 10 -UseBasicParsing
+              if (-not (Test-Path -LiteralPath $Archive) -or (Get-Item -LiteralPath $Archive).Length -lt 10000) {
+                throw 'GitHub archive download returned a missing or implausibly small file.'
+              }
+              $Downloaded = $true
+              break
+            } catch {
+              if ($Attempt -eq 6) { throw "Unable to fetch exact source archive after $Attempt attempts: $($_.Exception.Message)" }
+              Write-Warning "Source archive attempt $Attempt failed: $($_.Exception.Message)"
+              Start-Sleep -Seconds ([Math]::Min(15, 2 * $Attempt))
+            }
+          }
+          if (-not $Downloaded) { throw 'Source archive download did not complete.' }
+          Expand-Archive -LiteralPath $Archive -DestinationPath $Stage -Force
+          $RepositoryRoot = Get-ChildItem -LiteralPath $Stage -Directory | Select-Object -First 1
+          if (-not $RepositoryRoot) { throw 'Downloaded source archive has no repository root folder.' }
+          if (-not (Test-Path -LiteralPath $Workspace)) { New-Item -ItemType Directory -Force -Path $Workspace | Out-Null }
+          Get-ChildItem -LiteralPath $Workspace -Force | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+          Get-ChildItem -LiteralPath $RepositoryRoot.FullName -Force | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $Workspace -Recurse -Force }
+          if (-not (Test-Path -LiteralPath (Join-Path $Workspace 'scripts/benchmark_torch_sdpa.py'))) {
+            throw 'Exact source archive is missing scripts/benchmark_torch_sdpa.py.'
+          }
+          "SOURCE_COMMIT=$env:GITHUB_SHA" | Write-Host
+          "SOURCE_ARCHIVE_BYTES=$((Get-Item -LiteralPath $Archive).Length)" | Write-Host
+
+      - name: Verify CUDA PyTorch, CuPy, cuTile and RTX 4060 availability
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path -LiteralPath $Py)) { throw "GPU project Python environment missing: $Py" }
+          $NvidiaSmi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
+          if (-not $NvidiaSmi) { $NvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue }
+          if (-not $NvidiaSmi) { throw 'nvidia-smi is not available.' }
+          & $NvidiaSmi.Source --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader | Tee-Object -FilePath sdpa-gpu-inventory.log
+          if ($LASTEXITCODE -ne 0) { throw 'GPU inventory failed.' }
+          & $Py -c "import torch, cupy, cuda.tile; print('TORCH='+torch.__version__); print('TORCH_CUDA='+str(torch.version.cuda)); print('TORCH_CUDA_AVAILABLE='+str(torch.cuda.is_available())); print('CUPY='+cupy.__version__); print('CUTILE='+__import__('importlib.metadata',fromlist=['version']).version('cuda-tile'))" 2>&1 | Tee-Object -FilePath sdpa-environment.log
+          if ($LASTEXITCODE -ne 0) { throw 'GPU stack import failed.' }
+
+      - name: Run the three-session SDPA versus cuTile timing and correctness comparison
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+
+          # Kineto emits a USDT profiler_start diagnostic on stderr on Windows.
+          # Keep it in the log; fail only on Python's actual nonzero exit status.
+          $PreviousErrorPreference = $ErrorActionPreference
+          $ErrorActionPreference = 'Continue'
+          & $Py scripts/benchmark_torch_sdpa.py --output results/cutile-vs-pytorch-sdpa.json --warmup 10 --iterations 30 --repeats-per-sample 5 2>&1 | Tee-Object -FilePath cutile-torch-sdpa.log
+          $PythonExit = $LASTEXITCODE
+          $ErrorActionPreference = $PreviousErrorPreference
+          if ($PythonExit -ne 0) {
+            Get-Content -LiteralPath cutile-torch-sdpa.log -Tail 120 | Write-Host
+            throw "PyTorch SDPA benchmark exited with code $PythonExit."
+          }
+          foreach ($path in @('results/cutile-vs-pytorch-sdpa.json','results/cutile-vs-pytorch-sdpa.csv')) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "SDPA benchmark did not produce $path." }
+            if ((Get-Item -LiteralPath $path).Length -lt 100) { throw "SDPA report appears empty: $path." }
+          }
+          $Report = Get-Content -LiteralPath 'results/cutile-vs-pytorch-sdpa.json' -Raw | ConvertFrom-Json
+          if ($Report.framework_fp32_reference.cases_checked -lt 6 -or -not $Report.framework_fp32_reference.all_correctness_pass) {
+            throw 'The assignment-required FP32 CUDA PyTorch framework reference did not pass for all distinct workloads.'
+          }
+          if (@($Report.summary).Count -ne 10) { throw "Expected 10 legal framework comparison configurations; found $(@($Report.summary).Count)." }
+          if (@($Report.raw_sessions).Count -ne 30) { throw "Expected 30 paired session/config rows; found $(@($Report.raw_sessions).Count)." }
+          if (@($Report.summary | Where-Object { -not $_.all_correctness_pass }).Count -ne 0) {
+            throw 'At least one PyTorch SDPA/cuTile/NumPy comparison did not pass correctness.'
+          }
+          if (@($Report.summary | Where-Object { $_.session_count -ne 3 }).Count -ne 0) {
+            throw 'At least one framework comparison is missing one of its three sessions.'
+          }
+          "SDPA_CONFIGS=10 SESSIONS=3 RAW_ROWS=30 ALL_CORRECTNESS_PASS=True" | Tee-Object -FilePath cutile-torch-sdpa-status.log
+          "SDPA_REPORT_JSON=results/cutile-vs-pytorch-sdpa.json" | Add-Content cutile-torch-sdpa-status.log
+          "SDPA_REPORT_CSV=results/cutile-vs-pytorch-sdpa.csv" | Add-Content cutile-torch-sdpa-status.log
+
+      - name: Publish framework comparison outputs and logs to main
+        if: always()
+        continue-on-error: false
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $Files = @()
+          foreach ($path in @('cutile-torch-sdpa.log','cutile-torch-sdpa-status.log','sdpa-gpu-inventory.log','sdpa-environment.log')) {
+            if (Test-Path -LiteralPath $path) { $Files += Get-Item -LiteralPath $path }
+          }
+          foreach ($path in @('results/cutile-vs-pytorch-sdpa.json','results/cutile-vs-pytorch-sdpa.csv')) {
+            if (Test-Path -LiteralPath $path) { $Files += Get-Item -LiteralPath $path }
+          }
+          if ($Files.Count -eq 0) { throw 'No SDPA output or diagnostic files exist to publish.' }
+
+          $Headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+            'User-Agent' = 'gpu-nvidia-sdpa-publisher'
+          }
+          function Invoke-GitHubApi {
+            param([string]$Method,[string]$Path,[object]$Body=$null)
+            $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia$Path"
+            for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
+              try {
+                if ($null -eq $Body) { return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -TimeoutSec 180 }
+                $Json = $Body | ConvertTo-Json -Depth 60 -Compress
+                return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -Body $Json -ContentType 'application/json; charset=utf-8' -TimeoutSec 180
+              } catch {
+                $Status = 0
+                try { $Status = [int]$_.Exception.Response.StatusCode } catch {}
+                if ($Status -in @(401,403,404,422) -or $Attempt -eq 6) { throw }
+                Write-Warning "GitHub REST $Method $Path attempt $Attempt failed: $($_.Exception.Message)"
+                Start-Sleep -Seconds ([Math]::Min(20,2*$Attempt))
+              }
+            }
+          }
+
+          $RunRoot = "results/sdpa-reference/$env:GITHUB_RUN_ID"
+          $Entries = @()
+          foreach ($file in $Files) {
+            if ($file.Length -ge 90000000) { throw "SDPA output unexpectedly exceeds 90 MB: $($file.FullName)" }
+            $relative = $file.FullName.Substring((Get-Location).Path.TrimEnd('\').Length+1).Replace('\','/')
+            $content = [System.IO.File]::ReadAllText($file.FullName,[System.Text.Encoding]::UTF8)
+            $blob = Invoke-GitHubApi -Method POST -Path '/git/blobs' -Body @{content=$content;encoding='utf-8'}
+            $Entries += @{path="$RunRoot/$relative";mode='100644';type='blob';sha=$blob.sha}
+          }
+          $manifest = [pscustomobject]@{
+            run_id = $env:GITHUB_RUN_ID
+            source_commit = $env:GITHUB_SHA
+            gpu = 'NVIDIA GeForce RTX 4060 / compute capability 8.9'
+            file_count = $Entries.Count
+            files = @($Entries | ForEach-Object { $_.path })
+            created_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+          }
+          $manifestContent = $manifest | ConvertTo-Json -Depth 8
+          $manifestBlob = Invoke-GitHubApi -Method POST -Path '/git/blobs' -Body @{content=$manifestContent;encoding='utf-8'}
+          $Entries += @{path="$RunRoot/evidence-manifest.json";mode='100644';type='blob';sha=$manifestBlob.sha}
+
+          $Committed = $false
+          for ($Attempt = 1; $Attempt -le 4; $Attempt++) {
+            $ref = Invoke-GitHubApi -Method GET -Path '/git/ref/heads/main'
+            $parent = $ref.object.sha
+            $parentCommit = Invoke-GitHubApi -Method GET -Path "/git/commits/$parent"
+            $tree = Invoke-GitHubApi -Method POST -Path '/git/trees' -Body @{base_tree=$parentCommit.tree.sha;tree=$Entries}
+            $commit = Invoke-GitHubApi -Method POST -Path '/git/commits' -Body @{message="Publish CUDA PyTorch SDPA reference comparison from run $env:GITHUB_RUN_ID";tree=$tree.sha;parents=@($parent)}
+            try {
+              $null = Invoke-GitHubApi -Method PATCH -Path '/git/refs/heads/main' -Body @{sha=$commit.sha;force=$false}
+              "SDPA_EVIDENCE_COMMIT=$($commit.sha) FILES=$($Entries.Count)" | Write-Host
+              $Committed = $true
+              break
+            } catch {
+              if ($Attempt -eq 4) { throw }
+              Write-Warning 'SDPA evidence ref update raced with another main push; retrying.'
+              Start-Sleep -Seconds (2*$Attempt)
+            }
+          }
+          if (-not $Committed) { throw 'SDPA evidence commit was not published.' }

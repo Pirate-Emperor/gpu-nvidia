@@ -1,0 +1,212 @@
+name: Corrected four-pane SASS and PTX horizontal evidence for 27 NCU profiles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ncu-27-targeted-horizontal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  capture:
+    name: Probe actual four-pane movement from existing native reports
+    runs-on: [self-hosted, windows, x64, local]
+    timeout-minutes: 180
+    env:
+      RUN_ID: ${{ github.run_id }}
+      SOURCE_SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+      LIMIT_PROFILES: "27"
+      OUT_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\targeted-horizontal-${{ github.run_id }}'
+    steps:
+      - name: Verify existing NCU reports and RTX 4060
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $runDir = Join-Path $root 'results\ncu\rtx4060\legal-matrix-41206212024'
+          $ncu = 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          $helper = Join-Path $root 'scripts\capture_ncu_analysis_screenshots.py'
+          foreach ($p in @($root,$runDir,$ncu,$py,$helper)) { if (-not (Test-Path -LiteralPath $p)) { throw "Required path missing: $p" } }
+          $reports = @(Get-ChildItem -LiteralPath $runDir -Filter '*.ncu-repz' -File -Recurse | Sort-Object FullName)
+          if ($reports.Count -ne 27) { throw "Expected 27 existing reports; found $($reports.Count)" }
+          foreach ($r in $reports) {
+            $stPath = Join-Path $r.DirectoryName 'status.json'
+            if (-not (Test-Path $stPath)) { throw "Missing status.json beside $($r.FullName)" }
+            $st = Get-Content -LiteralPath $stPath -Raw | ConvertFrom-Json
+            if ($st.status -ne 'PASS') { throw "Report not PASS: $($r.FullName)" }
+          }
+          $gpu = (nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total --format=csv 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $gpu -notmatch 'RTX 4060') { throw "Expected RTX 4060; got $gpu" }
+          $out = Join-Path $runDir ("targeted-horizontal-" + $env:RUN_ID)
+          if (Test-Path $out) { throw "Refusing to overwrite existing output: $out" }
+          New-Item -ItemType Directory -Force -Path (Join-Path $out 'screenshots'),(Join-Path $out 'checks') | Out-Null
+          @("RUN_ID=$env:RUN_ID","SOURCE_SHA=$env:SOURCE_SHA","GPU=$gpu","NATIVE_REPORTS=27","PROFILE_RECAPTURE=NO","LIMIT_PROFILES=$env:LIMIT_PROFILES") | Set-Content -Encoding utf8 (Join-Path $out 'capture-environment.txt')
+          Write-Host "EXISTING_REPORTS=27"
+          Write-Host "GPU=$gpu"
+          Write-Host "OUT=$out"
+
+      - name: Capture and verify each pane with pane-local pixel comparison
+        id: capture
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          RUN_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024'
+          OUT_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\targeted-horizontal-${{ github.run_id }}'
+          NCU: 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          PY: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
+          HELPER: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\scripts\capture_ncu_analysis_screenshots.py'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The checked-in Python capture body is intentionally kept intact; only the profile
+          # limit changes from a one-profile probe to the complete 27-profile matrix.
+          $script = Join-Path $env:RUNNER_TEMP ("capture_ncu_panes_" + $env:GITHUB_RUN_ID + ".py")
+          $workflow = (Get-Content -LiteralPath $env:GITHUB_WORKFLOW_REF -Raw -ErrorAction SilentlyContinue)
+          $code = @'
+          import argparse, ctypes, hashlib, importlib.util, json, subprocess, time, csv, struct, zlib
+          from pathlib import Path
+          PANELS={"left-code":{"x":0.14,"box":(0.025,0.29,0.315,0.80)},"left-metrics":{"x":0.34,"box":(0.315,0.29,0.495,0.80)},"right-code":{"x":0.56,"box":(0.430,0.29,0.675,0.80)},"right-metrics":{"x":0.75,"box":(0.675,0.29,0.825,0.80)}}
+          WM_MOUSEHWHEEL=0x020E
+          def sha_bytes(data): return hashlib.sha256(data).hexdigest()
+          def read_png(path):
+            data=Path(path).read_bytes()
+            if data[:8]!=b"\x89PNG\r\n\x1a\n": raise RuntimeError(f"Not PNG: {path}")
+            pos=8;w=h=depth=ctype=interlace=None;chunks=[]
+            while pos<len(data):
+              n=struct.unpack(">I",data[pos:pos+4])[0];k=data[pos+4:pos+8];v=data[pos+8:pos+8+n];pos+=12+n
+              if k==b"IHDR":w,h,depth,ctype,comp,filt,interlace=struct.unpack(">IIBBBBB",v)
+              elif k==b"IDAT":chunks.append(v)
+              elif k==b"IEND":break
+            if (depth,ctype,interlace)!=(8,6,0):raise RuntimeError("Unsupported PNG encoding")
+            raw=zlib.decompress(b"".join(chunks));stride=w*4+1
+            if len(raw)!=stride*h:raise RuntimeError("PNG size mismatch")
+            return w,h,raw,stride
+          def crop(path,box):
+            w,h,raw,stride=read_png(path);x1,y1,x2,y2=(int(box[0]*w),int(box[1]*h),int(box[2]*w),int(box[3]*h));out=bytearray()
+            for y in range(y1,y2):out.extend(raw[y*stride+1+x1*4:y*stride+1+x2*4])
+            return bytes(out),x2-x1,y2-y1
+          def compare(a,b,box):
+            aa,w,h=crop(a,box);bb,w2,h2=crop(b,box)
+            if (w,h)!=(w2,h2):raise RuntimeError("crop size mismatch")
+            changed=total=0
+            for i in range(0,len(aa),4):
+              d=abs(aa[i]-bb[i])+abs(aa[i+1]-bb[i+1])+abs(aa[i+2]-bb[i+2]);total+=d;changed+=bool(d)
+            return {"changed_pixel_fraction":changed/(w*h),"mean_abs_channel_delta":total/(w*h*3)}
+          def main():
+            ap=argparse.ArgumentParser()
+            for flag,kw in [("--ncu-exe",{"type":Path,"required":True}),("--helper",{"type":Path,"required":True}),("--out-dir",{"type":Path,"required":True}),("--run-id",{"required":True}),("--reports",{"nargs":"+","type":Path,"required":True})]:ap.add_argument(flag,**kw)
+            a=ap.parse_args();sp=importlib.util.spec_from_file_location("cap",a.helper);cap=importlib.util.module_from_spec(sp);sp.loader.exec_module(cap);ui=cap._ui_path(a.ncu_exe)
+            if not ui:raise RuntimeError("ncu-ui.exe not found")
+            screens=a.out_dir/"screenshots";screens.mkdir(parents=True,exist_ok=True)
+            m={"workflow_run_id":int(a.run_id),"capture_method":"Nsight GUI PrintWindow; existing reports only","native_report_source":"Existing .ncu-repz; no kernel replay","hardware":"RTX 4060 / SM89","capture_dimensions":[1936,1048],"panels":PANELS,"profiles":[],"captures":[],"failures":[]}
+            for report in a.reports:
+              report=report.resolve();profile=report.parent.name;p=None;pr={"profile":profile,"modes":[]}
+              try:
+                p=subprocess.Popen([str(ui),str(report)],cwd=str(report.parent),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                win=cap._wait_window(p.pid,report.stem,60) or cap._wait_window(None,report.stem,10)
+                if not win:raise RuntimeError("NCU report window not found")
+                hwnd=win["hwnd"];cap.user32.ShowWindow(cap.HWND(hwnd),3);cap.user32.SetForegroundWindow(cap.HWND(hwnd));time.sleep(1.2)
+                rect=cap.RECT()
+                if not cap.user32.GetWindowRect(cap.HWND(hwnd),ctypes.byref(rect)):raise RuntimeError("GetWindowRect failed")
+                w,h=rect.right-rect.left,rect.bottom-rect.top
+                if w<1800 or h<900:raise RuntimeError(f"Window not maximized: {w}x{h}")
+                cap._click_relative(hwnd,230,212,verify_y=225)
+                for mode,key in (("sass","S"),("ptx","P")):
+                  cap._click_at(hwnd,300,253,pause=.25);cap._type_key(ord(key));cap._type_key(0x0D);time.sleep(.8)
+                  base=screens/f"{profile}-{mode}-baseline.png";cap._capture(hwnd,base)
+                  if read_png(base)[:2]!=(1936,1048):raise RuntimeError("Wrong baseline dimensions")
+                  mr={"mode":mode,"baseline":base.name,"panels":[]}
+                  for panel,ps in PANELS.items():
+                    x=rect.left+int(w*ps["x"]);y=rect.top+int(h*.55);cap.user32.SetCursorPos(x,y);time.sleep(.15)
+                    target=cap.user32.WindowFromPoint(cap.POINT(x,y))
+                    cap.user32.mouse_event(cap.MOUSEEVENTF_HWHEEL,0,0,ctypes.c_uint32((120*12)&0xffffffff).value,None);time.sleep(.75)
+                    cap.user32.SetCursorPos(rect.left+int(w*.98),rect.top+int(h*.04));time.sleep(.2)
+                    dest=screens/f"{profile}-{mode}-scroll-{panel}.png";cap._capture(hwnd,dest)
+                    delta=compare(base,dest,ps["box"]);fallback=False
+                    if delta["changed_pixel_fraction"]<.001:
+                      pt=cap.POINT(x,y);cap.user32.ScreenToClient(target,ctypes.byref(pt));packed=((pt.y&0xffff)<<16)|(pt.x&0xffff);wp=((120*12)&0xffff)<<16
+                      cap.user32.PostMessageW(target,WM_MOUSEHWHEEL,wp,packed);cap.user32.PostMessageW(cap.HWND(hwnd),WM_MOUSEHWHEEL,wp,packed);fallback=True;time.sleep(.8)
+                      cap.user32.SetCursorPos(rect.left+int(w*.98),rect.top+int(h*.04));time.sleep(.2);cap._capture(hwnd,dest);delta=compare(base,dest,ps["box"])
+                    changed=delta["changed_pixel_fraction"]>=.001
+                    cap.user32.SetCursorPos(x,y);time.sleep(.15);cap.user32.mouse_event(cap.MOUSEEVENTF_HWHEEL,0,0,ctypes.c_uint32((-120*12)&0xffffffff).value,None);time.sleep(.75)
+                    cap.user32.SetCursorPos(rect.left+int(w*.98),rect.top+int(h*.04));time.sleep(.2)
+                    restore=screens/f"{profile}-{mode}-restore-{panel}.png";cap._capture(hwnd,restore);rest=compare(base,restore,ps["box"])
+                    item={"panel":panel,"target_hwnd":int(target) if target else 0,"screenshot":dest.name,"changed_pixel_fraction":delta["changed_pixel_fraction"],"mean_abs_channel_delta":delta["mean_abs_channel_delta"],"wm_mousehwheel_fallback":fallback,"verified_horizontal_crop_change":changed,"restore_screenshot":restore.name,"restore_changed_pixel_fraction":rest["changed_pixel_fraction"],"restored_to_baseline":rest["changed_pixel_fraction"]<.001}
+                    mr["panels"].append(item);m["captures"].append({"profile":profile,"mode":mode,**item})
+                    if not changed:m["failures"].append({"profile":profile,"mode":mode,"panel":panel,"reason":"pane crop unchanged"})
+                    if not item["restored_to_baseline"]:m["failures"].append({"profile":profile,"mode":mode,"panel":panel,"reason":"inverse scroll not restored"})
+                  pr["modes"].append(mr)
+                m["profiles"].append(pr)
+              except Exception as e:m["failures"].append({"profile":profile,"reason":f"{type(e).__name__}: {e}"})
+              finally:
+                if p:
+                  try:p.terminate()
+                  except Exception:pass
+                  time.sleep(.5)
+            m["status"]="success" if len(m["profiles"])==len(a.reports) and not m["failures"] else "incomplete"
+            (screens/"capture-manifest.json").write_text(json.dumps(m,indent=2),encoding="utf-8")
+            with (a.out_dir/"pane-index.csv").open("w",newline="",encoding="utf-8") as f:
+              cw=csv.writer(f);cw.writerow(["profile","mode","pane","file","changed_fraction","restored","restore_fraction"])
+              for x in m["captures"]:cw.writerow([x["profile"],x["mode"],x["panel"],x["screenshot"],x["changed_pixel_fraction"],x["restored_to_baseline"],x["restore_changed_pixel_fraction"]])
+            print(f"PROFILES_CAPTURED={len(m['profiles'])}; PANE_CAPTURES={len(m['captures'])}; FAILURES={len(m['failures'])}")
+            return 0 if m["status"]=="success" else 2
+          if __name__=="__main__":raise SystemExit(main())
+          '@
+          [IO.File]::WriteAllText($script,$code,[Text.UTF8Encoding]::new($false))
+          $reports = @(Get-ChildItem -LiteralPath $env:RUN_DIR -Filter '*.ncu-repz' -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName })
+          if ($reports.Count -ne 27) { throw "Expected 27 reports; found $($reports.Count)" }
+          if ($env:LIMIT_PROFILES -eq '1') { $reports = @($reports | Select-Object -First 1) }
+          $argsList = @('--ncu-exe',$env:NCU,'--helper',$env:HELPER,'--out-dir',$env:OUT_DIR,'--run-id',$env:GITHUB_RUN_ID,'--reports') + $reports
+          & $env:PY $script @argsList
+          if ($LASTEXITCODE -ne 0) { throw "Pane movement validation failed: $LASTEXITCODE" }
+
+      - name: Publish captured PNGs as one Git tree commit (no external upload action)
+        if: always()
+        env:
+          PY: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
+          OUT_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\targeted-horizontal-${{ github.run_id }}'
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $publisher = @'
+          import base64, json, os, pathlib, urllib.request, urllib.error, sys
+          repo="xemptynothing/gpu-nvidia";token=os.environ["GH_TOKEN"];run_id=os.environ["RUN_ID"];source=os.environ["SOURCE_SHA"];out=pathlib.Path(os.environ["OUT_DIR"])
+          api=f"https://api.github.com/repos/{repo}";headers={"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}
+          def req(method,path,payload=None):
+            data=None if payload is None else json.dumps(payload).encode();r=urllib.request.Request(api+path,data=data,headers={**headers,**({"Content-Type":"application/json"} if data else {})},method=method)
+            try:
+              with urllib.request.urlopen(r,timeout=90) as x:return json.loads(x.read().decode())
+            except urllib.error.HTTPError as e:raise RuntimeError(f"GitHub HTTP {e.code}: {e.read().decode(errors='replace')[:1600]}")
+          ref=req("GET","/git/ref/heads/main");base=ref["object"]["sha"];commit=req("GET",f"/git/commits/{base}");tree0=commit["tree"]["sha"];entries=[]
+          for p in sorted(out.rglob("*")):
+            if not p.is_file():continue
+            rel=p.relative_to(out).as_posix()
+            if rel.endswith(".pyc") or "__pycache__" in rel:continue
+            dest=f"docs/ncu/rtx4060/27-profile-gui-analysis/horizontal-proof/{run_id}/{rel}";blob=req("POST","/git/blobs",{"content":base64.b64encode(p.read_bytes()).decode(),"encoding":"base64"});entries.append({"path":dest,"mode":"100644","type":"blob","sha":blob["sha"]})
+          if not entries:raise RuntimeError("No proof files")
+          tree=req("POST","/git/trees",{"base_tree":tree0,"tree":entries});commit2=req("POST","/git/commits",{"message":f"Add NCU pane-scroll proof from run {run_id}","tree":tree["sha"],"parents":[base]});req("PATCH","/git/refs/heads/main",{"sha":commit2["sha"],"force":False});print(f"EVIDENCE_COMMIT={commit2['sha']} FILES={len(entries)}")
+          '@
+          $pub = Join-Path $env:RUNNER_TEMP ("publish_ncu_evidence_" + $env:GITHUB_RUN_ID + ".py")
+          [IO.File]::WriteAllText($pub,$publisher,[Text.UTF8Encoding]::new($false))
+          & $env:PY $pub
+          if ($LASTEXITCODE -ne 0) { throw "Git publication failed: $LASTEXITCODE" }
+
+      - name: Publish status marker
+        if: always()
+        env:
+          JOB_RESULT: ${{ steps.capture.outcome }}
+          OUT_DIR: 'C:\\Users\\Public\\GPU-cutile-project\\gpu-nvidia\\results\\ncu\\rtx4060\\legal-matrix-41206212024\\targeted-horizontal-${{ github.run_id }}'
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $mp = Join-Path $env:OUT_DIR 'screenshots\capture-manifest.json'
+          $n=0;$p=0;$f=1
+          if (Test-Path $mp) {$m=Get-Content -LiteralPath $mp -Raw|ConvertFrom-Json;$n=@($m.captures).Count;$p=@($m.profiles).Count;$f=@($m.failures).Count}
+          $state=if($env:JOB_RESULT -eq 'success' -and $f -eq 0){'success'}else{'failure'}
+          $headers=@{Authorization="Bearer $env:GH_TOKEN";Accept='application/vnd.github+json';'X-GitHub-Api-Version'='2022-11-28'}
+          $body=@{state=$state;target_url="https://github.com/xemptynothing/gpu-nvidia/actions/runs/$env:RUN_ID";description="Pane-local scroll proof: $n captures / $p reports / $f failures";context='ncu-gui-corrected-four-pane-scroll'}|ConvertTo-Json -Depth 4
+          Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/xemptynothing/gpu-nvidia/statuses/$env:SOURCE_SHA" -Headers $headers -ContentType 'application/json' -Body $body|Out-Null

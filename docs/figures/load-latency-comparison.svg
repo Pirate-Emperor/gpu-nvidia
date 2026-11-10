@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500">
+  <rect width="960" height="500" fill="white"/>
+  <text x="480" y="38" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="24" font-weight="bold" fill="#1b2733">Targeted LOAD_LATENCY=10 comparison</text>
+  <text x="480" y="65" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="14" fill="#52606d">Medium D=128 · tile 64×64 · same RTX 4060 source and inputs</text>
+  <g font-family="DejaVu Sans,Arial" font-size="16" fill="#24313d"><text x="235" y="150" text-anchor="end">CUDA-event median</text><text x="235" y="300" text-anchor="end">NCU duration</text></g>
+  <g stroke="#d5dce3" stroke-width="1"><line x1="260" y1="195" x2="835" y2="195"/><line x1="260" y1="345" x2="835" y2="345"/></g>
+  <g fill="#778899"><rect x="260" y="102" width="530" height="44" rx="5"/><rect x="260" y="252" width="464" height="44" rx="5"/></g>
+  <g fill="#2b83ba"><rect x="260" y="154" width="491" height="30" rx="5"/><rect x="260" y="304" width="413" height="30" rx="5"/></g>
+  <g font-family="DejaVu Sans,Arial" font-size="15" font-weight="bold" fill="#17212b">
+    <text x="800" y="130">60.723 µs · hint 0</text><text x="761" y="176">56.320 µs · hint 10</text><text x="735" y="280">53.12 µs · hint 0</text><text x="685" y="326">47.39 µs · hint 10</text>
+  </g>
+  <g font-family="DejaVu Sans,Arial" font-size="13" fill="#52606d"><text x="260" y="220">0</text><text x="835" y="220" text-anchor="end">65 µs</text><text x="260" y="370">0</text><text x="835" y="370" text-anchor="end">65 µs</text></g>
+  <text x="480" y="426" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="14" fill="#33404c">Hint 10 is retained only for this medium workload; longer-batched D=128 keeps the compiler default.</text>
+  <text x="480" y="453" text-anchor="middle" font-family="DejaVu Sans,Arial" font-size="12" fill="#64717d">Higher shared-memory use and unchanged occupancy constrain promotion to a global default.</text>
+</svg>

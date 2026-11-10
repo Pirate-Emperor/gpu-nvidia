@@ -1,0 +1,15 @@
+{
+    "run_id":  "41511770773",
+    "source_commit":  "99e74f9b65b884db6153a1e18a43f1e3beba05a9",
+    "gpu":  "NVIDIA GeForce RTX 4060 / compute capability 8.9",
+    "file_count":  6,
+    "files":  [
+                  "results/sdpa-reference/41511770773/cutile-torch-sdpa.log",
+                  "results/sdpa-reference/41511770773/cutile-torch-sdpa-status.log",
+                  "results/sdpa-reference/41511770773/sdpa-gpu-inventory.log",
+                  "results/sdpa-reference/41511770773/sdpa-environment.log",
+                  "results/sdpa-reference/41511770773/results/cutile-vs-pytorch-sdpa.json",
+                  "results/sdpa-reference/41511770773/results/cutile-vs-pytorch-sdpa.csv"
+              ],
+    "created_at_utc":  "2026-11-02T19:47:19.3649130Z"
+}

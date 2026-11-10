@@ -1,0 +1,684 @@
+{
+    "run_id":  "41511762758",
+    "source_commit":  "a53e7e679aae23b52b70d4a3f546464605f3bc4a",
+    "gpu_target":  "NVIDIA GeForce RTX 4060 / compute capability 8.9",
+    "captured_at_utc":  "2026-11-02T19:54:32.5954467Z",
+    "file_count":  135,
+    "files":  [
+                  {
+                      "path":  "cutile-accuracy.log",
+                      "bytes":  7936,
+                      "sha256":  "4ff8aea124ca2bd58fa4eb2add6cb1720b205d29c474873e5e659b52a4432273"
+                  },
+                  {
+                      "path":  "cutile-benchmark-session1.log",
+                      "bytes":  8978,
+                      "sha256":  "a9cd442090f3c99e66096c9706f8b4c5dcb12c9ea8da13e2ccba844c89b7aace"
+                  },
+                  {
+                      "path":  "cutile-benchmark-session2.log",
+                      "bytes":  9216,
+                      "sha256":  "4366caa3005ca770cf84fb2dbcfe125b8d20d48503a26438c3a0424d90eba986"
+                  },
+                  {
+                      "path":  "cutile-benchmark-session3.log",
+                      "bytes":  8988,
+                      "sha256":  "4974a78b260652b98c120806f919f72de75ea6ea4f97c2dc60dbb633c72f9a01"
+                  },
+                  {
+                      "path":  "cutile-benchmark-summary.log",
+                      "bytes":  1684,
+                      "sha256":  "3f4592cd9f84eb9736fec2bc5794bd2a25906696afa462330c56e130d0a772d7"
+                  },
+                  {
+                      "path":  "cutile-clean-jit.log",
+                      "bytes":  8566,
+                      "sha256":  "34ee937a95e298dc5cd8aaee172a3ef6ddd5010eb18d13b217387e22ef50ba0e"
+                  },
+                  {
+                      "path":  "cutile-cli.log",
+                      "bytes":  212,
+                      "sha256":  "38e92e6feaecadc1251949aec51d34684d57a7afe0911dd8b0c46d1dfd8e840b"
+                  },
+                  {
+                      "path":  "cutile-cli-reference.log",
+                      "bytes":  54,
+                      "sha256":  "3945a0d3bfc25dd81ce29148262aab9b31703a4c36469847300ae950a6c08e53"
+                  },
+                  {
+                      "path":  "cutile-environment.log",
+                      "bytes":  14456,
+                      "sha256":  "73c8c7f678e4bf96680e3dfcb294aef68b7f950c822e925ca05a875a7b5d1166"
+                  },
+                  {
+                      "path":  "cutile-gpu-install.log",
+                      "bytes":  9008,
+                      "sha256":  "6f2f539253186289134e9c6e4a341d1e7ea42e007fb7b70018e39d0eb5723c16"
+                  },
+                  {
+                      "path":  "cutile-install.log",
+                      "bytes":  2692,
+                      "sha256":  "83bbb2a920200453612b4fdf53e30bf83f4c37ff7d43831ef732af484f07598b"
+                  },
+                  {
+                      "path":  "cutile-load-latency-hints.log",
+                      "bytes":  2088,
+                      "sha256":  "cbaa0d35bda8320c663f7f802da5d4435fda3e7f496fa1983860fc085113a0cc"
+                  },
+                  {
+                      "path":  "cutile-optional-objectives.log",
+                      "bytes":  238,
+                      "sha256":  "6bcdfc93ffe3436fc9c90297aad246215b25c74933bcc0fd6d7ec9de3f1258c6"
+                  },
+                  {
+                      "path":  "cutile-pip-freeze.txt",
+                      "bytes":  1416,
+                      "sha256":  "ec0c18c261cb0e4bbe22bc964fad46ee402b6afea188c9cd3a24c2d80782be27"
+                  },
+                  {
+                      "path":  "cutile-profile-long-batched.log",
+                      "bytes":  936,
+                      "sha256":  "454acc788c40f7975d8fa81697728a0c81c6b3413e107b0692020391acd9eb3e"
+                  },
+                  {
+                      "path":  "cutile-profile-medium.log",
+                      "bytes":  908,
+                      "sha256":  "1a61933f98e89b28beb268e6e5e2c83b9b4935d9a063999b6994a5ab023cfb83"
+                  },
+                  {
+                      "path":  "cutile-profile-status.log",
+                      "bytes":  812,
+                      "sha256":  "e2a5095a37623a610d00dc71f28334eb6d44db560ce96722e8663ab7368db68e"
+                  },
+                  {
+                      "path":  "cutile-pytest.log",
+                      "bytes":  240,
+                      "sha256":  "77bcffd6c47f6259489b195840954ae0fdef84954103db49874965d10add831d"
+                  },
+                  {
+                      "path":  "cutile-smoke.log",
+                      "bytes":  1598,
+                      "sha256":  "79cab9072c377da118316e7aef987f48802a189de15217d314a6ad7012a80919"
+                  },
+                  {
+                      "path":  "cutile-torch-sdpa.log",
+                      "bytes":  118,
+                      "sha256":  "995a57853d347b13faa2de1cae76a261c1acf9c2cf0892a16770f38e94450e36"
+                  },
+                  {
+                      "path":  "results/clean-jit-isolated-caches/long_d128-tq64-tk64-40wtphke/worker-result.json",
+                      "bytes":  2483,
+                      "sha256":  "2ad59b6fe642be77caf1d5d52e31c6cb19387c017a1800e8e04240187df91b83"
+                  },
+                  {
+                      "path":  "results/clean-jit-isolated-caches/longer_batched_d128-tq64-tk128-du7fxyzd/worker-result.json",
+                      "bytes":  2475,
+                      "sha256":  "e4cf916e9bf9a3949141ad0d965f9aaf7c2aff5f28eaaaf2d15179a05604753b"
+                  },
+                  {
+                      "path":  "results/cutile-accuracy.json",
+                      "bytes":  22480,
+                      "sha256":  "2c3f12f43924387e6c04dd0af8e98d731f27db650adf18c6d1734e0c75d69176"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session1.csv",
+                      "bytes":  8775,
+                      "sha256":  "61cf483d8972e56fa1c1122cbd8785ff1b731e72f91aee6a46edc9aa1e2f13ff"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session1.json",
+                      "bytes":  28426,
+                      "sha256":  "64ae9e9577c6de5c9f9a80ec93cfe15d539a9b9870dae38172c735f841d59151"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session2.csv",
+                      "bytes":  8823,
+                      "sha256":  "12d186892a89bd394106c97d60f0bc24ba0fab6a4d1363933e500c6b9a5e6bda"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session2.json",
+                      "bytes":  28474,
+                      "sha256":  "ac9e4072f06bdad4048dc6164834d8c59c71acee83dc2cf8c4b46ff6afb0cdf0"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session3.csv",
+                      "bytes":  8829,
+                      "sha256":  "a3f306cdfec242963b6d80a74f35f781aaa23cfbbf48e4478fecbe04dc42ce89"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session3.json",
+                      "bytes":  28480,
+                      "sha256":  "dcfce92abfcabdeedb5ee22e2c9084e377d2801b034723c01c74d186b1744ff8"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-summary.csv",
+                      "bytes":  13221,
+                      "sha256":  "dda323bb2c80f3331a36eb7129243b1d42e6ceef4bf7ac0531653a1f26d3b721"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-summary.json",
+                      "bytes":  35209,
+                      "sha256":  "19c6d10d8753eb6c42166e6214a6680b05ed23666cc845ffed4e633408e42359"
+                  },
+                  {
+                      "path":  "results/cutile-clean-jit.json",
+                      "bytes":  6731,
+                      "sha256":  "494954ab5e8586222e53f0a5221d932913871be7dd6b97a5d0bb5dc653d3a7b2"
+                  },
+                  {
+                      "path":  "results/cutile-load-latency-hints.csv",
+                      "bytes":  4688,
+                      "sha256":  "767e20f7ac7b43fedb41f9d6789350ef21b16c58f3ab0d7ec8b4ad6e20f82917"
+                  },
+                  {
+                      "path":  "results/cutile-load-latency-hints.json",
+                      "bytes":  57199,
+                      "sha256":  "f384a720a5779c8195a23f558dbd465ea7c9a10d77191c1373b68f9a5fe0d45a"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/default.log",
+                      "bytes":  1020,
+                      "sha256":  "40ffff6ad1646e2267069c445db767ed97328eb226a34f7b53e4251a6fb479f6"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/environment.txt",
+                      "bytes":  457,
+                      "sha256":  "d57551650122ded96e9f20133f219539e9026013447814e2311336e60e702509"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/latency10.log",
+                      "bytes":  1032,
+                      "sha256":  "380b188361f7cf3a4db77b2691c64a47db7a618882cf05f0754d6952f8cd6583"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-default-details.csv",
+                      "bytes":  142233,
+                      "sha256":  "dd1507115d8f39011d34d42b1b820b6aecdc4030092fb087e40f96053e71637d"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-default-raw.csv",
+                      "bytes":  42268,
+                      "sha256":  "ea74fdbbd85ff1c6a2ef4f32610e6a3dffc1b45b1df13cc5b693d9d338382d8e"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-latency10-details.csv",
+                      "bytes":  142306,
+                      "sha256":  "dd2848ea9883196b9f1b01696c0c15d2f1c49ae29dc27ea89d9626dd9570b77d"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-latency10-raw.csv",
+                      "bytes":  42272,
+                      "sha256":  "ad336dc55cf4d0a967d6b3e3a639f068b8e8e011e36970f23da7768a217b75e1"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/status.txt",
+                      "bytes":  50,
+                      "sha256":  "52354a895f7e2659c83c246191eaf894562c2e8e09ac7e648e144b30fe28e26b"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-accuracy.log",
+                      "bytes":  3967,
+                      "sha256":  "1f5fde60515327863f03db03dd09a5434bc5614d0caab0612b97266e8632683a"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-benchmark-session1.log",
+                      "bytes":  4603,
+                      "sha256":  "171a7d01b56305b74745c3b18a8ac78274d10a8c21b5d764d3771373b42654b3"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-benchmark-session2.log",
+                      "bytes":  4604,
+                      "sha256":  "ca923b79916a77b64a07e5effde51c328b3a4349a264fafe0d3ce4a245fe753a"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-benchmark-session3.log",
+                      "bytes":  4605,
+                      "sha256":  "74c840fe1fe3f0f2a35eadd880a97e90fe3e9e14ee967da17a390923297f5567"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-benchmark-summary.log",
+                      "bytes":  838,
+                      "sha256":  "45910041dd4362d8f4bf56ed2e899cf24bb2af5d9bc4bea5a5d7102b6baefd73"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-clean-jit.log",
+                      "bytes":  4282,
+                      "sha256":  "17441fbfab19f580530197b6e8a90e4fad247ebe6280e450a1fe7afdae92c342"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-cli.log",
+                      "bytes":  105,
+                      "sha256":  "7d83d082e58c6928362540255a7f0f50cab6880a368d774ba16484caf505a705"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-cli-reference.log",
+                      "bytes":  26,
+                      "sha256":  "db260947055f9b4f113cf5469d9af2dead4e4229cf21a41da206c97cf23c1e0e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-environment.log",
+                      "bytes":  7227,
+                      "sha256":  "fbabaa1fd2cfabee336263c62d6df593996d774cbbe719d31f4ccc1b7ca22994"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-gpu-install.log",
+                      "bytes":  4503,
+                      "sha256":  "c52bd55b77ca8c0b8fab799621cb4cafb85a9dee39e36f58fed12bcd0b0bb2db"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-install.log",
+                      "bytes":  1345,
+                      "sha256":  "f138770bf8ec5e7788d85d23947fde9d9dc93bc72603ed1bc48dc5583e3b027f"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-load-latency-hints.log",
+                      "bytes":  1039,
+                      "sha256":  "70ac9fef03b8ffdd723f0b605f69d54bfc0e0463cf3248a0582bb81a268079a7"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-optional-objectives.log",
+                      "bytes":  118,
+                      "sha256":  "e7f413a8cbf390bcc924844f336696866b36d061a558c472b0747b26705dc331"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-pip-freeze.txt",
+                      "bytes":  707,
+                      "sha256":  "481967397207845adb4843363fb33fa9e5d87f2b69ed5fefc2f08378aa48cebb"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-profile-long-batched.log",
+                      "bytes":  469,
+                      "sha256":  "0c0c730a745a4d584a2ff09614eb5738b66da9ff23f3a9686a258d74eb262cfb"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-profile-medium.log",
+                      "bytes":  453,
+                      "sha256":  "83bf85bd86e7b64c753a6eeb7ff60d4b957e9626d33cd979e4e4963d52164e63"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-profile-status.log",
+                      "bytes":  405,
+                      "sha256":  "1584f1e8b7423c1aae9cb22a857cf1fc2da7120feb58b8e751f1ee04b7f32717"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-pytest.log",
+                      "bytes":  120,
+                      "sha256":  "4459900619173f52ec98033ad512b8baefbf44ed0b3de9856a9ba81e07261b75"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-smoke.log",
+                      "bytes":  798,
+                      "sha256":  "c4760d8dc3fd5ef00599c5582dfa900ea0a88967cafacdd1375cc5c624aed855"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/cutile-torch-sdpa.log",
+                      "bytes":  58,
+                      "sha256":  "527c73444d173792d8df7faa3ca4888e208343184f465de8bbd6a3fd1f426f1c"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/evidence-manifest.json",
+                      "bytes":  10971,
+                      "sha256":  "9ed989ebea511d90d68ece6ae4c535754ab29e649f8a50bfbc074383911428d1"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/clean-jit-isolated-caches/long_d128-tq64-tk64-apxcrpzw/worker-result.json",
+                      "bytes":  2482,
+                      "sha256":  "10d95aa626a82930a03c9ea03f2406312498d49a180154829b408344afd23fe7"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/clean-jit-isolated-caches/longer_batched_d128-tq64-tk128-jdk_hlvx/worker-result.json",
+                      "bytes":  2476,
+                      "sha256":  "96c19fe7e381f3ad124d6d69251a7f28915a4bc523c0f43edbebea949366dcf4"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-accuracy.json",
+                      "bytes":  22480,
+                      "sha256":  "60abc15afda2dee489984bacdec40baaf7de8cdd56586214e637400c5290610d"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-session1.csv",
+                      "bytes":  8821,
+                      "sha256":  "d15afd2c43b676e1fc0022ff4b776980508afce39a3f0f61fbb39b3cc449140c"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-session1.json",
+                      "bytes":  28472,
+                      "sha256":  "dbdd2202a2d9a9c2c280640f4c90f1244b6494df9fefdd381a7dc32c1acb02ea"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-session2.csv",
+                      "bytes":  8830,
+                      "sha256":  "a7ea2691b3c27a6e97e6ccd3f914d03ff841970488a7917e5e18aeb3de4cc654"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-session2.json",
+                      "bytes":  28481,
+                      "sha256":  "2927e8c4fefaf82dfd49f60abc5f906f70c9d5e7cbb49b838c26752ce6d8706c"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-session3.csv",
+                      "bytes":  8842,
+                      "sha256":  "4d34ff5c000c2e063d8c4fac3f3e5e64aa34dbb715fc37cf29a7f24835ffa7e1"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-session3.json",
+                      "bytes":  28493,
+                      "sha256":  "909ae3bcbcd6b6dfedbeab200889997295f9fcc772671aac964bcb475ccbb804"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-summary.csv",
+                      "bytes":  13217,
+                      "sha256":  "81b456fc4f13c3158d1711228adb24b79f9f26042241b3dac9457075efce8af1"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-benchmark-summary.json",
+                      "bytes":  35205,
+                      "sha256":  "3289abd5fcca7992ebf882f20e4a249746b723a44d741b160c488254675cf29e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-clean-jit.json",
+                      "bytes":  6731,
+                      "sha256":  "3bcf9bf44f65f853ca7c6f5894f471690fa63c24135550489e4984821548face"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-load-latency-hints.csv",
+                      "bytes":  4686,
+                      "sha256":  "3486c01b927656cf205c725b6f4ae01e140bce1d1a37b50d81df075db23f01d5"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-load-latency-hints.json",
+                      "bytes":  57190,
+                      "sha256":  "10d08c4c0d197e58f37df7a85d2da580e2d5faedfacdec4f7f0e8ca169ecbb2a"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/default.log",
+                      "bytes":  507,
+                      "sha256":  "e1dfa796e7f78598f1dcb6d8c7fd611630cec9ee63d046e8557b9dbe5ce3824e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/environment.txt",
+                      "bytes":  457,
+                      "sha256":  "d65694a0c124fec97139ee8f7e03d1ad70031cfb709c3ff0a5084694598ea4db"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/latency10.log",
+                      "bytes":  513,
+                      "sha256":  "4ddfef041aec3a6b7560398ff3414325ea8af3b57506af2e4d1037f5b7f175cb"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/medium-d128-64x64-default-details.csv",
+                      "bytes":  142568,
+                      "sha256":  "668dfd0270aa323404959ade99de354155178a5414045a7d94e2fad7319c09a4"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/medium-d128-64x64-default-raw.csv",
+                      "bytes":  42265,
+                      "sha256":  "7b1879af4fb0843fd860035d1d81da99f76123ee7465cc841852b90122f43330"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/medium-d128-64x64-latency10-details.csv",
+                      "bytes":  142641,
+                      "sha256":  "c2ed8d8bef1849b07b1d00762e28b10142f9c7bb13f479a50cb375d3791dc83e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/medium-d128-64x64-latency10-raw.csv",
+                      "bytes":  42269,
+                      "sha256":  "a61243f3ffc212d25cf811d9358db3541d8c587ca7826b234d319309cb7d17c4"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499590898/results/cutile-matched-ncu/status.txt",
+                      "bytes":  24,
+                      "sha256":  "df4f4d2aa477f6d08b8c8ff73f232fd99db58f1bd3ac3373cb0d119b56c18bd0"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-accuracy.log",
+                      "bytes":  3967,
+                      "sha256":  "1f5fde60515327863f03db03dd09a5434bc5614d0caab0612b97266e8632683a"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-benchmark-session1.log",
+                      "bytes":  4606,
+                      "sha256":  "457a56f0ad0fb16701f343c974a30bad7b1e6f8d95b436a7d8a658cd9e1dcfeb"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-benchmark-session2.log",
+                      "bytes":  4607,
+                      "sha256":  "09b2892814f5ffc9010e3df32bbcaf2b112e2c80d2821d53a06ff0435f5ba005"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-benchmark-session3.log",
+                      "bytes":  4489,
+                      "sha256":  "df5eeab82c6c394d4a06a258e7a7b6308dcfa38e61bacd55fb298edc1b024202"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-benchmark-summary.log",
+                      "bytes":  839,
+                      "sha256":  "a3df4c40327b14861dc1f8e8a3226800ae1ba77c4745fadda4257859b51df502"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-clean-jit.log",
+                      "bytes":  4280,
+                      "sha256":  "9ede8847fb6e579dc3960c2e483e4e6fde53fea74ec17d1672c4c95cf5d5ff3e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-cli.log",
+                      "bytes":  105,
+                      "sha256":  "7d83d082e58c6928362540255a7f0f50cab6880a368d774ba16484caf505a705"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-cli-reference.log",
+                      "bytes":  26,
+                      "sha256":  "db260947055f9b4f113cf5469d9af2dead4e4229cf21a41da206c97cf23c1e0e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-environment.log",
+                      "bytes":  7227,
+                      "sha256":  "533db105136d43ddc50ec79e825fdb2247af25a757145f723c4e8cbba06c9359"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-gpu-install.log",
+                      "bytes":  4503,
+                      "sha256":  "c52bd55b77ca8c0b8fab799621cb4cafb85a9dee39e36f58fed12bcd0b0bb2db"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-install.log",
+                      "bytes":  1345,
+                      "sha256":  "f138770bf8ec5e7788d85d23947fde9d9dc93bc72603ed1bc48dc5583e3b027f"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-load-latency-hints.log",
+                      "bytes":  1021,
+                      "sha256":  "d698b0769818f6bdff4b9495914e81be590ebc730d2395285731e07098b317b5"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-optional-objectives.log",
+                      "bytes":  118,
+                      "sha256":  "e1f81d84661a3d96844c1f46db8919d3929b9db91155f30731b8360a2ba26011"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-pip-freeze.txt",
+                      "bytes":  707,
+                      "sha256":  "481967397207845adb4843363fb33fa9e5d87f2b69ed5fefc2f08378aa48cebb"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-profile-long-batched.log",
+                      "bytes":  467,
+                      "sha256":  "08dcd0ac4753ca18dacd0ac5750d96a925f66babcc391317c79dfa992d94c2b9"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-profile-medium.log",
+                      "bytes":  451,
+                      "sha256":  "bcb587c0c13e5a5d0d47822f70ab3fcd1cde8852d670f703084d1d0bd80b392e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-profile-status.log",
+                      "bytes":  405,
+                      "sha256":  "7f22d95273a88739e7a8047b98b3577a4fad02c847d1c3192e0fd307d445f570"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-pytest.log",
+                      "bytes":  119,
+                      "sha256":  "fd148e66769ff5b1f27017c53aff4308a07d7182a5229ad6ecc85e941b21347c"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-smoke.log",
+                      "bytes":  798,
+                      "sha256":  "c4760d8dc3fd5ef00599c5582dfa900ea0a88967cafacdd1375cc5c624aed855"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/cutile-torch-sdpa.log",
+                      "bytes":  58,
+                      "sha256":  "527c73444d173792d8df7faa3ca4888e208343184f465de8bbd6a3fd1f426f1c"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/evidence-manifest.json",
+                      "bytes":  10971,
+                      "sha256":  "f04a08f67695114c35139eb8a6e3a9a26d6a1274da022b2303477cf20581a44c"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/clean-jit-isolated-caches/long_d128-tq64-tk64-tfobpoou/worker-result.json",
+                      "bytes":  2479,
+                      "sha256":  "e009151660a266718f77d69d07eb3ea73a9ae2c22a7e4159d4a93ea995e8b606"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/clean-jit-isolated-caches/longer_batched_d128-tq64-tk128-_m91s1hl/worker-result.json",
+                      "bytes":  2477,
+                      "sha256":  "1942561d8e47a271439bff3d165d17d5de03506c6d05c7e225733b22b7f681d9"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-accuracy.json",
+                      "bytes":  22480,
+                      "sha256":  "1c6a36233ad82d0804ab60aee26ea942dfce6e5c8dd81dd9cf7dd7018452bc52"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-session1.csv",
+                      "bytes":  8839,
+                      "sha256":  "11011843016e2d52aa998a44eafd6d39affa36770ee65121a72bea9b001b92d7"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-session1.json",
+                      "bytes":  28490,
+                      "sha256":  "1bf45c3186203b2dba2485f22f74efda6e173344010f726e3dd503040ceb89bb"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-session2.csv",
+                      "bytes":  8825,
+                      "sha256":  "55f385abb903f7d731139d82091270ea99b88f3613b80422f4abac4eb022ad9e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-session2.json",
+                      "bytes":  28476,
+                      "sha256":  "2ba27a0f47312685d21b3b66735705528723302d102dfab44d1362b50a7bb211"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-session3.csv",
+                      "bytes":  8798,
+                      "sha256":  "bedb549ba341b7dd232f0bb91ae7a39aaa10919958a1963e092727ba7d56e5f1"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-session3.json",
+                      "bytes":  28449,
+                      "sha256":  "684b37fcad69a0112ca641761907ccbd97d9c9a91e130439a3e94915efe1bfb5"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-summary.csv",
+                      "bytes":  13198,
+                      "sha256":  "0125bd7b63255c3d3648f188c5a600e5a7bfa0c6287427d7ec7df17ecdf4b671"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-benchmark-summary.json",
+                      "bytes":  35186,
+                      "sha256":  "faae6636be544054e7b0e5df85e2cfc935355923ef851309286a0c9966d7515e"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-clean-jit.json",
+                      "bytes":  6729,
+                      "sha256":  "d8091c24916d2ff196fa1923174e596fbeab1ba756f5c09a5dfe351c8d50fae2"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-load-latency-hints.csv",
+                      "bytes":  4685,
+                      "sha256":  "fab0c9fe184e71292dedb3d3084db44a7dcc08cf1655c7f61da798df8e314a65"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-load-latency-hints.json",
+                      "bytes":  57150,
+                      "sha256":  "15be53d5e3ff21c7e8d7e71a34a6e8ff163aab7dee6c729cdfea56481e193465"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/default.log",
+                      "bytes":  507,
+                      "sha256":  "d3e8fe4e8029b84c8b8942b65acb6f05d42efa3dcd2efad0b788e7d6e24baf24"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/environment.txt",
+                      "bytes":  457,
+                      "sha256":  "db24afc7c90fd5b49cf06f6be29e0538a86790316363b3c41e5f92b3116879d3"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/latency10.log",
+                      "bytes":  513,
+                      "sha256":  "32630c88a52f13f682be9596769bb3e304e308941bdbaecbf4654ac8f8cf62aa"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/medium-d128-64x64-default-details.csv",
+                      "bytes":  142153,
+                      "sha256":  "387c8f3df39cfcb3a69726d8ba093d4cb92a5bbf65d30dda246d21d7ac917b2d"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/medium-d128-64x64-default-raw.csv",
+                      "bytes":  42264,
+                      "sha256":  "8481d6fd15a14b05c1ff00fc99624ebe9213f397a732372716e9b6be21e9c4c6"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/medium-d128-64x64-latency10-details.csv",
+                      "bytes":  142639,
+                      "sha256":  "ce91bc68258924287e470b19659bb688abb5689d29ebf56fcf9d57a0c61e862d"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/medium-d128-64x64-latency10-raw.csv",
+                      "bytes":  42268,
+                      "sha256":  "08ea980dab97d9ae13dcf5b500adae54b6423c8f7440ef4d580b4e9b489cc1e0"
+                  },
+                  {
+                      "path":  "results/rtx4060-validation/41499939303/results/cutile-matched-ncu/status.txt",
+                      "bytes":  24,
+                      "sha256":  "df4f4d2aa477f6d08b8c8ff73f232fd99db58f1bd3ac3373cb0d119b56c18bd0"
+                  },
+                  {
+                      "path":  "results/sdpa-reference/41501308083/cutile-torch-sdpa.log",
+                      "bytes":  3654,
+                      "sha256":  "c42babd29064b86d65b9caa4b1b76a4560f12544ae4509f6013907b2a202ea93"
+                  },
+                  {
+                      "path":  "results/sdpa-reference/41501308083/cutile-torch-sdpa-status.log",
+                      "bytes":  172,
+                      "sha256":  "81a6407e072129770a5a3486c550233c0003416d82f8f9dcc721b7a0055dbe4f"
+                  },
+                  {
+                      "path":  "results/sdpa-reference/41501308083/evidence-manifest.json",
+                      "bytes":  787,
+                      "sha256":  "9d68630b70c0cd0e998bc0f30e6653a03125bd136c4a4978c5c02edc18699f73"
+                  },
+                  {
+                      "path":  "results/sdpa-reference/41501308083/results/cutile-vs-pytorch-sdpa.csv",
+                      "bytes":  3973,
+                      "sha256":  "7e4b1b14742d08f763da5df929738906caa6c5c5c39b2aafda5e40359f042001"
+                  },
+                  {
+                      "path":  "results/sdpa-reference/41501308083/results/cutile-vs-pytorch-sdpa.json",
+                      "bytes":  126183,
+                      "sha256":  "8ee0dc735dc5b700ac54303c3f2d00319dedccdaa67a406d4326980813db5692"
+                  },
+                  {
+                      "path":  "results/sdpa-reference/41501308083/sdpa-environment.log",
+                      "bytes":  91,
+                      "sha256":  "b0ae4b2e09237987218dad8313120e6ed59bd19382cd9bf7b72d0bd58de8e44d"
+                  },
+                  {
+                      "path":  "results/sdpa-reference/41501308083/sdpa-gpu-inventory.log",
+                      "bytes":  48,
+                      "sha256":  "6c655d9cba99a5b83a7e54c9232a888a8e61aed37290fcb54886dd553e53078f"
+                  }
+              ]
+}

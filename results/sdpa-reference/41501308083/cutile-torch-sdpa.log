@@ -1,0 +1,63 @@
+python.exe : USDT:2026-11-03 00:06:42 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:39] 
+profiler_start
+At 
+C:\Users\Public\GPU-cutile-project\gpu-nvidia\actions-runner\_work\_temp\3e582723-804b-432a-a779-7fbb0db216ea.ps1:11 
+char:1
++ & $Py scripts/benchmark_torch_sdpa.py --output results/cutile-vs-pyto ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (USDT:2026-11-03... profiler_start:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+USDT:2026-11-03 00:06:42 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:46] 
+profiler_stop
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:39] 
+profiler_start
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:46] 
+profiler_stop
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:39] 
+profiler_start
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:46] 
+profiler_stop
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:39] 
+profiler_start
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:46] 
+profiler_stop
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:39] 
+profiler_start
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:46] 
+profiler_stop
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:39] 
+profiler_start
+USDT:2026-11-03 00:06:43 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:46] 
+profiler_stop
+USDT:2026-11-03 00:06:45 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:39] 
+profiler_start
+USDT:2026-11-03 00:06:45 11500:6960 
+C:\actions-runner\_work\pytorch\pytorch\third_party\kineto\libkineto\src\SyncActivityProfilerHandler.cpp:46] 
+profiler_stop
+short_d32                tile=64x64 SDPA=0.0447ms cuTile=0.0214ms PASS
+short_d64                tile=64x64 SDPA=0.0699ms cuTile=0.0364ms PASS
+short_multihead_d64      tile=64x64 SDPA=0.0413ms cuTile=0.0199ms PASS
+medium_d64               tile=64x64 SDPA=0.0403ms cuTile=0.0210ms PASS
+medium_d128              tile=64x64 SDPA=0.0703ms cuTile=0.0589ms PASS
+medium_d128              tile=64x128 SDPA=0.0700ms cuTile=0.0614ms PASS
+long_d128                tile=64x64 SDPA=0.3149ms cuTile=0.2873ms PASS
+long_d128                tile=64x128 SDPA=0.2916ms cuTile=0.2702ms PASS
+longer_batched_d128      tile=64x64 SDPA=1.0118ms cuTile=0.9375ms PASS
+longer_batched_d128      tile=64x128 SDPA=1.0115ms cuTile=0.9217ms PASS
+SDPA_REPORT_JSON=results\cutile-vs-pytorch-sdpa.json
+SDPA_REPORT_CSV=results\cutile-vs-pytorch-sdpa.csv
+PYTORCH=2.14.0+cu130 CUDA_BUILD=13.0 GPU=NVIDIA GeForce RTX 4060

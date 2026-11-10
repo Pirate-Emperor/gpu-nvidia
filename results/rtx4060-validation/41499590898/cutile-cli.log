@@ -1,0 +1,3 @@
+backend=cutile
+Q=(1, 1, 64, 32) K=(1, 1, 64, 32) V=(1, 1, 64, 32)
+output=(1, 1, 64, 32) dtype=float16

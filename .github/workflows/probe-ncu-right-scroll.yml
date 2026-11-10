@@ -1,0 +1,96 @@
+name: Probe Nsight right-pane horizontal scrolling
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/probe-ncu-right-scroll.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, windows, x64, local]
+    timeout-minutes: 10
+    steps:
+      - name: Probe actual horizontal pane targets on one existing report
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          $helper = Join-Path $root 'scripts\capture_ncu_analysis_screenshots.py'
+          $report = Join-Path $root 'results\ncu\rtx4060\legal-matrix-41206212024\medium_d128-tq64-tk64-lat10\medium_d128-tq64-tk64-lat10.ncu-repz'
+          foreach ($p in @($py,$helper,$report)) { if (-not (Test-Path $p)) { throw "Missing $p" } }
+          $code = @'
+          import ctypes, importlib.util, json, subprocess, time
+          from pathlib import Path
+          from ctypes import wintypes
+          import hashlib
+          
+          root=Path(r"C:\Users\Public\GPU-cutile-project\gpu-nvidia")
+          helper=root/"scripts"/"capture_ncu_analysis_screenshots.py"
+          report=root/"results"/"ncu"/"rtx4060"/"legal-matrix-41206212024"/"medium_d128-tq64-tk64-lat10"/"medium_d128-tq64-tk64-lat10.ncu-repz"
+          out=root/"results"/"ncu"/"rtx4060"/"legal-matrix-41206212024"/"right-scroll-probe"/"all-four"
+          out.mkdir(parents=True,exist_ok=False)
+          spec=importlib.util.spec_from_file_location("cap",helper)
+          cap=importlib.util.module_from_spec(spec);spec.loader.exec_module(cap)
+          ui=cap._ui_path(Path(r"C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe"))
+          if not ui: raise RuntimeError("ncu-ui.exe not found")
+          proc=subprocess.Popen([str(ui),str(report)],cwd=str(report.parent),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+          win=cap._wait_window(proc.pid,report.stem,60) or cap._wait_window(None,report.stem,10)
+          if not win: raise RuntimeError("Nsight UI window not found")
+          hwnd=win["hwnd"]
+          cap.user32.ShowWindow(cap.HWND(hwnd),cap.SW_MAXIMIZE)
+          cap.user32.SetForegroundWindow(cap.HWND(hwnd))
+          time.sleep(2)
+          cap._click_relative(hwnd,260,212,verify_y=225)
+          time.sleep(1)
+          def snap(name):
+            dest=out/(name+".png")
+            return cap._capture(hwnd,dest),dest
+          _,base=snap("00-baseline")
+          rect=cap.RECT()
+          cap.user32.GetWindowRect(cap.HWND(hwnd),ctypes.byref(rect))
+          width,height=rect.right-rect.left,rect.bottom-rect.top
+          cap.user32.GetCursorPos
+          # child details APIs
+          getclass=cap.ctypes.windll.user32.GetClassNameW
+          for p,xratio in [("left-code",0.14),("left-metrics",0.34),("right-code",0.66),("right-metrics",0.88)]:
+            x=rect.left+int(width*xratio); y=rect.top+int(height*0.58)
+            cap.user32.SetCursorPos(x,y)
+            time.sleep(0.3)
+            child=cap.user32.WindowFromPoint(cap.POINT(x,y))
+            r=cap.RECT();cap.user32.GetWindowRect(child,ctypes.byref(r))
+            cls=ctypes.create_unicode_buffer(256);getclass(child,cls,256)
+            print(f"TARGET {p} x={x} y={y} hwnd={int(child)} class={cls.value} child_rect={r.left},{r.top},{r.right},{r.bottom}")
+            # Positive horizontal wheel is the verified rightward direction.
+            cap.user32.mouse_event(cap.MOUSEEVENTF_HWHEEL,0,0,ctypes.c_uint32(120*12).value,None)
+            time.sleep(1)
+            _,pos=snap(p+"-positive")
+            cap.user32.mouse_event(cap.MOUSEEVENTF_HWHEEL,0,0,ctypes.c_uint32((-120*12)&0xffffffff).value,None)
+            time.sleep(1)
+            _,neg=snap(p+"-negative")
+          # image compare via deterministic PNG hashes (no Pillow dependency)
+          base_hash=hashlib.sha256(base.read_bytes()).hexdigest()
+          lines=[f"baseline={base.name} sha256={base_hash}"]
+          for f in sorted(out.glob("*.png")):
+            digest=hashlib.sha256(f.read_bytes()).hexdigest()
+            same=(digest==base_hash)
+            print(f"IMAGE {f.name} bytes={f.stat().st_size} sha256={digest} same_as_baseline={same}")
+            lines.append(f"{f.name} sha256={digest} same_as_baseline={same}")
+          (out/"probe-results.txt").write_text("\\n".join(lines)+"\\n",encoding="utf-8")
+          print("PROBE_DIR",out)
+          '@
+          $script = Join-Path $env:RUNNER_TEMP 'ncu_right_scroll_probe.py'
+          [IO.File]::WriteAllText($script,$code,[Text.UTF8Encoding]::new($false))
+          & $py $script
+          if ($LASTEXITCODE -ne 0) { throw "Probe failed with $LASTEXITCODE" }
+      - name: Upload probe images and log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncu-right-scroll-probe
+          path: C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\right-scroll-probe\
+          retention-days: 7

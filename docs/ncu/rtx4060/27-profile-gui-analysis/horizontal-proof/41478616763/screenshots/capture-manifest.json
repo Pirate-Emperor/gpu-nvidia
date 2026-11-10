@@ -1,0 +1,457 @@
+{
+  "workflow_run_id": 41478616763,
+  "capture_method": "PrintWindow from genuine Nsight Compute GUI",
+  "native_report_source": "Existing .ncu-repz files; no kernel profiling/replay was repeated",
+  "hardware": "RTX 4060 / SM 8.9",
+  "capture_dimensions": [
+    1936,
+    1048
+  ],
+  "pane_geometry": {
+    "left-code": {
+      "cursor_x_fraction": 0.14,
+      "crop_fraction": [
+        0.025,
+        0.29,
+        0.315,
+        0.8
+      ]
+    },
+    "left-metrics": {
+      "cursor_x_fraction": 0.34,
+      "crop_fraction": [
+        0.315,
+        0.29,
+        0.495,
+        0.8
+      ]
+    },
+    "right-code": {
+      "cursor_x_fraction": 0.56,
+      "crop_fraction": [
+        0.43,
+        0.29,
+        0.675,
+        0.8
+      ]
+    },
+    "right-metrics": {
+      "cursor_x_fraction": 0.75,
+      "crop_fraction": [
+        0.675,
+        0.29,
+        0.825,
+        0.8
+      ]
+    }
+  },
+  "comparison": "SHA-256 and pixel-difference of the target pane crop, not whole-window hash",
+  "profiles": [
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "report": "C:\\Users\\Public\\GPU-cutile-project\\gpu-nvidia\\results\\ncu\\rtx4060\\legal-matrix-41206212024\\long_d128-tq128-tk128-lat0\\long_d128-tq128-tk128-lat0.ncu-repz",
+      "modes": [
+        {
+          "mode": "sass",
+          "baseline": "long_d128-tq128-tk128-lat0-sass-baseline.png",
+          "panels": [
+            {
+              "panel": "left-code",
+              "target_x": 263,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-left-code.png",
+              "baseline_crop_sha256": "4bcea9ade24bd6225974151c3f6a1f72953be8c93289b5b53b2eb4fc392e2d28",
+              "after_crop_sha256": "bb0ebf0c8c5f66c4fce1293264264bd146c2599838332e8607f2d64ee63b5a23",
+              "changed_pixel_fraction": 0.096973028803705,
+              "mean_abs_channel_delta": 7.330049255612752,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-left-code.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            },
+            {
+              "panel": "left-metrics",
+              "target_x": 650,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-left-metrics.png",
+              "baseline_crop_sha256": "8c3482030addba1626a91314cfa617299008120704cbafaf50d5875be71f9d8c",
+              "after_crop_sha256": "9772d9ee4add733a59441ca11dc8fbd82224f0352cbe77a9d5a019e8cdbae560",
+              "changed_pixel_fraction": 0.030126128056128323,
+              "mean_abs_channel_delta": 1.752874702086067,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-left-metrics.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            },
+            {
+              "panel": "right-code",
+              "target_x": 1076,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-right-code.png",
+              "baseline_crop_sha256": "19ab839a154a1a0ed94ffb90bc4ab956d2afee681faa57091330418c2f5a656a",
+              "after_crop_sha256": "9eeca92fdc98eb0e1bb668b66377140fc943015af2ff9d48b49efdc56cb564cb",
+              "changed_pixel_fraction": 0.13245396111834062,
+              "mean_abs_channel_delta": 12.919697148941204,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-right-code.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            },
+            {
+              "panel": "right-metrics",
+              "target_x": 1444,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-right-metrics.png",
+              "baseline_crop_sha256": "231e5af9c5218b0a862a355c60cf9071507223ecd628d7460b98cc238f1d7dc9",
+              "after_crop_sha256": "882f1236f42fa5510330e3565ac549322b006b0b38a9b861787248d72a8e44f5",
+              "changed_pixel_fraction": 0.1394675145325497,
+              "mean_abs_channel_delta": 11.455749322884886,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-right-metrics.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            }
+          ]
+        },
+        {
+          "mode": "ptx",
+          "baseline": "long_d128-tq128-tk128-lat0-ptx-baseline.png",
+          "panels": [
+            {
+              "panel": "left-code",
+              "target_x": 263,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-left-code.png",
+              "baseline_crop_sha256": "4bcea9ade24bd6225974151c3f6a1f72953be8c93289b5b53b2eb4fc392e2d28",
+              "after_crop_sha256": "bb0ebf0c8c5f66c4fce1293264264bd146c2599838332e8607f2d64ee63b5a23",
+              "changed_pixel_fraction": 0.096973028803705,
+              "mean_abs_channel_delta": 7.330049255612752,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-left-code.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            },
+            {
+              "panel": "left-metrics",
+              "target_x": 650,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-left-metrics.png",
+              "baseline_crop_sha256": "8c3482030addba1626a91314cfa617299008120704cbafaf50d5875be71f9d8c",
+              "after_crop_sha256": "9772d9ee4add733a59441ca11dc8fbd82224f0352cbe77a9d5a019e8cdbae560",
+              "changed_pixel_fraction": 0.030126128056128323,
+              "mean_abs_channel_delta": 1.752874702086067,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-left-metrics.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            },
+            {
+              "panel": "right-code",
+              "target_x": 1076,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-right-code.png",
+              "baseline_crop_sha256": "cf2d70478b8029371629a0e4756fa219000e4ab74b332971b2fa35e18abe27fe",
+              "after_crop_sha256": "431deb9857e1f5b9502e82c4eb7a45b9c5730eed6baf99370ef6798a0fbf1465",
+              "changed_pixel_fraction": 0.0806577546433219,
+              "mean_abs_channel_delta": 7.034444050107128,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-right-code.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            },
+            {
+              "panel": "right-metrics",
+              "target_x": 1444,
+              "target_y": 568,
+              "target_hwnd": 394998,
+              "target_class": "Qt6102QWindowOwnDCIcon",
+              "target_rect": [
+                -8,
+                -8,
+                1928,
+                1040
+              ],
+              "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-right-metrics.png",
+              "baseline_crop_sha256": "7ae300d3b83b0fe9eca47d59c2fed7ed5e16be4ce16b190670f329ae6181735a",
+              "after_crop_sha256": "255e3d7e65b796cdf84cdec6f46a5c7a3c5ad973910b852c344091a332e8d0fa",
+              "changed_pixel_fraction": 0.07061695089443427,
+              "mean_abs_channel_delta": 7.6589309610217216,
+              "wm_mousehwheel_fallback": false,
+              "verified_horizontal_crop_change": true,
+              "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-right-metrics.png",
+              "restore_changed_pixel_fraction": 0.0,
+              "restored_to_baseline": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "sass",
+      "panel": "left-code",
+      "target_x": 263,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-left-code.png",
+      "baseline_crop_sha256": "4bcea9ade24bd6225974151c3f6a1f72953be8c93289b5b53b2eb4fc392e2d28",
+      "after_crop_sha256": "bb0ebf0c8c5f66c4fce1293264264bd146c2599838332e8607f2d64ee63b5a23",
+      "changed_pixel_fraction": 0.096973028803705,
+      "mean_abs_channel_delta": 7.330049255612752,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-left-code.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    },
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "sass",
+      "panel": "left-metrics",
+      "target_x": 650,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-left-metrics.png",
+      "baseline_crop_sha256": "8c3482030addba1626a91314cfa617299008120704cbafaf50d5875be71f9d8c",
+      "after_crop_sha256": "9772d9ee4add733a59441ca11dc8fbd82224f0352cbe77a9d5a019e8cdbae560",
+      "changed_pixel_fraction": 0.030126128056128323,
+      "mean_abs_channel_delta": 1.752874702086067,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-left-metrics.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    },
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "sass",
+      "panel": "right-code",
+      "target_x": 1076,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-right-code.png",
+      "baseline_crop_sha256": "19ab839a154a1a0ed94ffb90bc4ab956d2afee681faa57091330418c2f5a656a",
+      "after_crop_sha256": "9eeca92fdc98eb0e1bb668b66377140fc943015af2ff9d48b49efdc56cb564cb",
+      "changed_pixel_fraction": 0.13245396111834062,
+      "mean_abs_channel_delta": 12.919697148941204,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-right-code.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    },
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "sass",
+      "panel": "right-metrics",
+      "target_x": 1444,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-sass-scroll-right-metrics.png",
+      "baseline_crop_sha256": "231e5af9c5218b0a862a355c60cf9071507223ecd628d7460b98cc238f1d7dc9",
+      "after_crop_sha256": "882f1236f42fa5510330e3565ac549322b006b0b38a9b861787248d72a8e44f5",
+      "changed_pixel_fraction": 0.1394675145325497,
+      "mean_abs_channel_delta": 11.455749322884886,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-sass-restore-right-metrics.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    },
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "ptx",
+      "panel": "left-code",
+      "target_x": 263,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-left-code.png",
+      "baseline_crop_sha256": "4bcea9ade24bd6225974151c3f6a1f72953be8c93289b5b53b2eb4fc392e2d28",
+      "after_crop_sha256": "bb0ebf0c8c5f66c4fce1293264264bd146c2599838332e8607f2d64ee63b5a23",
+      "changed_pixel_fraction": 0.096973028803705,
+      "mean_abs_channel_delta": 7.330049255612752,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-left-code.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    },
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "ptx",
+      "panel": "left-metrics",
+      "target_x": 650,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-left-metrics.png",
+      "baseline_crop_sha256": "8c3482030addba1626a91314cfa617299008120704cbafaf50d5875be71f9d8c",
+      "after_crop_sha256": "9772d9ee4add733a59441ca11dc8fbd82224f0352cbe77a9d5a019e8cdbae560",
+      "changed_pixel_fraction": 0.030126128056128323,
+      "mean_abs_channel_delta": 1.752874702086067,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-left-metrics.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    },
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "ptx",
+      "panel": "right-code",
+      "target_x": 1076,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-right-code.png",
+      "baseline_crop_sha256": "cf2d70478b8029371629a0e4756fa219000e4ab74b332971b2fa35e18abe27fe",
+      "after_crop_sha256": "431deb9857e1f5b9502e82c4eb7a45b9c5730eed6baf99370ef6798a0fbf1465",
+      "changed_pixel_fraction": 0.0806577546433219,
+      "mean_abs_channel_delta": 7.034444050107128,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-right-code.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    },
+    {
+      "profile": "long_d128-tq128-tk128-lat0",
+      "mode": "ptx",
+      "panel": "right-metrics",
+      "target_x": 1444,
+      "target_y": 568,
+      "target_hwnd": 394998,
+      "target_class": "Qt6102QWindowOwnDCIcon",
+      "target_rect": [
+        -8,
+        -8,
+        1928,
+        1040
+      ],
+      "screenshot": "long_d128-tq128-tk128-lat0-ptx-scroll-right-metrics.png",
+      "baseline_crop_sha256": "7ae300d3b83b0fe9eca47d59c2fed7ed5e16be4ce16b190670f329ae6181735a",
+      "after_crop_sha256": "255e3d7e65b796cdf84cdec6f46a5c7a3c5ad973910b852c344091a332e8d0fa",
+      "changed_pixel_fraction": 0.07061695089443427,
+      "mean_abs_channel_delta": 7.6589309610217216,
+      "wm_mousehwheel_fallback": false,
+      "verified_horizontal_crop_change": true,
+      "restore_screenshot": "long_d128-tq128-tk128-lat0-ptx-restore-right-metrics.png",
+      "restore_changed_pixel_fraction": 0.0,
+      "restored_to_baseline": true
+    }
+  ],
+  "failures": [],
+  "status": "success"
+}

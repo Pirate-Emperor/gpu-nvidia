@@ -1,0 +1,94 @@
+name: A100 actual cuTile correctness and Nsight profile
+
+on:
+  workflow_dispatch:
+
+jobs:
+  profile:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify supported cuTile runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          DRIVER_VERSION="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | xargs)"
+          DRIVER_MAJOR="${DRIVER_VERSION%%.*}"
+          echo "Driver: $DRIVER_VERSION"
+          if [ "$DRIVER_MAJOR" -lt 580 ]; then
+            echo "ERROR: cuTile profiling requires R580+."
+            exit 1
+          fi
+          if [ "$DRIVER_MAJOR" -eq 580 ]; then
+            DRIVER_MINOR="$(printf "%s" "$DRIVER_VERSION" | cut -d. -f2)"
+            DRIVER_PATCH="$(printf "%s" "$DRIVER_VERSION" | cut -d. -f3)"
+            if [ "$DRIVER_MINOR" -lt 126 ] || { [ "$DRIVER_MINOR" -eq 126 ] && [ "$DRIVER_PATCH" -lt 09 ]; }; then
+              echo "ERROR: detailed cuTile statistics require R580.126.09+; found $DRIVER_VERSION."
+              exit 1
+            fi
+          fi
+
+      - name: Install isolated profiling environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          python3 scripts/with_core_config.py python3 -m venv .venv-ncu
+          python3 scripts/with_core_config.py .venv-ncu/bin/python -m pip install --upgrade pip
+          python3 scripts/with_core_config.py .venv-ncu/bin/python -m pip install -r requirements-dev.txt
+          python3 scripts/with_core_config.py .venv-ncu/bin/python -m pip install "cupy-cuda13x" "cuda-tile[tileiras]"
+
+      - name: Check Nsight Compute
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ncu
+          ncu --version
+
+      - name: Run actual cuTile correctness matrix
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          .venv-ncu/bin/python -m pytest -q \
+            tests/test_gpu_correctness.py \
+            tests/test_gpu_edge_cases.py
+
+      - name: Capture two actual cuTile configurations
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/nsight
+          export PYTHONPATH="$HOME:${PYTHONPATH:-}"
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+
+          ncu --set full \
+            --target-processes all \
+            --force-overwrite \
+            --export "results/nsight/${stamp}_A100_cutile_medium_d128_t64x64.ncu-rep" \
+            .venv-ncu/bin/python benchmarks/profile_fused.py \
+              --case medium_d128 \
+              --tile-q 64 \
+              --tile-k 64
+
+          ncu --set full \
+            --target-processes all \
+            --force-overwrite \
+            --export "results/nsight/${stamp}_A100_cutile_longer_batched_d128_t64x32.ncu-rep" \
+            .venv-ncu/bin/python benchmarks/profile_fused.py \
+              --case longer_batched_d128 \
+              --tile-q 64 \
+              --tile-k 32
+
+      - name: Upload Nsight artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: a100-nsight-${{ github.run_id }}
+          path: results/nsight/
+          if-no-files-found: error

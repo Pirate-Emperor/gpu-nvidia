@@ -1,0 +1,429 @@
+name: Sequential Nsight Compute GUI evidence for all 27 legal profiles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ncu-27-gui-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  statuses: write
+
+jobs:
+  capture-gui-evidence:
+    if: ${{ !contains(github.event.head_commit.message, 'PTX four-pane supplement') }}
+    name: Capture GUI evidence from existing NCU reports (sequential)
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 180
+    env:
+      RUN_ID: ${{ github.run_id }}
+      SOURCE_COMMIT: ${{ github.sha }}
+    steps:
+      - name: Verify existing native reports and create isolated output
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $runDir = Join-Path $root 'results\ncu\rtx4060\legal-matrix-41206212024'
+          $ncu = 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $root)) { throw "Local project root missing: $root" }
+          if (-not (Test-Path $runDir)) { throw "Existing report directory missing: $runDir" }
+          if (-not (Test-Path $ncu)) { throw "Nsight Compute CLI missing: $ncu" }
+          if (-not (Test-Path $py)) { throw "Project Python environment missing: $py" }
+          $reports = @(Get-ChildItem -LiteralPath $runDir -Filter '*.ncu-repz' -File -Recurse | Sort-Object FullName)
+          if ($reports.Count -ne 27) { throw "Expected exactly 27 native reports; found $($reports.Count)" }
+          foreach ($r in $reports) {
+            $statusPath = Join-Path $r.DirectoryName 'status.json'
+            if (-not (Test-Path $statusPath)) { throw "Status record missing beside $($r.Name)" }
+            $status = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
+            if ($status.status -ne 'PASS') { throw "Profile status is not PASS: $($r.FullName)" }
+            if ((Get-Item -LiteralPath $r.FullName).Length -lt 10000) { throw "Report unexpectedly small: $($r.FullName)" }
+          }
+          $gpu = (nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total --format=csv 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $gpu -notmatch 'RTX 4060') { throw "Expected RTX 4060; detected: $gpu" }
+          $out = Join-Path $runDir ("gui-analysis-" + $env:RUN_ID)
+          if (Test-Path $out) { throw "Refusing to overwrite an existing output folder: $out" }
+          $screens = Join-Path $out 'screenshots'
+          $inputs = Join-Path $out 'inputs'
+          New-Item -ItemType Directory -Force -Path $screens,$inputs | Out-Null
+          Copy-Item -LiteralPath (Join-Path $runDir 'PROFILE_INDEX.md') -Destination $inputs
+          Copy-Item -LiteralPath (Join-Path $runDir 'profile-index.csv') -Destination $inputs
+          if (Test-Path (Join-Path $runDir 'matrix-status.txt')) { Copy-Item -LiteralPath (Join-Path $runDir 'matrix-status.txt') -Destination $inputs }
+          $original = Join-Path $root 'results\ncu\rtx4060\20261027-230742\ncu-analysis-current'
+          if (Test-Path $original) { Copy-Item -LiteralPath $original -Destination (Join-Path $inputs 'original-two-config-analysis') -Recurse }
+          $sourceHelper = Join-Path $root 'scripts\\capture_ncu_analysis_screenshots.py'
+          if (-not (Test-Path $sourceHelper)) { throw "Local capture helper missing: $sourceHelper" }
+          $sourceText = Get-Content -LiteralPath $sourceHelper -Raw
+          if ($sourceText -notmatch 'def _click_relative' -or $sourceText -notmatch 'PrintWindow') { throw 'Local capture helper is not the expected genuine GUI capture implementation' }
+
+          # The local runner copy had stale click coordinates (y=190). The actual
+          # Nsight tab row is at y=212 in the runner's 1936x1048 window.
+          # Rewrite every top-level report-tab click by tab identity, and leave
+          # the four lower Source-analysis tab clicks (y=855) untouched.
+          $topClickPattern = '(?m)_click_relative\(\s*window\["hwnd"\]\s*,\s*(?<x>\d+)\s*,\s*(?<y>\d+)(?:\s*,\s*verify_y\s*=\s*\d+)?\s*\)'
+          $topClickCount = 0
+          foreach ($tabMatch in [regex]::Matches($sourceText, $topClickPattern)) { if ([int]$tabMatch.Groups['y'].Value -lt 500) { $topClickCount++ } }
+          $sourceText = [regex]::Replace($sourceText, $topClickPattern, {
+            param($m)
+            $x = [int]$m.Groups['x'].Value
+            $y = [int]$m.Groups['y'].Value
+            if ($y -ge 500) { return $m.Value }
+            $newX = if ($x -lt 130) { 90 } elseif ($x -lt 220) { 180 } elseif ($x -lt 350) { 260 } else { 520 }
+            return "_click_relative(window[`"hwnd`"], $newX, 212, verify_y=225)"
+          })
+          if ($topClickCount -lt 4) { throw "Expected to correct at least four top-level report-tab clicks; corrected $topClickCount" }
+          Write-Host "CORRECTED_TOP_LEVEL_TAB_CLICKS=$topClickCount"
+
+          # Use independent horizontal scrolling for all four Source subpanels.
+          $sourceText = $sourceText.Replace('panel_offsets = {"left-code": 0.14, "left-metrics": 0.34, "right-code": 0.57, "right-metrics": 0.78}', 'panel_offsets = {"left-code": 0.14, "left-metrics": 0.34, "right-code": 0.66, "right-metrics": 0.88}')
+          $sourceText = $sourceText.Replace('delta = ctypes.c_uint32((-120 * notches) & 0xFFFFFFFF).value', 'delta = ctypes.c_uint32((120 * notches) & 0xFFFFFFFF).value')
+          $scrollPattern = '(?s)                for panel_name, x in \(\r?\n                    \("left-code", 600\),.*?                    for _ in range\(14\):\r?\n                        _click_at\(window\["hwnd"\], x, 836, pause=0\.025\)'
+          $scrollReplacement = "                for panel_name in (`"left-code`", `"left-metrics`", `"right-code`", `"right-metrics`"):`n                    _scroll_horizontal(window[`"hwnd`"], panel_name, notches=12)"
+          $patched = [regex]::Replace($sourceText,$scrollPattern,$scrollReplacement,1)
+          if ($patched -ne $sourceText) { $sourceText = $patched }
+          if (-not $sourceText.Contains('panel_offsets = {"left-code"') -or -not $sourceText.Contains('for panel_name in ("left-code", "left-metrics", "right-code", "right-metrics")')) { throw 'Four-pane Source horizontal scrolling was not correctly installed in the capture helper' }
+          $helper = Join-Path $env:RUNNER_TEMP ("capture-ncu-gui-" + $env:RUN_ID + '.py')
+          [IO.File]::WriteAllText($helper,$sourceText,[Text.UTF8Encoding]::new($false))
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $helper).Hash
+          @(
+            "SOURCE_COMMIT=$env:SOURCE_COMMIT",
+            "WORKFLOW_RUN_ID=$env:RUN_ID",
+            "GPU=$gpu",
+            "NCU=$ncu",
+            "PYTHON=$py",
+            "NATIVE_REPORTS=27",
+            "CAPTURE_HELPER_SHA256=$sha",
+            "CAPTURE_MODE=Import existing native reports into actual Nsight Compute GUI; no profiling/replay"
+          ) | Set-Content -Encoding utf8 (Join-Path $out 'capture-environment.txt')
+          "OUTPUT=$out" | Set-Content $env:GITHUB_OUTPUT
+          "SCREENSHOTS=$screens" | Add-Content $env:GITHUB_OUTPUT
+          "HELPER=$helper" | Add-Content $env:GITHUB_OUTPUT
+          Write-Host "VERIFIED_EXISTING_REPORTS=27"
+          Write-Host "GPU=$gpu"
+          Write-Host "OUTPUT=$out"
+
+      - name: Capture 27 reports one at a time in the actual Nsight Compute GUI
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          RUN_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024'
+          OUT_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\gui-analysis-${{ github.run_id }}'
+          NCU: 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          PY: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP ("capture-ncu-gui-" + $env:GITHUB_RUN_ID + '.py')
+          $screens = Join-Path $env:OUT_DIR 'screenshots'
+          $reports = @(Get-ChildItem -LiteralPath $env:RUN_DIR -Filter '*.ncu-repz' -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName })
+          if ($reports.Count -ne 27) { throw "Expected exactly 27 reports at capture time; found $($reports.Count)" }
+          $expectedCount = $reports.Count
+          & $env:PY $helper --ncu-exe $env:NCU --output-dir $screens --reports $reports --wait-seconds 45
+          if ($LASTEXITCODE -ne 0) { throw "GUI capture helper exited $LASTEXITCODE" }
+          $manifestPath = Join-Path $screens 'capture-manifest.json'
+          if (-not (Test-Path $manifestPath)) { throw 'Screenshot manifest missing' }
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          $groups = @{}
+          $missing = @()
+          foreach ($capture in @($manifest.captures)) {
+            $name = [IO.Path]::GetFileName([string]$capture.report)
+            if (-not $groups.ContainsKey($name)) { $groups[$name] = 0 }
+            $groups[$name]++
+            if (-not (Test-Path ([string]$capture.screenshot))) { $missing += [string]$capture.screenshot }
+          }
+          $expected = @($reports | ForEach-Object { [IO.Path]::GetFileName([string]$_) })
+          $unrepresented = @($expected | Where-Object { -not $groups.ContainsKey($_) })
+          $tooFew = @($groups.GetEnumerator() | Where-Object { $_.Value -lt 25 })
+          if (@($manifest.skipped).Count -gt 0 -or $missing.Count -gt 0 -or $unrepresented.Count -gt 0 -or $tooFew.Count -gt 0) {
+            throw "GUI capture incomplete: captures=$(@($manifest.captures).Count), report_groups=$($groups.Count)/$expectedCount, skips=$(@($manifest.skipped).Count), missing_files=$($missing.Count), unrepresented=$($unrepresented.Count), reports_under_25=$($tooFew.Count)"
+          }
+          $rows = foreach ($name in $expected) {
+            [pscustomobject]@{
+              report = $name
+              screenshot_count = $groups[$name]
+              views = (@($manifest.captures | Where-Object { [IO.Path]::GetFileName([string]$_.report) -eq $name } | ForEach-Object { $_.view }) -join ';')
+            }
+          }
+          $rows | Export-Csv -NoTypeInformation -Encoding utf8 (Join-Path $env:OUT_DIR 'screenshot-index.csv')
+          $total = @($manifest.captures).Count
+          $lines = @(
+            '# 27-report Nsight Compute GUI screenshot capture',
+            '',
+            "- Workflow run: $env:GITHUB_RUN_ID",
+            "- Source commit: $env:GITHUB_SHA",
+            "- Reports imported: $expectedCount",
+            "- Genuine GUI screenshots: $total",
+            "- Skipped reports/views: $(@($manifest.skipped).Count)",
+            "- Capture status: $($manifest.status)",
+            '- Capture sequence: one report at a time; GPU profiling not repeated',
+            '',
+            '| Native report | Genuine screenshots |',
+            '|---|---:|'
+          )
+          foreach ($row in $rows) { $lines += "| $($row.report) | $($row.screenshot_count) |" }
+          $lines += ''
+          $lines += "Total genuine GUI screenshots: $total."
+          $lines | Set-Content -Encoding utf8 (Join-Path $env:OUT_DIR 'CAPTURE_STATUS.md')
+          Write-Host "NCU_REPORTS_CAPTURED=$expectedCount"
+          Write-Host "NCU_GUI_SCREENSHOTS=$total"
+          Write-Host "NCU_CAPTURE_STATUS=$($manifest.status)"
+
+      - name: Upload screenshots, manifests and report indexes
+        id: upload_evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncu-27-gui-evidence-${{ github.run_id }}
+          path: |
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\gui-analysis-${{ github.run_id }}\
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Publish a machine-readable completion marker for run discovery
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          SOURCE_SHA: ${{ github.sha }}
+          JOB_RESULT: ${{ job.status }}
+          ARTIFACT_ID: ${{ steps.upload_evidence.outputs.artifact-id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\gui-analysis-' + $env:RUN_ID
+          $summary = [ordered]@{
+            workflow = 'ncu-27-gui-evidence'
+            run_id = [long]$env:RUN_ID
+            source_commit = $env:SOURCE_SHA
+            job_result = $env:JOB_RESULT
+            artifact_id = $env:ARTIFACT_ID
+            expected_full_matrix = 27
+            capture_probe_mode = $false
+            manifest_status = $null
+            screenshots = 0
+            reports_represented = 0
+            skipped = 0
+            generated_utc = [DateTime]::UtcNow.ToString('o')
+          }
+          $manifestPath = Join-Path $out 'screenshots\capture-manifest.json'
+          if (Test-Path $manifestPath) {
+            $m = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+            $summary.manifest_status = $m.status
+            $summary.screenshots = @($m.captures).Count
+            $summary.reports_represented = @($m.captures | ForEach-Object { [IO.Path]::GetFileName([string]$_.report) } | Sort-Object -Unique).Count
+            $summary.skipped = @($m.skipped).Count
+          }
+          $json = $summary | ConvertTo-Json -Depth 6
+          $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+          $body = @{
+            message = "Record Nsight GUI evidence run $env:RUN_ID"
+            content = [Convert]::ToBase64String($bytes)
+            branch = 'main'
+          } | ConvertTo-Json -Depth 4
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/docs/ncu-gui-runs/$env:RUN_ID.json"
+          $response = Invoke-RestMethod -Method Put -Uri $uri -Headers $headers -ContentType 'application/json' -Body $body
+          Write-Host "PUBLISHED_RUN_MARKER=$($response.content.path)"
+          Write-Host "JOB_RESULT=$env:JOB_RESULT SCREENSHOTS=$($summary.screenshots) REPORTS=$($summary.reports_represented) SKIPPED=$($summary.skipped)"
+      - name: Publish final commit status and run URL
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          SOURCE_SHA: ${{ github.sha }}
+          JOB_RESULT: ${{ job.status }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\gui-analysis-' + $env:RUN_ID
+          $manifestPath = Join-Path $out 'screenshots\capture-manifest.json'
+          $screenshots = 0; $reports = 0; $skipped = 0
+          if (Test-Path $manifestPath) {
+            $m = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+            $screenshots = @($m.captures).Count
+            $reports = @($m.captures | ForEach-Object { [IO.Path]::GetFileName([string]$_.report) } | Sort-Object -Unique).Count
+            $skipped = @($m.skipped).Count
+          }
+          $state = if ($env:JOB_RESULT -eq 'success' -and $reports -eq 27 -and $screenshots -ge 675 -and $skipped -eq 0) { 'success' } else { 'failure' }
+          $description = "NCU GUI full matrix: $screenshots screenshots / $reports report(s) / $skipped skipped"
+          if ($description.Length -gt 140) { $description = $description.Substring(0,140) }
+          $body = @{
+            state = $state
+            target_url = "https://github.com/xemptynothing/gpu-nvidia/actions/runs/$env:RUN_ID"
+            description = $description
+            context = 'ncu-gui-full-matrix'
+          } | ConvertTo-Json -Depth 4
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia/statuses/$env:SOURCE_SHA"
+          $status = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -ContentType 'application/json' -Body $body
+          Write-Host "PUBLISHED_COMMIT_STATUS=$($status.state) $($status.target_url) $description"
+  capture-ptx-panes:
+    if: ${{ contains(github.event.head_commit.message, 'PTX four-pane supplement') }}
+    name: Capture four PTX-mode Source subpanels sequentially
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 180
+    env:
+      RUN_ID: ${{ github.run_id }}
+      SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Verify existing reports and create PTX pane capture script
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $runDir = Join-Path $root 'results\ncu\rtx4060\legal-matrix-41206212024'
+          $ncu = 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          $helper = Join-Path $root 'scripts\capture_ncu_analysis_screenshots.py'
+          foreach ($p in @($root,$runDir,$ncu,$py,$helper)) { if (-not (Test-Path -LiteralPath $p)) { throw "Required local resource missing: $p" } }
+          $reports = @(Get-ChildItem -LiteralPath $runDir -Filter '*.ncu-repz' -File -Recurse | Sort-Object FullName)
+          if ($reports.Count -ne 27) { throw "Expected 27 existing reports; found $($reports.Count)" }
+          foreach ($r in $reports) {
+            $statusPath = Join-Path $r.DirectoryName 'status.json'
+            if (-not (Test-Path $statusPath)) { throw "Missing PASS status: $($r.FullName)" }
+            $s = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
+            if ($s.status -ne 'PASS') { throw "Profile not PASS: $($r.FullName)" }
+          }
+          $gpu = (nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total --format=csv 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or $gpu -notmatch 'RTX 4060') { throw "Expected RTX 4060, got: $gpu" }
+          $out = Join-Path $runDir ("ptx-four-pane-" + $env:RUN_ID)
+          if (Test-Path $out) { throw "Refusing to overwrite existing evidence: $out" }
+          New-Item -ItemType Directory -Force -Path (Join-Path $out 'screenshots') | Out-Null
+          $script = @'
+          import argparse, importlib.util, json, subprocess, time
+          from pathlib import Path
+          
+          def main():
+              ap=argparse.ArgumentParser()
+              ap.add_argument("--ncu-exe",type=Path,required=True)
+              ap.add_argument("--helper",type=Path,required=True)
+              ap.add_argument("--screens",type=Path,required=True)
+              ap.add_argument("--reports",nargs="+",type=Path,required=True)
+              a=ap.parse_args()
+              spec=importlib.util.spec_from_file_location("ncu_capture_helper",a.helper)
+              cap=importlib.util.module_from_spec(spec); spec.loader.exec_module(cap)
+              ui=cap._ui_path(a.ncu_exe)
+              if not ui: raise RuntimeError("ncu-ui.exe not found")
+              manifest={"capture_method":"Windows PrintWindow from real NVIDIA Nsight Compute UI; import existing native report only; no profiler replay",
+                        "mode":"PTX right-view; four independently horizontally scrolled Source panes",
+                        "captures":[],"skipped":[],"status":"pending"}
+              for report in a.reports:
+                  report=report.resolve()
+                  try:
+                      proc=subprocess.Popen([str(ui),str(report)],cwd=str(report.parent),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                      win=cap._wait_window(proc.pid,report.stem,45) or cap._wait_window(None,report.stem,8)
+                      if not win: raise RuntimeError("Nsight Compute window not found")
+                      hwnd=win["hwnd"]
+                      cap.user32.ShowWindow(cap.HWND(hwnd),cap.SW_MAXIMIZE)
+                      cap.user32.SetForegroundWindow(cap.HWND(hwnd))
+                      time.sleep(1.5)
+                      newer=cap._wait_window(proc.pid,report.stem,5)
+                      if newer: win=newer; hwnd=win["hwnd"]
+                      cap._click_relative(hwnd,260,212,verify_y=225)
+                      cap._click_at(hwnd,300,253)
+                      cap._type_key(0x50)  # PTX
+                      cap._type_key(0x0D)
+                      time.sleep(1.0)
+                      for panel in ("left-code","left-metrics","right-code","right-metrics"):
+                          cap._scroll_horizontal(hwnd,panel,notches=-4)
+                          dest=a.screens/f"{report.stem}-source-ptx-horizontal-{panel}.png"
+                          width,height,colours=cap._capture(hwnd,dest)
+                          manifest["captures"].append({"report":str(report),"window_title":win.get("title","NVIDIA Nsight Compute"),
+                              "view":f"source-ptx-horizontal-{panel}","panel":panel,"screenshot":str(dest),
+                              "width":width,"height":height,"sampled_distinct_colours":colours})
+                          print(f"PTX_PANE_CAPTURED={report.stem}:{panel}")
+                  except Exception as e:
+                      manifest["skipped"].append({"report":str(report),"reason":f"{type(e).__name__}: {e}"})
+                      print(f"PTX_PANE_SKIPPED={report}:{type(e).__name__}:{e}")
+              manifest["status"]="captured" if manifest["captures"] else "empty"
+              (a.screens/"capture-manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
+              if manifest["skipped"] or len(manifest["captures"])!=4*len(a.reports): return 2
+              print(f"PTX_PANE_SCREENSHOTS={len(manifest['captures'])}")
+              return 0
+          if __name__=="__main__": raise SystemExit(main())
+          '@
+          $scriptPath = Join-Path $env:RUNNER_TEMP ("capture-ptx-four-pane-" + $env:RUN_ID + '.py')
+          [IO.File]::WriteAllText($scriptPath,$script,[Text.UTF8Encoding]::new($false))
+          @("RUN_ID=$env:RUN_ID","SOURCE_COMMIT=$env:SOURCE_SHA","GPU=$gpu","EXISTING_NATIVE_REPORTS=27","PROFILE_RECAPTURE=NO") | Set-Content -Encoding utf8 (Join-Path $out 'capture-environment.txt')
+          "SUPPLEMENTAL_OUT=$out"
+          "VERIFIED_EXISTING_REPORTS=27"
+          "GPU=$gpu"
+
+      - name: Capture all four PTX-mode panes sequentially
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          ROOT: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          RUN_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024'
+          OUT_DIR: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\ptx-four-pane-${{ github.run_id }}'
+          NCU: 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          PY: 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\.venv-cutile-windows\Scripts\python.exe'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reports = @(Get-ChildItem -LiteralPath $env:RUN_DIR -Filter '*.ncu-repz' -File -Recurse | Sort-Object FullName | ForEach-Object { $_.FullName })
+          $screens = Join-Path $env:OUT_DIR 'screenshots'
+          $scriptPath = Join-Path $env:RUNNER_TEMP ("capture-ptx-four-pane-" + $env:GITHUB_RUN_ID + '.py')
+          $argsList = @('--ncu-exe',$env:NCU,'--helper',(Join-Path $env:ROOT 'scripts\capture_ncu_analysis_screenshots.py'),'--screens',$screens,'--reports') + $reports
+          & $env:PY $scriptPath @argsList
+          if ($LASTEXITCODE -ne 0) { throw "PTX four-pane capture exited $LASTEXITCODE" }
+          $manifest = Get-Content -LiteralPath (Join-Path $screens 'capture-manifest.json') -Raw | ConvertFrom-Json
+          $reportsSeen = @($manifest.captures | ForEach-Object { [IO.Path]::GetFileName([string]$_.report) } | Sort-Object -Unique).Count
+          if (@($manifest.captures).Count -ne 108 -or $reportsSeen -ne 27 -or @($manifest.skipped).Count -ne 0) {
+            throw "PTX capture validation failed: screenshots=$(@($manifest.captures).Count), reports=$reportsSeen, skipped=$(@($manifest.skipped).Count)"
+          }
+          $manifest.captures | ForEach-Object {
+            if (-not (Test-Path -LiteralPath $_.screenshot)) { throw "Missing screenshot $($_.screenshot)" }
+            if ($_.width -ne 1936 -or $_.height -ne 1048) { throw "Unexpected image dimensions for $($_.screenshot)" }
+          }
+          $manifest.captures | ForEach-Object {
+            [pscustomobject]@{report=[IO.Path]::GetFileName([string]$_.report);panel=$_.panel;view=$_.view;screenshot=[IO.Path]::GetFileName([string]$_.screenshot);width=$_.width;height=$_.height}
+          } | Export-Csv -NoTypeInformation -Encoding utf8 (Join-Path $env:OUT_DIR 'ptx-four-pane-index.csv')
+          "PTX_PANE_REPORTS=27"
+          "PTX_PANE_SCREENSHOTS=108"
+          "PTX_PANE_SKIPPED=0"
+
+      - name: Upload supplemental PTX pane evidence
+        id: upload_ptx
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncu-27-ptx-four-pane-${{ github.run_id }}
+          path: |
+            C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\ptx-four-pane-${{ github.run_id }}\
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish PTX supplement marker and status
+        if: always()
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          SOURCE_SHA: ${{ github.sha }}
+          JOB_RESULT: ${{ job.status }}
+          ARTIFACT_ID: ${{ steps.upload_ptx.outputs.artifact-id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\ptx-four-pane-' + $env:RUN_ID
+          $mPath = Join-Path $out 'screenshots\capture-manifest.json'
+          $n = 0; $r = 0; $s = 0
+          if (Test-Path $mPath) {
+            $m = Get-Content -LiteralPath $mPath -Raw | ConvertFrom-Json
+            $n = @($m.captures).Count
+            $r = @($m.captures | ForEach-Object { [IO.Path]::GetFileName([string]$_.report) } | Sort-Object -Unique).Count
+            $s = @($m.skipped).Count
+          }
+          $state = if ($env:JOB_RESULT -eq 'success' -and $n -eq 108 -and $r -eq 27 -and $s -eq 0) { 'success' } else { 'failure' }
+          $headers = @{ Authorization="Bearer $env:GH_TOKEN"; Accept='application/vnd.github+json'; 'X-GitHub-Api-Version'='2022-11-28' }
+          $statusBody = @{state=$state;target_url="https://github.com/xemptynothing/gpu-nvidia/actions/runs/$env:RUN_ID";description="PTX four-pane captures: $n / $r reports / $s skipped";context='ncu-gui-ptx-four-pane'} | ConvertTo-Json -Depth 4
+          Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/xemptynothing/gpu-nvidia/statuses/$env:SOURCE_SHA" -Headers $headers -ContentType 'application/json' -Body $statusBody | Out-Null
+          $json = [ordered]@{run_id=[long]$env:RUN_ID;source_commit=$env:SOURCE_SHA;job_result=$env:JOB_RESULT;artifact_id=$env:ARTIFACT_ID;screenshots=$n;reports=$r;skipped=$s;status=$state} | ConvertTo-Json -Depth 5
+          $payload = @{message="Record PTX four-pane screenshot run $env:RUN_ID";content=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json));branch='main'} | ConvertTo-Json -Depth 4
+          Invoke-RestMethod -Method Put -Uri "https://api.github.com/repos/xemptynothing/gpu-nvidia/contents/docs/ncu-gui-runs/$env:RUN_ID-ptx-four-pane.json" -Headers $headers -ContentType 'application/json' -Body $payload | Out-Null

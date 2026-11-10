@@ -1,0 +1,43 @@
+name: A100 shared-tile version benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/shared_tile_cuda_attention.py"
+      - "src/variants/**"
+      - "benchmarks/benchmark_kernel_versions.py"
+      - ".github/workflows/a100-kernel-version-benchmark.yml"
+
+concurrency:
+  group: a100-kernel-version-benchmark-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare persistent native environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/setup_native_env.sh
+      - name: Run v1 v2 benchmark
+        env:
+          REQUIRE_A100: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          ${NATIVE_VENV}/bin/python benchmarks/benchmark_kernel_versions.py
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-version-benchmark
+          path: |
+            results/kernel_version_benchmark.json
+            results/kernel_version_benchmark.csv

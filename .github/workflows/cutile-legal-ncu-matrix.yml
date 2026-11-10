@@ -1,0 +1,317 @@
+name: Sequential Nsight Compute profiles for remaining legal cuTile configurations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-legal-ncu-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    name: ${{ matrix.case }} TQ${{ matrix.tq }} TK${{ matrix.tk }} latency=${{ matrix.latency }}
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - case: short_d32
+            tq: 32
+            tk: 64
+            latency: 0
+          - case: short_d32
+            tq: 64
+            tk: 64
+            latency: 0
+          - case: short_d64
+            tq: 32
+            tk: 64
+            latency: 0
+          - case: short_d64
+            tq: 64
+            tk: 64
+            latency: 0
+          - case: short_multihead_d64
+            tq: 32
+            tk: 64
+            latency: 0
+          - case: short_multihead_d64
+            tq: 64
+            tk: 64
+            latency: 0
+          - case: short_multihead_d64
+            tq: 64
+            tk: 128
+            latency: 0
+          - case: short_multihead_d64
+            tq: 128
+            tk: 64
+            latency: 0
+          - case: short_multihead_d64
+            tq: 128
+            tk: 128
+            latency: 0
+          - case: medium_d64
+            tq: 32
+            tk: 64
+            latency: 0
+          - case: medium_d64
+            tq: 64
+            tk: 64
+            latency: 0
+          - case: medium_d64
+            tq: 64
+            tk: 128
+            latency: 0
+          - case: medium_d64
+            tq: 128
+            tk: 64
+            latency: 0
+          - case: medium_d64
+            tq: 128
+            tk: 128
+            latency: 0
+          - case: medium_d128
+            tq: 32
+            tk: 64
+            latency: 0
+          - case: medium_d128
+            tq: 128
+            tk: 64
+            latency: 0
+          - case: medium_d128
+            tq: 128
+            tk: 128
+            latency: 0
+          - case: long_d128
+            tq: 32
+            tk: 64
+            latency: 0
+          - case: long_d128
+            tq: 64
+            tk: 64
+            latency: 0
+          - case: long_d128
+            tq: 64
+            tk: 128
+            latency: 0
+          - case: long_d128
+            tq: 128
+            tk: 64
+            latency: 0
+          - case: long_d128
+            tq: 128
+            tk: 128
+            latency: 0
+          - case: longer_batched_d128
+            tq: 32
+            tk: 64
+            latency: 0
+          - case: longer_batched_d128
+            tq: 64
+            tk: 64
+            latency: 0
+          - case: longer_batched_d128
+            tq: 128
+            tk: 64
+            latency: 0
+          - case: longer_batched_d128
+            tq: 128
+            tk: 128
+            latency: 0
+          - case: medium_d128
+            tq: 64
+            tk: 64
+            latency: 10
+    env:
+      CASE: ${{ matrix.case }}
+      TILE_Q: ${{ matrix.tq }}
+      TILE_K: ${{ matrix.tk }}
+      LOAD_LATENCY: ${{ matrix.latency }}
+      RUN_ID: ${{ github.run_id }}
+      COMMIT_SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout the exact source revision without cleaning saved NCU reports
+        uses: actions/checkout@v4
+        with:
+          clean: false
+          fetch-depth: 1
+
+      - name: Capture one actual cuTile Nsight Compute profile
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          $ncu = (Get-Command ncu.exe -ErrorAction SilentlyContinue).Source
+          if (-not $ncu) {
+            $ncu = 'C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          }
+          $script = Join-Path $env:GITHUB_WORKSPACE 'benchmarks\profile_fused.py'
+          if (-not (Test-Path $root)) { throw "Project root missing: $root" }
+          if (-not (Test-Path $py)) { throw "Project cuTile Python environment missing: $py" }
+          if (-not (Test-Path $ncu)) { throw "Nsight Compute CLI missing: $ncu" }
+          if (-not (Test-Path $script)) { throw "Profile script missing: $script" }
+
+          $gpu = (nvidia-smi --query-gpu=name,driver_version,compute_cap,memory.total --format=csv 2>&1 | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "nvidia-smi failed: $gpu" }
+          if ($gpu -notmatch 'RTX 4060') { throw "This matrix must run on the local RTX 4060; found: $gpu" }
+          $runDir = Join-Path $root ("results\ncu\rtx4060\legal-matrix-" + $env:RUN_ID)
+          $tag = "$($env:CASE)-tq$($env:TILE_Q)-tk$($env:TILE_K)-lat$($env:LOAD_LATENCY)"
+          $dir = Join-Path $runDir $tag
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $base = Join-Path $dir $tag
+          $log = Join-Path $dir 'ncu-capture.log'
+          $statusPath = Join-Path $dir 'status.json'
+          $started = Get-Date
+          "EXPERIMENT_START=$tag" | Tee-Object -FilePath $log
+          "COMMIT=$env:COMMIT_SHA" | Add-Content $log
+          "GPU=$gpu" | Add-Content $log
+          "NCU=$ncu" | Add-Content $log
+          & $ncu --version 2>&1 | Tee-Object -FilePath $log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute --version failed.' }
+          & $py -c "import sys,cupy,importlib.metadata; import cuda.tile; print('PYTHON='+sys.version); print('CUPY='+cupy.__version__); print('CUDA_TILE='+importlib.metadata.version('cuda-tile'))" 2>&1 | Tee-Object -FilePath $log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'cuTile/CuPy runtime import failed.' }
+
+          $profileArgs = @(
+            '--set','basic',
+            '--section','SchedulerStats',
+            '--section','WarpStateStats',
+            '--section','MemoryWorkloadAnalysis',
+            '--launch-skip','6',
+            '--launch-count','1',
+            '--force-overwrite',
+            '-o',$base,
+            $py,$script,
+            '--case',$env:CASE,
+            '--tile-q',$env:TILE_Q,
+            '--tile-k',$env:TILE_K,
+            '--warmup','5',
+            '--load-latency',$env:LOAD_LATENCY
+          )
+          & $ncu @profileArgs 2>&1 | Tee-Object -FilePath $log -Append
+          $captureExit = $LASTEXITCODE
+          if ($captureExit -ne 0) {
+            $failed = [ordered]@{
+              status='FAILED'; experiment=$tag; case=$env:CASE
+              tile_q=[int]$env:TILE_Q; tile_k=[int]$env:TILE_K
+              load_latency=[int]$env:LOAD_LATENCY; commit=$env:COMMIT_SHA
+              gpu=$gpu; error="Nsight Compute exited $captureExit"
+              started=$started.ToString('o'); completed=(Get-Date).ToString('o')
+            }
+            $failed | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $statusPath
+            throw "NCU_PROFILE_FAILED=$tag exit=$captureExit"
+          }
+
+          $report = @("$base.ncu-repz","$base.ncu-rep") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $report) { throw "NCU completed but no report was created for $tag" }
+          "REPORT=$report" | Add-Content $log
+          "REPORT_BYTES=$((Get-Item $report).Length)" | Add-Content $log
+
+          & $ncu --import $report --page details --csv 2>&1 | Out-File -Encoding utf8 (Join-Path $dir 'details.csv')
+          if ($LASTEXITCODE -ne 0) { throw "Details CSV export failed for $tag" }
+          & $ncu --import $report --page raw --csv 2>&1 | Out-File -Encoding utf8 (Join-Path $dir 'raw.csv')
+          if ($LASTEXITCODE -ne 0) { throw "Raw CSV export failed for $tag" }
+
+          # Keep source exports when correlation data is available. These are
+          # supplemental; the native .ncu-rep[z] plus details/raw remain primary.
+          & $ncu --import $report --page source --print-source tileir,ptx 2>&1 | Out-File -Encoding utf8 (Join-Path $dir 'source-tileir-ptx.txt')
+          $ptxExit = $LASTEXITCODE
+          & $ncu --import $report --page source --print-source tileir,sass 2>&1 | Out-File -Encoding utf8 (Join-Path $dir 'source-tileir-sass.txt')
+          $sassExit = $LASTEXITCODE
+
+          $completedAt = Get-Date
+          $ok = [ordered]@{
+            status='PASS'; experiment=$tag; case=$env:CASE
+            tile_q=[int]$env:TILE_Q; tile_k=[int]$env:TILE_K
+            load_latency=[int]$env:LOAD_LATENCY; commit=$env:COMMIT_SHA
+            gpu=$gpu; report=(Split-Path $report -Leaf)
+            report_bytes=(Get-Item $report).Length
+            details_csv=(Test-Path (Join-Path $dir 'details.csv'))
+            raw_csv=(Test-Path (Join-Path $dir 'raw.csv'))
+            ptx_export_exit=$ptxExit; sass_export_exit=$sassExit
+            started=$started.ToString('o'); completed=$completedAt.ToString('o')
+            elapsed_seconds=[math]::Round(($completedAt-$started).TotalSeconds,2)
+          }
+          $ok | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $statusPath
+          "EXPERIMENT_COMPLETE=$tag STATUS=PASS ELAPSED_SECONDS=$($ok.elapsed_seconds)" | Tee-Object -FilePath $log -Append
+          @(
+            "## Nsight Compute profile: $tag",
+            "",
+            "- **Status:** PASS",
+            "- **Source commit:** $env:COMMIT_SHA",
+            "- **GPU:** $gpu",
+            "- **Report:** $report",
+            "- **Duration:** $($ok.elapsed_seconds) seconds"
+          ) | Add-Content $env:GITHUB_STEP_SUMMARY
+
+  aggregate:
+    name: Assemble per-experiment NCU results
+    if: always()
+    needs: [profile]
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 20
+    env:
+      RUN_ID: ${{ github.run_id }}
+      MATRIX_RESULT: ${{ needs.profile.result }}
+    steps:
+      - name: Build experiment status and results index
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $runDir = Join-Path $root ("results\ncu\rtx4060\legal-matrix-" + $env:RUN_ID)
+          if (-not (Test-Path $runDir)) { throw "No experiment output directory: $runDir" }
+          $statuses = @(Get-ChildItem $runDir -Filter status.json -File -Recurse)
+          $rows = @()
+          foreach ($file in $statuses) {
+            $s = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            $rows += [pscustomobject]@{
+              status=$s.status; experiment=$s.experiment; case=$s.case
+              tile_q=$s.tile_q; tile_k=$s.tile_k; load_latency=$s.load_latency
+              elapsed_seconds=$s.elapsed_seconds; report=$s.report
+              report_bytes=$s.report_bytes; directory=$file.DirectoryName
+              error=$s.error
+            }
+          }
+          $rows = @($rows | Sort-Object case,tile_q,tile_k,load_latency)
+          $rows | Export-Csv -NoTypeInformation -Encoding utf8 (Join-Path $runDir 'profile-index.csv')
+          $passed = @($rows | Where-Object status -eq 'PASS').Count
+          $failed = @($rows | Where-Object status -ne 'PASS').Count
+          $md = @(
+            '# Remaining legal cuTile Nsight Compute matrix',
+            '',
+            "- Workflow run: $env:RUN_ID",
+            "- Source commit: $env:GITHUB_SHA",
+            "- Matrix result: $env:MATRIX_RESULT",
+            "- Completed profile records: $($rows.Count)",
+            "- Passed: $passed",
+            "- Failed or incomplete: $failed",
+            '',
+            '| Status | Workload | TQ×TK | Load latency | NCU report |',
+            '|---|---|---:|---:|---|'
+          )
+          foreach ($row in $rows) {
+            $md += "| $($row.status) | $($row.case) | $($row.tile_q)x$($row.tile_k) | $($row.load_latency) | $($row.report) |"
+          }
+          $md | Set-Content -Encoding utf8 (Join-Path $runDir 'PROFILE_INDEX.md')
+          "MATRIX_RESULT=$env:MATRIX_RESULT" | Set-Content (Join-Path $runDir 'matrix-status.txt')
+          "PROFILE_RECORDS=$($rows.Count)" | Add-Content (Join-Path $runDir 'matrix-status.txt')
+          "PASSED=$passed" | Add-Content (Join-Path $runDir 'matrix-status.txt')
+          "FAILED_OR_INCOMPLETE=$failed" | Add-Content (Join-Path $runDir 'matrix-status.txt')
+          "PROFILE_OUTPUT=$runDir" | Add-Content (Join-Path $runDir 'matrix-status.txt')
+          Write-Host "MATRIX_RESULT=$env:MATRIX_RESULT PROFILE_RECORDS=$($rows.Count) PASSED=$passed FAILED_OR_INCOMPLETE=$failed"
+
+      - name: Upload all legal NCU reports and indexes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-legal-ncu-matrix-${{ github.run_id }}
+          path: C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-${{ github.run_id }}\
+          if-no-files-found: warn
+          retention-days: 30

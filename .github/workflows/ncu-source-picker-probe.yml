@@ -1,0 +1,102 @@
+name: Probe Nsight Tile IR and right-view selectors (single existing report)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ncu-source-picker-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, windows, x64, local]
+    timeout-minutes: 15
+    steps:
+      - name: Probe Tile IR selector, PTX selector, and right-metrics horizontal scroll
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference='Stop'
+          $root='C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $py=Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          $helper=Join-Path $root 'scripts\capture_ncu_analysis_screenshots.py'
+          $ncu='C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe'
+          $profile='long_d128-tq128-tk128-lat0'
+          $runDir=Join-Path $root 'results\ncu\rtx4060\legal-matrix-41206212024'
+          $report=Join-Path (Join-Path $runDir $profile) ($profile+'.ncu-repz')
+          foreach($p in @($py,$helper,$ncu,$report)){if(-not(Test-Path $p)){throw "Missing $p"}}
+          $out=Join-Path $runDir ('tileir-rightpane-probe-'+$env:GITHUB_RUN_ID)
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $code=@'
+import importlib.util, subprocess, time, json, hashlib, ctypes
+from pathlib import Path
+ap=Path(r"C:\Users\Public\GPU-cutile-project\gpu-nvidia\scripts\capture_ncu_analysis_screenshots.py")
+spec=importlib.util.spec_from_file_location("cap",ap)
+cap=importlib.util.module_from_spec(spec);spec.loader.exec_module(cap)
+ncu=Path(r"C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe")
+rep=Path(r"C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\long_d128-tq128-tk128-lat0\long_d128-tq128-tk128-lat0.ncu-repz")
+out=Path(r"OUT_PLACEHOLDER");out.mkdir(parents=True,exist_ok=True)
+ui=cap._ui_path(ncu)
+if not ui:raise RuntimeError("ncu-ui.exe missing")
+p=subprocess.Popen([str(ui),str(rep)],cwd=str(rep.parent),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+win=cap._wait_window(p.pid,rep.stem,60) or cap._wait_window(None,rep.stem,10)
+if not win:raise RuntimeError("Nsight window not found")
+hwnd=win["hwnd"]
+cap.user32.ShowWindow(cap.HWND(hwnd),cap.SW_MAXIMIZE)
+cap.user32.SetForegroundWindow(cap.HWND(hwnd));time.sleep(1.5)
+cap._click_relative(hwnd,230,212,verify_y=225);time.sleep(.7)
+manifest=[]
+def snap(name):
+ f=out/(name+".png");w,h,c=cap._capture(hwnd,f)
+ sha=hashlib.sha256(f.read_bytes()).hexdigest()
+ manifest.append({"name":name,"file":f.name,"width":w,"height":h,"sha256":sha})
+ print("SNAP",name,w,h,sha)
+snap("00-source-sass-baseline")
+# Source-file/view picker: this actual control advances Source -> Tile IR.
+cap._click_at(hwnd,185,243,pause=.5)
+snap("01-left-source-dropdown-open")
+cap._type_key(0x28);cap._type_key(0x0D);time.sleep(.8)
+snap("02-left-view-tileir")
+# Restore the left pane to Source with Home.
+cap._click_at(hwnd,185,243,pause=.35)
+cap._type_key(0x24);cap._type_key(0x0D);time.sleep(.7)
+snap("03-left-view-source-restored")
+# Click the right-view selector arrow (row 215), not the Source filename picker.
+cap._click_at(hwnd,278,215,pause=.5)
+snap("04-right-view-dropdown-open")
+cap._type_key(0x28);cap._type_key(0x0D);time.sleep(.8)
+snap("05-right-view-after-down")
+# If Down selected PTX, scroll the right-side metrics table at x=75% of
+# the report width; the former x=88% landed in the right-side toolbar.
+rect=cap.RECT()
+if not cap.user32.GetWindowRect(cap.HWND(hwnd),ctypes.byref(rect)):raise RuntimeError("GetWindowRect failed")
+w,h=rect.right-rect.left,rect.bottom-rect.top
+x=rect.left+int(w*.75);y=rect.top+int(h*.58)
+if not cap.user32.SetCursorPos(x,y):raise RuntimeError("SetCursorPos failed")
+time.sleep(.2)
+target=cap.user32.WindowFromPoint(cap.POINT(x,y))
+buf=ctypes.create_unicode_buffer(256);cap.user32.GetClassNameW(target,buf,256)
+cap.user32.mouse_event(cap.MOUSEEVENTF_HWHEEL,0,0,ctypes.c_uint32((120*12)&0xffffffff).value,None)
+time.sleep(1)
+snap("06-right-view-rightmetrics-scroll")
+manifest.append({"target_x":x,"target_y":y,"target_class":buf.value})
+(out/"probe-manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
+print("PROBE_COMPLETE",len(manifest))
+'@
+          $code=$code.Replace('OUT_PLACEHOLDER',($out -replace '\\','/'))
+          $script=Join-Path $env:RUNNER_TEMP 'ncu_tileir_rightpane_probe.py'
+          [IO.File]::WriteAllText($script,$code,[Text.UTF8Encoding]::new($false))
+          & $py $script
+          if($LASTEXITCODE -ne 0){throw "Tile IR/right pane probe failed $LASTEXITCODE"}
+          "PROBE_OUT=$out"
+
+      - name: Upload Tile IR and right-pane probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ncu-tileir-rightpane-probe-${{ github.run_id }}
+          path: C:\Users\Public\GPU-cutile-project\gpu-nvidia\results\ncu\rtx4060\legal-matrix-41206212024\tileir-rightpane-probe-RUN_ID_TOKEN\
+          if-no-files-found: warn
+          retention-days: 30

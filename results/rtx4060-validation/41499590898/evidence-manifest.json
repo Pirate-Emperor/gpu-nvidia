@@ -1,0 +1,219 @@
+{
+    "run_id":  "41499590898",
+    "source_commit":  "202f32b6c98fad6986f788ec5f71b63677fab694",
+    "gpu_target":  "NVIDIA GeForce RTX 4060 / compute capability 8.9",
+    "captured_at_utc":  "2026-11-02T18:24:25.8467893Z",
+    "file_count":  42,
+    "files":  [
+                  {
+                      "path":  "cutile-accuracy.log",
+                      "bytes":  7936,
+                      "sha256":  "4ff8aea124ca2bd58fa4eb2add6cb1720b205d29c474873e5e659b52a4432273"
+                  },
+                  {
+                      "path":  "cutile-benchmark-session1.log",
+                      "bytes":  9208,
+                      "sha256":  "9daae493ca3e528e4fdc3158f7a12ea71d6a5de2fdfdeb9aff9d522dbe9483cc"
+                  },
+                  {
+                      "path":  "cutile-benchmark-session2.log",
+                      "bytes":  9210,
+                      "sha256":  "a27b8f2bd39e0fc9b4fd9283ed446b502c06cc8a0fcff1b9d3818b35a8faacf1"
+                  },
+                  {
+                      "path":  "cutile-benchmark-session3.log",
+                      "bytes":  9212,
+                      "sha256":  "14df946cb8ff5bc5bc536fe705740a20ba7508337d15387cbf21d78813a67bf9"
+                  },
+                  {
+                      "path":  "cutile-benchmark-summary.log",
+                      "bytes":  1678,
+                      "sha256":  "16c05e502d591b6bf3ccb6a7f6164b3172f484bd01511530279e0bd3c345656b"
+                  },
+                  {
+                      "path":  "cutile-clean-jit.log",
+                      "bytes":  8566,
+                      "sha256":  "cfbcb7d576bcf0ed045136f0d341b4e7f8c746268be0bee2d9688f2c57e2f525"
+                  },
+                  {
+                      "path":  "cutile-cli.log",
+                      "bytes":  212,
+                      "sha256":  "38e92e6feaecadc1251949aec51d34684d57a7afe0911dd8b0c46d1dfd8e840b"
+                  },
+                  {
+                      "path":  "cutile-cli-reference.log",
+                      "bytes":  54,
+                      "sha256":  "3945a0d3bfc25dd81ce29148262aab9b31703a4c36469847300ae950a6c08e53"
+                  },
+                  {
+                      "path":  "cutile-environment.log",
+                      "bytes":  14456,
+                      "sha256":  "6367c3287564c04f9ebbb84ee4068025ae6fa9f763ad9c944c6328eb7d5f79c5"
+                  },
+                  {
+                      "path":  "cutile-gpu-install.log",
+                      "bytes":  9008,
+                      "sha256":  "6f2f539253186289134e9c6e4a341d1e7ea42e007fb7b70018e39d0eb5723c16"
+                  },
+                  {
+                      "path":  "cutile-install.log",
+                      "bytes":  2692,
+                      "sha256":  "83bbb2a920200453612b4fdf53e30bf83f4c37ff7d43831ef732af484f07598b"
+                  },
+                  {
+                      "path":  "cutile-load-latency-hints.log",
+                      "bytes":  2080,
+                      "sha256":  "adf1e0cc07eb4b14b6ae385a6894f7476d4d08dc786118013104b5e783c5034b"
+                  },
+                  {
+                      "path":  "cutile-optional-objectives.log",
+                      "bytes":  238,
+                      "sha256":  "94aba7e23f2c3562516028ca6bc5d6ca8b6672f7a0460be51db4e5797c87a689"
+                  },
+                  {
+                      "path":  "cutile-pip-freeze.txt",
+                      "bytes":  1416,
+                      "sha256":  "ec0c18c261cb0e4bbe22bc964fad46ee402b6afea188c9cd3a24c2d80782be27"
+                  },
+                  {
+                      "path":  "cutile-profile-long-batched.log",
+                      "bytes":  940,
+                      "sha256":  "83853da2500421e408e0829df182580aae47c1b643b6e672e40f75617da00ecf"
+                  },
+                  {
+                      "path":  "cutile-profile-medium.log",
+                      "bytes":  908,
+                      "sha256":  "9d1bdebc57cfa4b6aaa107ff9ff678126c5c588c4af080d804861a1e42977ca7"
+                  },
+                  {
+                      "path":  "cutile-profile-status.log",
+                      "bytes":  812,
+                      "sha256":  "1fe2212ce480ac7b84c1da11ea80482619bace4a21f0cc4f15fd9b2f62e0620f"
+                  },
+                  {
+                      "path":  "cutile-pytest.log",
+                      "bytes":  242,
+                      "sha256":  "c03fc18ef1bbcce1a57f32a1dba2bf0eab9a4a4774adafd07de976db65075c34"
+                  },
+                  {
+                      "path":  "cutile-smoke.log",
+                      "bytes":  1598,
+                      "sha256":  "79cab9072c377da118316e7aef987f48802a189de15217d314a6ad7012a80919"
+                  },
+                  {
+                      "path":  "cutile-torch-sdpa.log",
+                      "bytes":  118,
+                      "sha256":  "995a57853d347b13faa2de1cae76a261c1acf9c2cf0892a16770f38e94450e36"
+                  },
+                  {
+                      "path":  "results/clean-jit-isolated-caches/long_d128-tq64-tk64-apxcrpzw/worker-result.json",
+                      "bytes":  2482,
+                      "sha256":  "10d95aa626a82930a03c9ea03f2406312498d49a180154829b408344afd23fe7"
+                  },
+                  {
+                      "path":  "results/clean-jit-isolated-caches/longer_batched_d128-tq64-tk128-jdk_hlvx/worker-result.json",
+                      "bytes":  2476,
+                      "sha256":  "96c19fe7e381f3ad124d6d69251a7f28915a4bc523c0f43edbebea949366dcf4"
+                  },
+                  {
+                      "path":  "results/cutile-accuracy.json",
+                      "bytes":  22480,
+                      "sha256":  "60abc15afda2dee489984bacdec40baaf7de8cdd56586214e637400c5290610d"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session1.csv",
+                      "bytes":  8821,
+                      "sha256":  "d15afd2c43b676e1fc0022ff4b776980508afce39a3f0f61fbb39b3cc449140c"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session1.json",
+                      "bytes":  28472,
+                      "sha256":  "dbdd2202a2d9a9c2c280640f4c90f1244b6494df9fefdd381a7dc32c1acb02ea"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session2.csv",
+                      "bytes":  8830,
+                      "sha256":  "a7ea2691b3c27a6e97e6ccd3f914d03ff841970488a7917e5e18aeb3de4cc654"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session2.json",
+                      "bytes":  28481,
+                      "sha256":  "2927e8c4fefaf82dfd49f60abc5f906f70c9d5e7cbb49b838c26752ce6d8706c"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session3.csv",
+                      "bytes":  8842,
+                      "sha256":  "4d34ff5c000c2e063d8c4fac3f3e5e64aa34dbb715fc37cf29a7f24835ffa7e1"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-session3.json",
+                      "bytes":  28493,
+                      "sha256":  "909ae3bcbcd6b6dfedbeab200889997295f9fcc772671aac964bcb475ccbb804"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-summary.csv",
+                      "bytes":  13217,
+                      "sha256":  "81b456fc4f13c3158d1711228adb24b79f9f26042241b3dac9457075efce8af1"
+                  },
+                  {
+                      "path":  "results/cutile-benchmark-summary.json",
+                      "bytes":  35205,
+                      "sha256":  "3289abd5fcca7992ebf882f20e4a249746b723a44d741b160c488254675cf29e"
+                  },
+                  {
+                      "path":  "results/cutile-clean-jit.json",
+                      "bytes":  6731,
+                      "sha256":  "3bcf9bf44f65f853ca7c6f5894f471690fa63c24135550489e4984821548face"
+                  },
+                  {
+                      "path":  "results/cutile-load-latency-hints.csv",
+                      "bytes":  4686,
+                      "sha256":  "3486c01b927656cf205c725b6f4ae01e140bce1d1a37b50d81df075db23f01d5"
+                  },
+                  {
+                      "path":  "results/cutile-load-latency-hints.json",
+                      "bytes":  57190,
+                      "sha256":  "10d08c4c0d197e58f37df7a85d2da580e2d5faedfacdec4f7f0e8ca169ecbb2a"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/default.log",
+                      "bytes":  1016,
+                      "sha256":  "4e97c94dff00e87c55073401c601ebae764b3f5b625ef64e77fb66f08d33bd64"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/environment.txt",
+                      "bytes":  457,
+                      "sha256":  "d65694a0c124fec97139ee8f7e03d1ad70031cfb709c3ff0a5084694598ea4db"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/latency10.log",
+                      "bytes":  1028,
+                      "sha256":  "3b21f64916b2e4cd62c82e00915edc3c1034a2491e775905380b9ee59a7f4d0e"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-default-details.csv",
+                      "bytes":  142571,
+                      "sha256":  "b2bdfb06d835fe6f7e43989cb1fdaa6395569e50aa22d8013ca0a40951c5ebf9"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-default-raw.csv",
+                      "bytes":  42268,
+                      "sha256":  "2ae83ec9935bf5369c8bb996a2ac56bb45f14cc3182d9a7fd8c7288c5f8c5786"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-latency10-details.csv",
+                      "bytes":  142644,
+                      "sha256":  "c88a3d8a3533d57063223cfa53654be10b4b7fb63aeb09c0899bd07871c74dd0"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/medium-d128-64x64-latency10-raw.csv",
+                      "bytes":  42272,
+                      "sha256":  "af0b17b09cf4fa511b2afb31de911209528161d6a19e8a8204f23ebf602e7aa3"
+                  },
+                  {
+                      "path":  "results/cutile-matched-ncu/status.txt",
+                      "bytes":  50,
+                      "sha256":  "52354a895f7e2659c83c246191eaf894562c2e8e09ac7e648e144b30fe28e26b"
+                  }
+              ]
+}

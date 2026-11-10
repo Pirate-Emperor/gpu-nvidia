@@ -1,0 +1,49 @@
+SESSION=3 TILE_ORDER=64x64,32x64,128x64,64x128,128x128
+GPU: NVIDIA GeForce RTX 4060
+Python: 3.12.10 | CuPy: 14.2.0 | cuTile: 1.6.0
+Protocol: warmup=10, samples=30, launches/sample=5, timed launches/config=150
+Baseline: deliberately unfused FP32 CuPy attention; not FlashAttention/optimized SDPA
+Results JSON: results\cutile-benchmark-session3.json
+Results CSV:  results\cutile-benchmark-session3.csv
+
+CASE                     TILE        MEDIAN ms     P90 ms    BASE ms   SPEEDUP   DRIFT %       FIRST CALL
+short_d32                64x64         0.0155     0.0168     0.2961    19.15x     7.12%        1573.2 ms
+short_d32                32x64         0.0174     0.0213     0.2961    17.03x     7.12%          27.1 ms
+short_d64                64x64         0.0168     0.0187     0.2923    17.40x     2.48%          27.8 ms
+short_d64                32x64         0.0160     0.0182     0.2923    18.28x     2.48%          26.1 ms
+short_multihead_d64      64x64         0.0161     0.0190     0.2714    16.88x     0.91% cached/already compiled
+short_multihead_d64      32x64         0.0158     0.0191     0.2714    17.21x     0.91% cached/already compiled
+short_multihead_d64      128x64         0.0166     0.0187     0.2714    16.39x     0.91%          26.8 ms
+short_multihead_d64      64x128        0.0158     0.0180     0.2714    17.21x     0.91%          26.0 ms
+short_multihead_d64      128x128        0.0183     0.0200     0.2714    14.81x     0.91%          26.8 ms
+medium_d64               64x64         0.0166     0.0174     0.2725    16.44x     2.74% cached/already compiled
+medium_d64               32x64         0.0199     0.0225     0.2725    13.72x     2.74% cached/already compiled
+medium_d64               128x64         0.0180     0.0201     0.2725    15.12x     2.74% cached/already compiled
+medium_d64               64x128        0.0182     0.0195     0.2725    14.95x     2.74% cached/already compiled
+medium_d64               128x128        0.0236     0.0246     0.2725    11.57x     2.74% cached/already compiled
+medium_d128              64x64         0.0545     0.0552     0.3883     7.13x    10.44%          28.1 ms
+medium_d128              32x64         0.0651     0.0664     0.3883     5.96x    10.44%          26.8 ms
+medium_d128              128x64         0.0778     0.0783     0.3883     4.99x    10.44%          76.0 ms
+medium_d128              64x128        0.0571     0.0582     0.3883     6.80x    10.44%          26.5 ms
+medium_d128              128x128        0.1051     0.1059     0.3883     3.70x    10.44%          29.2 ms
+long_d128                64x64         0.2672     0.2684     4.3926    16.44x     0.03% cached/already compiled
+long_d128                32x64         0.3342     0.3365     4.3926    13.14x     0.03% cached/already compiled
+long_d128                128x64         0.3161     0.3203     4.3926    13.90x     0.03% cached/already compiled
+long_d128                64x128        0.2706     0.2723     4.3926    16.23x     0.03% cached/already compiled
+long_d128                128x128        0.4090     0.4131     4.3926    10.74x     0.03% cached/already compiled
+longer_batched_d128      64x64         0.9416     0.9454    17.1209    18.18x     0.00% cached/already compiled
+longer_batched_d128      32x64         1.1537     1.1561    17.1209    14.84x     0.00% cached/already compiled
+longer_batched_d128      128x64         1.0229     1.0273    17.1209    16.74x     0.00% cached/already compiled
+longer_batched_d128      64x128        0.9218     0.9245    17.1209    18.57x     0.00% cached/already compiled
+longer_batched_d128      128x128        1.2897     1.2923    17.1209    13.27x     0.00% cached/already compiled
+
+BEST MEDIAN TILE PER CASE (for this measured sweep only):
+  short_d32: 64x64 median=0.0155 ms, P90=0.0168 ms; within-case tile spread=12.44%
+  short_d64: 32x64 median=0.0160 ms, P90=0.0182 ms; within-case tile spread=5.04%
+  short_multihead_d64: 32x64 median=0.0158 ms, P90=0.0191 ms; within-case tile spread=16.19%
+  medium_d64: 64x64 median=0.0166 ms, P90=0.0174 ms; within-case tile spread=42.03%
+  medium_d128: 64x64 median=0.0545 ms, P90=0.0552 ms; within-case tile spread=92.86%
+  long_d128: 64x64 median=0.2672 ms, P90=0.2684 ms; within-case tile spread=53.04%
+  longer_batched_d128: 64x128 median=0.9218 ms, P90=0.9245 ms; within-case tile spread=39.91%
+WARNING: at least one baseline bracket drifted by >5%; treat speedup for those rows as noisy and repeat the sweep.
+NOTE: first-call wall time may be a compiler-cache hit; it is not a clean-cache JIT measurement.

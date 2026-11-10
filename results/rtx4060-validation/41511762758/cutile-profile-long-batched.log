@@ -1,0 +1,5 @@
+==PROF== Connected to process 7252 (C:\Users\Raman Singh\AppData\Local\Programs\Python\Python312\python.exe)
+==PROF== Profiling "kernel" - 0 (1/1): 0%....50%....100% - 8 passes
+Ready for profiling: case=longer_batched_d128 B=2 H=8 N=2048 D=128 tile=64x128 load_latency=0
+==PROF== Disconnected from process 7252
+==PROF== Report: C:\Users\Public\GPU-cutile-project\gpu-nvidia\actions-runner\_work\gpu-nvidia\gpu-nvidia\results\cutile-profile-long-batched.ncu-repz

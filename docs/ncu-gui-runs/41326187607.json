@@ -1,0 +1,14 @@
+{
+    "workflow":  "ncu-27-gui-evidence",
+    "run_id":  41326187607,
+    "source_commit":  "7deafe742ac01072591e603eb5838f85001e4be2",
+    "job_result":  "success",
+    "artifact_id":  "13090519693",
+    "expected_full_matrix":  27,
+    "capture_probe_mode":  true,
+    "manifest_status":  "captured",
+    "screenshots":  32,
+    "reports_represented":  1,
+    "skipped":  0,
+    "generated_utc":  "2026-11-01T16:26:30.0093432Z"
+}

@@ -1,0 +1,7 @@
+NCU_PATH=C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.3.1\target\windows-desktop-win7-x64\ncu.exe
+NVIDIA (R) Nsight Compute Command Line Profiler
+Copyright (c) 2018-2026 NVIDIA Corporation
+Version 2026.3.1.0 (build 38829034) (public-release)
+PROFILE_REPORTS_CREATED=True
+PROFILE_FILE=cutile-profile-long-batched.ncu-repz SIZE=73241
+PROFILE_FILE=cutile-profile-medium.ncu-repz SIZE=59974

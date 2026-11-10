@@ -1,0 +1,32 @@
+short_d32                tile=32x64 max_abs=0.0009765625 p99_abs=0.0004882812 rmse=8.686074e-05 max_tol_ratio=0.023256 violations=0
+short_d32                tile=64x64 max_abs=0.0009765625 p99_abs=0.0004882812 rmse=8.686074e-05 max_tol_ratio=0.023256 violations=0
+short_d64                tile=32x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=7.672054e-05 max_tol_ratio=0.021805 violations=0
+short_d64                tile=64x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=7.672054e-05 max_tol_ratio=0.021805 violations=0
+short_multihead_d64      tile=32x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=6.514594e-05 max_tol_ratio=0.023574 violations=0
+short_multihead_d64      tile=64x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=6.514594e-05 max_tol_ratio=0.023574 violations=0
+short_multihead_d64      tile=64x128 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=6.523642e-05 max_tol_ratio=0.023574 violations=0
+short_multihead_d64      tile=128x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=6.514594e-05 max_tol_ratio=0.023574 violations=0
+short_multihead_d64      tile=128x128 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=6.523642e-05 max_tol_ratio=0.023574 violations=0
+medium_d64               tile=32x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=5.270423e-05 max_tol_ratio=0.024178 violations=0
+medium_d64               tile=64x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=5.270174e-05 max_tol_ratio=0.024178 violations=0
+medium_d64               tile=64x128 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=5.294413e-05 max_tol_ratio=0.024178 violations=0
+medium_d64               tile=128x64 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=5.270174e-05 max_tol_ratio=0.024178 violations=0
+medium_d64               tile=128x128 max_abs=0.0009765625 p99_abs=0.0002441406 rmse=5.294413e-05 max_tol_ratio=0.024178 violations=0
+medium_d128              tile=32x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=4.074697e-05 max_tol_ratio=0.024355 violations=0
+medium_d128              tile=64x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=4.074864e-05 max_tol_ratio=0.024355 violations=0
+medium_d128              tile=64x128 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=4.093367e-05 max_tol_ratio=0.024355 violations=0
+medium_d128              tile=128x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=4.074864e-05 max_tol_ratio=0.024355 violations=0
+medium_d128              tile=128x128 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=4.093367e-05 max_tol_ratio=0.024355 violations=0
+long_d128                tile=32x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=3.15139e-05 max_tol_ratio=0.024366 violations=0
+long_d128                tile=64x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=3.151487e-05 max_tol_ratio=0.024366 violations=0
+long_d128                tile=64x128 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=3.172955e-05 max_tol_ratio=0.024366 violations=0
+long_d128                tile=128x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=3.151487e-05 max_tol_ratio=0.024366 violations=0
+long_d128                tile=128x128 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=3.172955e-05 max_tol_ratio=0.024366 violations=0
+longer_batched_d128      tile=32x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=2.406863e-05 max_tol_ratio=0.024343 violations=0
+longer_batched_d128      tile=64x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=2.406793e-05 max_tol_ratio=0.024343 violations=0
+longer_batched_d128      tile=64x128 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=2.422627e-05 max_tol_ratio=0.024343 violations=0
+longer_batched_d128      tile=128x64 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=2.406793e-05 max_tol_ratio=0.024343 violations=0
+longer_batched_d128      tile=128x128 max_abs=0.0009765625 p99_abs=0.0001220703 rmse=2.422627e-05 max_tol_ratio=0.024343 violations=0
+ACCURACY_REPORT=results\cutile-accuracy.json
+ACCURACY_CASES=29
+ACCURACY_ALL_PASSED=True

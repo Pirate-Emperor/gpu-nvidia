@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "description": "Workloads and tile candidates for the extended cuTile numerical-validation matrix. Add cases or tiles through scripts/mentor_step_by_step.ps1 -> configuration menu. The required 48-test suite remains a separate fixed suite.",
+  "cases": [
+    {
+      "name": "short_d32",
+      "B": 1,
+      "H": 1,
+      "N": 64,
+      "D": 32,
+      "Dv": 32,
+      "seed": 1000
+    },
+    {
+      "name": "short_d64",
+      "B": 1,
+      "H": 1,
+      "N": 64,
+      "D": 64,
+      "Dv": 64,
+      "seed": 1001
+    },
+    {
+      "name": "short_multihead_d64",
+      "B": 1,
+      "H": 4,
+      "N": 128,
+      "D": 64,
+      "Dv": 64,
+      "seed": 1002
+    },
+    {
+      "name": "medium_d64",
+      "B": 1,
+      "H": 8,
+      "N": 256,
+      "D": 64,
+      "Dv": 64,
+      "seed": 1003
+    },
+    {
+      "name": "medium_d128",
+      "B": 1,
+      "H": 8,
+      "N": 512,
+      "D": 128,
+      "Dv": 128,
+      "seed": 1004
+    },
+    {
+      "name": "long_d128",
+      "B": 1,
+      "H": 16,
+      "N": 1024,
+      "D": 128,
+      "Dv": 128,
+      "seed": 1005
+    },
+    {
+      "name": "longer_batched_d128",
+      "B": 2,
+      "H": 8,
+      "N": 2048,
+      "D": 128,
+      "Dv": 128,
+      "seed": 1006
+    }
+  ],
+  "tile_candidates": [
+    {
+      "tile_q": 32,
+      "tile_k": 64
+    },
+    {
+      "tile_q": 64,
+      "tile_k": 64
+    },
+    {
+      "tile_q": 64,
+      "tile_k": 128
+    },
+    {
+      "tile_q": 128,
+      "tile_k": 64
+    },
+    {
+      "tile_q": 128,
+      "tile_k": 128
+    }
+  ]
+}

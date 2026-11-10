@@ -1,0 +1,84 @@
+name: Package and inspect the exact cuTile course project brief
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/package-assignment-brief.yml"
+      - "nvidia2-cutile.pdf"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-brief:
+    name: Extract and verify the tracked six-page assignment PDF
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Extract exact PDF text and preserve the original
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check pypdf
+          mkdir -p brief-audit
+          cp nvidia2-cutile.pdf brief-audit/nvidia2-cutile.pdf
+          sha256sum nvidia2-cutile.pdf | tee brief-audit/SOURCE_SHA256.txt
+          python - <<'PY' | tee brief-audit/nvidia2-cutile-extracted.txt
+          from pypdf import PdfReader
+          path = "nvidia2-cutile.pdf"
+          reader = PdfReader(path)
+          print(f"PDF_PAGE_COUNT={len(reader.pages)}")
+          print(f"PDF_METADATA={reader.metadata}")
+          for index, page in enumerate(reader.pages, start=1):
+              print(f"\\n===== PAGE {index} =====")
+              print(page.extract_text() or "[NO EMBEDDED TEXT]")
+          PY
+      - name: Upload exact source PDF and extracted text
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-assignment-brief-audit-${{ github.run_id }}
+          path: brief-audit/
+          if-no-files-found: error
+          retention-days: 30
+
+  package-brief:
+    name: Verify the existing Windows project copy (when its local runner is online)
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 10
+    steps:
+      - name: Verify and package the exact tracked brief
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $source = Join-Path $root 'nvidia2-cutile.pdf'
+          if (-not (Test-Path -LiteralPath $source)) { throw "Assignment brief is missing from the local project: $source" }
+          $item = Get-Item -LiteralPath $source
+          if ($item.Length -ne 147208) { throw "Unexpected assignment PDF size: $($item.Length) bytes" }
+          $out = Join-Path $env:RUNNER_TEMP ("cutile-assignment-brief-" + $env:GITHUB_RUN_ID)
+          if (Test-Path $out) { throw "Refusing to overwrite existing package: $out" }
+          New-Item -ItemType Directory -Path $out | Out-Null
+          Copy-Item -LiteralPath $source -Destination (Join-Path $out 'nvidia2-cutile.pdf')
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $out 'nvidia2-cutile.pdf')).Hash
+          @(
+            "SOURCE_COMMIT=$env:GITHUB_SHA",
+            "WORKFLOW_RUN_ID=$env:GITHUB_RUN_ID",
+            "SOURCE_PATH=$source",
+            "PDF_BYTES=$($item.Length)",
+            "SHA256=$hash"
+          ) | Set-Content -Encoding utf8 (Join-Path $out 'SOURCE_PROVENANCE.txt')
+          Write-Host "ASSIGNMENT_PDF_BYTES=$($item.Length)"
+          Write-Host "ASSIGNMENT_PDF_SHA256=$hash"
+          "OUT=$out" | Set-Content $env:GITHUB_OUTPUT
+      - name: Upload original PDF and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: cutile-assignment-brief-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}\\cutile-assignment-brief-${{ github.run_id }}\\
+          if-no-files-found: error
+          retention-days: 30

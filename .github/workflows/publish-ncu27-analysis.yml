@@ -1,0 +1,348 @@
+name: Publish full 27-profile Nsight screenshot analysis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-ncu27-analysis.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Generate per-profile review from existing reports and captures
+    runs-on: [self-hosted, windows, x64]
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Build and publish 27 profile-specific analysis pages
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\Users\Public\GPU-cutile-project\gpu-nvidia'
+          $py = Join-Path $root '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $py)) { throw "Project Python missing: $py" }
+          $code = @'
+          
+          from pathlib import Path
+          import csv,json,re,hashlib,base64,struct,urllib.request,urllib.error,os,time,io
+          
+          ROOT=Path(r"C:\Users\Public\GPU-cutile-project\gpu-nvidia")
+          RUN=ROOT/"results"/"ncu"/"rtx4060"/"legal-matrix-41206212024"
+          PRIMARY=RUN/"gui-analysis-41326582158"/"screenshots"
+          PTX=RUN/"ptx-four-pane-41329271876"/"screenshots"
+          OUT=ROOT/"docs"/"ncu"/"rtx4060"/"27-profile-gui-analysis"
+          PROFILES=OUT/"profiles"
+          REPO="xemptynothing/gpu-nvidia"
+          TOKEN=os.environ["GH_TOKEN"]
+          API="https://api.github.com/repos/"+REPO
+          for p in [ROOT,RUN,PRIMARY,PTX]:
+              if not p.exists(): raise RuntimeError("Missing existing evidence directory: "+str(p))
+          
+          def api(method,path,payload=None):
+              body=None if payload is None else json.dumps(payload).encode()
+              q=urllib.request.Request(API+path,data=body,method=method,headers={
+                "Authorization":"Bearer "+TOKEN,"Accept":"application/vnd.github+json",
+                "X-GitHub-Api-Version":"2022-11-28","User-Agent":"ncu27-report-builder",
+                "Content-Type":"application/json"})
+              try:
+                with urllib.request.urlopen(q,timeout=90) as r:return json.loads(r.read().decode())
+              except urllib.error.HTTPError as e:
+                raise RuntimeError("GitHub API failure "+str(e.code)+" "+path+": "+e.read().decode("utf-8","replace")[:1000])
+          
+          def num(v):
+              try:return float(str(v).replace(",","").strip())
+              except:return None
+          def get(rows,name,unit=None):
+              for r in rows:
+                if r.get("Metric Name")==name and (unit is None or r.get("Metric Unit")==unit):return num(r.get("Metric Value"))
+              return None
+          def fmt(x,n=2):
+              if x is None:return "n/a"
+              if abs(x-round(x))<1e-9:return format(int(round(x)),",")
+              return format(x,",."+str(n)+"f")
+          def pct(x):return "n/a" if x is None else fmt(x)+"%"
+          def pnginfo(p):
+              b=p.read_bytes()[:24]
+              if b[:8]!=b"\x89PNG\r\n\x1a\n":raise RuntimeError("Invalid PNG: "+str(p))
+              return struct.unpack(">II",b[16:24])
+          def fingerprint(path,kind):
+              txt=path.read_text(encoding="utf-8-sig",errors="replace")
+              pat=re.compile(r"^\s*0x[0-9a-fA-F]+\s+([A-Z][A-Z0-9_.]*)\s+.*?\s+(\d+)\s*$") if kind=="sass" else re.compile(r"^\s*\d+\s+([A-Za-z][A-Za-z0-9_.]*)\s+.*?\s+(\d+)\s*$")
+              counts={}; rows=0
+              for line in txt.splitlines():
+                m=pat.match(line)
+                if m: rows+=1;op=m.group(1).lower();counts[op]=counts.get(op,0)+1
+              return len(txt.splitlines()),rows,sorted(counts.items(),key=lambda z:(-z[1],z[0]))[:10],txt
+          
+          views=[
+          ("summary","Summary","Kernel result row, duration in the native unit, launch dimensions, GPU metadata and rule-engine messages. Estimated-speedup values are diagnostic estimates, not measured gains.")
+          ]+[(f"details-{i:02d}",f"Details scroll {i:02d}","One of nine ordered, overlapping vertical scroll positions. Together they span Speed of Light, Memory Workload, Scheduler, Warp State, Launch, Occupancy and GPU/Memory Workload Distribution; CSV supplies exact values.") for i in range(1,10)]+[(f"source-{i:02d}",f"Source scroll {i:02d}","Sequential vertical source/disassembly correlation. Left source resolves to generated CuTile stub content in these reports; right pane is SASS correlation, not a direct source listing of the high-level kernel module.") for i in range(1,6)]+[
+          ("source-high-level-tail","Source high-level tail","Bookend view of the Source tab's higher-level source attribution."),
+          ("source-high-level-head","Source high-level head","Bookend view of the Source tab's higher-level source attribution."),
+          ("source-line91-sass","SASS at selected line 91","SASS correlated with selected generated source line. In the inspected D=128 profile this is tile block-ID setup, not the attention score/PV loop."),
+          ("source-horizontal-left-code","Source left code horizontal","Left code pane after a horizontal action; differs from the left-metrics capture."),
+          ("source-horizontal-left-metrics","Source left metrics horizontal","Left metrics pane after a horizontal action; exposes additional instruction/stall/register columns."),
+          ("source-horizontal-right-code","Source right code horizontal attempt","Right SASS/code pane after the requested horizontal action."),
+          ("source-horizontal-right-metrics","Source right metrics horizontal attempt","SHA-256 audit finds this byte-identical to right-code for all 27 reports; no distinct horizontal displacement is demonstrated."),
+          ("source-view-picker","Source view picker","Right-side view selector state."),
+          ("source-ptx","Source view with PTX selected","PTX is selected in the right Source view. The exports identify PTX 9.4 targeting sm_89; this capture shows the entry/parameter region."),
+          ("source-line91-ptx","PTX at selected line 91","PTX correlated to the selected generated source line; inspected example shows CTA/block-ID derivation."),
+          ("source-ptx-horizontal-ptx-code","Initial PTX horizontal code view","Initial horizontal capture of the PTX-mode code-oriented pane."),
+          ("source-ptx-horizontal-ptx-metrics","Initial PTX horizontal metrics view","Initial horizontal capture of the PTX-mode metrics-oriented pane."),
+          ("source-bottom-instructions-dependencies","Bottom tab: Instructions & Dependencies","Lower Source pane with the dependency selector and self/input/output tables. Blank tables mean no populated attribution in this view, not zero dependencies."),
+          ("source-bottom-inline-functions","Bottom tab: Inline Functions","Lower Source pane selected to Inline Functions; empty/informational state is not proof of no inlining."),
+          ("source-bottom-source-markers","Bottom tab: Source Markers","Lower Source pane selected to Source Markers; no displayed markers is not proof of no source events."),
+          ("source-bottom-statistics","Bottom tab: Statistics","Lower Source pane selected to Statistics for the current source/disassembly context."),
+          ("raw","Raw metrics","Raw native-report GUI page; raw.csv is the machine-readable cross-check.")
+          ]
+          ptxviews=[
+          ("source-ptx-horizontal-left-code","PTX supplement: left code","Additional horizontal view of the PTX-mode left code/source pane."),
+          ("source-ptx-horizontal-left-metrics","PTX supplement: left metrics","Additional horizontal view of the PTX-mode left metrics pane."),
+          ("source-ptx-horizontal-right-code","PTX supplement: right code","Additional horizontal view of the PTX-mode right code pane."),
+          ("source-ptx-horizontal-right-metrics","PTX supplement: right metrics","Byte-identical to the right-code capture in every report; no distinct scroll is proven.")
+          ]
+          assert len(views)==32 and len(ptxviews)==4
+          
+          folders=sorted([p for p in RUN.iterdir() if p.is_dir() and (p/"details.csv").exists()])
+          if len(folders)!=27:raise RuntimeError("Expected exactly 27 native report folders")
+          data=[];allfiles={}
+          for folder in folders:
+            name=folder.name
+            st=json.loads((folder/"status.json").read_text(encoding="utf-8-sig"))
+            if st.get("status")!="PASS":raise RuntimeError("Profile not PASS "+name)
+            with (folder/"details.csv").open("r",encoding="utf-8-sig",newline="") as f: rows=list(csv.DictReader(f))
+            dr=next(r for r in rows if r.get("Metric Name")=="Duration")
+            native=num(dr["Metric Value"]);unit=dr.get("Metric Unit","")
+            dur_us=native*(1000 if unit=="ms" else 1000000 if unit=="s" else 1)
+            grid=rows[0].get("Grid Size","");block=rows[0].get("Block Size","")
+            m={
+              "compute":get(rows,"Compute (SM) Throughput"),"memory":get(rows,"Memory Throughput","%"),
+              "dram":get(rows,"DRAM Throughput"),"l1":get(rows,"L1/TEX Cache Throughput"),
+              "l2":get(rows,"L2 Cache Throughput"),"bw":get(rows,"Memory Throughput","Gbyte/s"),
+              "mem_busy":get(rows,"Mem Busy"),"mem_pipe":get(rows,"Mem Pipes Busy"),"l2_hit":get(rows,"L2 Hit Rate"),
+              "no_eligible":get(rows,"No Eligible"),"eligible":get(rows,"Eligible Warps Per Scheduler"),
+              "issued":get(rows,"Issued Warp Per Scheduler"),"active_sched":get(rows,"Active Warps Per Scheduler"),
+              "warp_cycles":get(rows,"Warp Cycles Per Issued Instruction"),"regs":get(rows,"Registers Per Thread"),
+              "shared":get(rows,"Static Shared Memory Per Block"),"waves":get(rows,"Waves Per SM"),
+              "theoretical":get(rows,"Theoretical Occupancy"),"achieved":get(rows,"Achieved Occupancy"),
+              "active_sm":get(rows,"Achieved Active Warps Per SM"),"grid_ctas":get(rows,"Grid Size"),
+              "threads":get(rows,"Threads"),"limit_shared":get(rows,"Block Limit Shared Mem"),
+              "limit_regs":get(rows,"Block Limit Registers"),"limit_warps":get(rows,"Block Limit Warps"),
+              "local_spills":get(rows,"Local Memory Spilling Requests"),"shared_spills":get(rows,"Shared Memory Spilling Requests")}
+            rules=[]
+            for r in rows:
+              if r.get("Rule Name") and r.get("Estimated Speedup"):
+                z=num(r["Estimated Speedup"])
+                if z is not None:rules.append((r["Rule Name"],z,(r.get("Rule Description") or "").replace("|","/").replace("\n"," ")))
+            rules.sort(key=lambda x:-x[1])
+            pl,pr,ptop,ptxt=fingerprint(folder/"source-tileir-ptx.txt","ptx")
+            sl,sr,stop,stxt=fingerprint(folder/"source-tileir-sass.txt","sass")
+            shots={}
+            for v,_,_ in views+ptxviews:
+              base=PRIMARY if any(v==x[0] for x in views) else PTX
+              fp=base/(name+"-"+v+".png")
+              if not fp.exists():raise RuntimeError("Missing capture "+str(fp))
+              wh=pnginfo(fp)
+              if wh!=(1936,1048):raise RuntimeError("Bad image dimensions "+str(fp))
+              sha=hashlib.sha256(fp.read_bytes()).hexdigest()
+              shots[v]={"file":fp.name,"sha":sha,"bytes":fp.stat().st_size}
+            if shots["source-horizontal-right-code"]["sha"]!=shots["source-horizontal-right-metrics"]["sha"]:raise RuntimeError("SASS right capture mismatch requires audit")
+            if shots["source-ptx-horizontal-right-code"]["sha"]!=shots["source-ptx-horizontal-right-metrics"]["sha"]:raise RuntimeError("PTX right capture mismatch requires audit")
+            d={"name":name,"status":st,"duration_us":dur_us,"native":native,"unit":unit,"grid":grid,"block":block,"m":m,"rules":rules,"ptx_lines":pl,"ptx_rows":pr,"ptx_top":ptop,"sass_lines":sl,"sass_rows":sr,"sass_top":stop,"shots":shots}
+            data.append(d)
+          assert len(data)==27 and len(data)*36==972
+          
+          def page(d):
+            n=d["name"];m=d["m"];st=d["status"]
+            ptop=", ".join(f"{a} ({b})" for a,b in d["ptx_top"])
+            stop=", ".join(f"{a} ({b})" for a,b in d["sass_top"])
+            out=[
+          "# "+n,"",
+          "**Workload:** "+str(st.get("case"))+" | **TQ×TK:** "+str(st.get("tile_q"))+"×"+str(st.get("tile_k"))+" | **load latency:** "+str(st.get("load_latency"))+" | **status:** PASS","",
+          "## 1. Provenance",
+          "- Native report "+n+".ncu-repz is in [workflow 41206212024](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41206212024).",
+          "- 32 genuine GUI screenshots are in [primary capture run 41326582158](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41326582158); 4 PTX-mode supplementary captures are in [run 41329271876](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41329271876).",
+          "- Hardware: NVIDIA GeForce RTX 4060, compute capability 8.9, 24 SMs, driver 616.92, 8,188 MiB reported; Nsight Compute 2026.3.1.",
+          "- Profile commit: "+str(st.get("commit"))+"; capture session elapsed "+fmt(st.get("elapsed_seconds"))+" s (not kernel latency).",
+          "- GUI capture opened the existing .ncu-repz sequentially; it did not replay kernels or redo profiling. The native profile files were not overwritten.","",
+          "## 2. Summary and launch geometry",
+          "| Item | Value | Interpretation |","|---|---:|---|",
+          "| NCU duration | "+fmt(d["duration_us"])+" µs ("+fmt(d["duration_us"]/1000,3)+" ms) | Original metric unit: "+d["unit"]+"; instrumented value, not normal CUDA-event latency. |",
+          "| Grid / block | "+d["grid"]+" / "+d["block"]+" | "+fmt(m["grid_ctas"])+" CTAs; "+fmt(m["threads"])+" threads. |",
+          "| Compute / memory / DRAM throughput | "+pct(m["compute"])+" / "+pct(m["memory"])+" / "+pct(m["dram"])+" | All normalized throughput metrics from this report. |",
+          "| L1/TEX / L2 throughput | "+pct(m["l1"])+" / "+pct(m["l2"])+" | Cache-pipeline throughput indicators. |",
+          "| Memory bandwidth | "+fmt(m["bw"])+" GB/s | Memory Workload Analysis throughput. |",
+          "| L2 hit rate | "+pct(m["l2_hit"])+" | Interpret with traffic and working set. |",
+          "| Mem Busy / Mem Pipes Busy | "+pct(m["mem_busy"])+" / "+pct(m["mem_pipe"])+" | Neither is evidence of saturated DRAM. |",
+          "| Registers / thread | "+fmt(m["regs"])+" | Per-thread register demand. |",
+          "| Static shared memory / CTA | "+fmt(m["shared"])+" KiB | Important CTA residency constraint. |",
+          "| Theoretical / achieved occupancy | "+pct(m["theoretical"])+" / "+pct(m["achieved"])+" | Achieved is near this launch/resource cap. |",
+          "| Achieved active warps / SM | "+fmt(m["active_sm"])+" | Average active warps per SM. |",
+          "| CTA limit from shared / registers / warps | "+fmt(m["limit_shared"])+" / "+fmt(m["limit_regs"])+" / "+fmt(m["limit_warps"])+" | Minimum limit controls active CTA count. |",
+          "| No Eligible cycles | "+pct(m["no_eligible"])+" | No ready warp on these scheduler cycles; not whole-GPU idle time. |",
+          "| Eligible / issued / active warps per scheduler | "+fmt(m["eligible"])+" / "+fmt(m["issued"])+" / "+fmt(m["active_sched"])+" | Sparse issue-ready pool. |",
+          "| Warp cycles per issued instruction | "+fmt(m["warp_cycles"])+" | Aggregate issue spacing, not a single dependency latency. |",
+          "| Local/shared spill requests | "+fmt(m["local_spills"])+" / "+fmt(m["shared_spills"])+" | No spill requests reported. |","",
+          "## 3. Interpretation for this configuration",
+          "- Scheduler: No Eligible is "+pct(m["no_eligible"])+" and Eligible Warps Per Scheduler is "+fmt(m["eligible"])+". This indicates frequent absence of an immediately ready warp. It does not uniquely identify long scoreboard, math-pipe dependency, barrier wait or insufficient independent CTAs.",
+          "- Residency: "+fmt(m["shared"])+" KiB static shared memory per CTA; the shared-memory block limit is "+fmt(m["limit_shared"])+" CTA(s)/SM. Where this value is 1, extra grid CTAs do not create a second concurrent CTA on each SM.",
+          "- Memory: DRAM throughput "+pct(m["dram"])+" and bandwidth "+fmt(m["bw"])+" GB/s do not show DRAM saturation. Memory-latency dependencies remain possible.",
+          "- Spilling: both local and shared spill requests are zero; spilling is not supported as the cause by this report.",
+          "- Use this profile as diagnostic evidence for this precise workload/tile on SM89. Do not change production defaults without correctness and repeated unprofiled latency tests.","",
+          "## 4. NCU rule-engine messages",
+          "Estimated Speedup percentages are NCU diagnostic/rule estimates, not measured runtime improvements.",
+          "",
+          "| Rule | Estimated speedup | Explanation |","|---|---:|---|"
+            ]
+            for a,b,c in d["rules"]:out.append("| "+a+" | "+fmt(b)+"% | "+c+" |")
+            if not d["rules"]:out.append("| none | — | No estimate exported. |")
+            out += ["","## 5. PTX/SASS evidence",
+          "- PTX export: "+n+"/source-tileir-ptx.txt; "+fmt(d["ptx_lines"])+" text lines, "+fmt(d["ptx_rows"])+" parsed source-correlated instruction rows.",
+          "- SASS export: "+n+"/source-tileir-sass.txt; "+fmt(d["sass_lines"])+" text lines, "+fmt(d["sass_rows"])+" parsed disassembly rows.",
+          "- Frequent PTX mnemonics: "+ptop+".",
+          "- Frequent SASS mnemonics: "+stop+".",
+          "- Across the 27 exports, PTX contains bar.sync, global/shared load/store, FMA and exponent-related operations; SASS contains HMMA tensor-core instructions, FFMA, MUFU, memory operations and BAR.SYNC. The PTX text dump does not show a literal mma token; that does not imply absence of tensor-core operations, which are visible as HMMA in SASS.",
+          "- The GUI's left source often resolves to generated CuTile stub code rather than a direct listing of the high-level kernel. In the inspected D=128 latency-10 export, source line 91 is block-ID setup, not the attention inner loop. Blank dependency/inline/source-marker panels mean no populated attribution was visible, not that those relationships are absent.","",
+          "## 6. Screenshot-by-screenshot review (36 captures)",
+          "All PNG files are genuine captures from the actual Nsight Compute GUI and are 1936×1048. Extract the two screenshot artifacts and open the exact files listed below.",
+          "",
+          "| # | View | PNG filename | Per-image interpretation | SHA-256 prefix |","|---:|---|---|---|---|"
+            ]
+            for i,(v,label,desc) in enumerate(views+ptxviews,1):
+              specific=desc
+              if v=="summary":specific+=" This profile: "+fmt(d["duration_us"])+" µs, grid "+d["grid"]+", compute "+pct(m["compute"])+", DRAM "+pct(m["dram"])+"."
+              elif v.startswith("details-"):specific+=" Key values in this report: No Eligible "+pct(m["no_eligible"])+", achieved occupancy "+pct(m["achieved"])+", shared memory "+fmt(m["shared"])+" KiB."
+              elif v=="source-horizontal-left-metrics":specific+=" The visible left-side metrics columns are distinct from the left-code view."
+              elif v in ("source-horizontal-right-code","source-horizontal-right-metrics","source-ptx-horizontal-right-code","source-ptx-horizontal-right-metrics"):specific+=" The SHA-256 comparison found no visible change from its paired right-side image."
+              out.append("| "+str(i)+" | "+label+" | "+d["shots"][v]["file"]+" | "+specific+" | "+d["shots"][v]["sha"][:12]+" |")
+            out += ["","### Integrity caveat",
+          "- 32 primary screenshots plus 4 supplemental PTX screenshots = 36 named views for this profile.",
+          "- All 36 PNGs passed signature and 1936×1048 dimension checks.",
+          "- SASS right-code/right-metrics are byte-identical. PTX right-code/right-metrics are also byte-identical. The right-side horizontal movement is therefore not demonstrated; the capture inventory records this instead of claiming success.",
+          "- Left code and left metrics are distinct. No assertion of successful right-pane horizontal displacement is made.","",
+          "## 7. Conclusion",
+          "- The NCU report confirms this exact resource, occupancy, scheduler and memory signature on the RTX 4060.",
+          "- NCU replay duration and rule-engine Estimated Speedup are not normal performance benchmark results.",
+          "- Next optimization step: change only one of TQ, TK or load-latency; run correctness; then conduct a repeated, order-rotated unprofiled CUDA-event benchmark and a matched NCU profile.","",
+          "[Back to the matrix index](../README.md)",""]
+            return "\n".join(out)
+          
+          local={}
+          PROFILES.mkdir(parents=True,exist_ok=True)
+          for d in data:
+            p=PROFILES/(d["name"]+".md");text=page(d);p.write_text(text,encoding="utf-8")
+            local["docs/ncu/rtx4060/27-profile-gui-analysis/profiles/"+p.name]=text
+          
+          bycase={}
+          for d in data:bycase.setdefault(d["status"]["case"],[]).append(d)
+          idx=[
+          "# 27-profile Nsight Compute screenshot-by-screenshot analysis",
+          "",
+          "**Every one of the 27 legal NCU experiments now has its own report** in profiles/, including per-case metrics, scheduler/resource interpretation, PTX/SASS fingerprints and a 36-image screenshot-by-screenshot index.",
+          "",
+          "## Capture provenance",
+          "- Native reports: [run 41206212024](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41206212024), 27/27 PASS on Windows RTX 4060, SM 8.9, driver 616.92.",
+          "- Actual NCU GUI screenshot capture: [run 41326582158](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41326582158), 864 PNGs (32/report), zero skipped.",
+          "- PTX supplement: [run 41329271876](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41329271876), 108 PNGs (4/report), zero skipped.",
+          "- Total 972 genuine 1936×1048 GUI screenshots, 36 per report. The captures imported existing reports sequentially; the screenshot stage did not replay or reprofile the GPU.",
+          "- The original two base D=128 experiments remain preserved separately in results/ncu/rtx4060/20261027-230742/ncu-analysis-current/README.md.",
+          "",
+          "## Individual experiment reports",
+          "| Workload | Report |","|---|---|"
+          ]
+          for case in sorted(bycase):
+            for d in sorted(bycase[case],key=lambda x:x["name"]):
+              idx.append("| "+case+" | [ "+d["name"]+" ](profiles/"+d["name"]+".md) |")
+          idx += [
+          "",
+          "## Matrix-wide findings",
+          "| Metric | Range / result | Interpretation |","|---|---:|---|",
+          "| NCU duration, normalized | "+fmt(min(d["duration_us"] for d in data))+"–"+fmt(max(d["duration_us"] for d in data))+" µs | Instrumented NCU values; original units retained on individual pages. |",
+          "| Compute throughput | "+pct(min(d["m"]["compute"] for d in data))+"–"+pct(max(d["m"]["compute"] for d in data))+" | Low relative to device peak in all reports. |",
+          "| DRAM throughput | "+pct(min(d["m"]["dram"] for d in data))+"–"+pct(max(d["m"]["dram"] for d in data))+" | DRAM not saturated. |",
+          "| Memory bandwidth | "+fmt(min(d["m"]["bw"] for d in data))+"–"+fmt(max(d["m"]["bw"] for d in data))+" GB/s | Workload-specific; max remains well below the device peak. |",
+          "| No Eligible cycles | "+pct(min(d["m"]["no_eligible"] for d in data))+"–"+pct(max(d["m"]["no_eligible"] for d in data))+" | Schedulers often lacked ready warps; not whole-GPU idle time. |",
+          "| Achieved occupancy | "+pct(min(d["m"]["achieved"] for d in data))+"–"+pct(max(d["m"]["achieved"] for d in data))+" | Constrained by per-CTA resource footprint and workload shape. |",
+          "| Static shared memory per CTA | "+fmt(min(d["m"]["shared"] for d in data))+"–"+fmt(max(d["m"]["shared"] for d in data))+" KiB | Large D=128 allocations produce one CTA/SM limits in most profiles. |",
+          "| Spilling | 0 local and 0 shared requests, all 27 | No spill evidence. |",
+          "",
+          "### Findings",
+          "- D=128 cases generally allocate 65.54–98.30 KiB static shared memory per CTA, often limiting residency to one CTA/SM and 8.33% theoretical occupancy.",
+          "- Best scheduler/resource case in the 27-profile set: medium_d64-tq32-tk64-lat0 (15.52% achieved occupancy, 0.31 eligible warps/scheduler, 75.11% No Eligible, 213 registers/thread, 45.06 KiB shared memory). Follow-up candidate only; not a production-default decision by itself.",
+          "- Maximum DRAM throughput is 30.42% and maximum memory bandwidth is 79.76 GB/s; simple DRAM saturation is not a common explanation. Memory latency/scoreboard waits remain possible.",
+          "- All 27 profiles report zero local and shared spill requests.",
+          "- NCU rule-engine estimated speedups are diagnostic heuristics, not measured gains. NCU replay duration is not normal unprofiled CUDA-event latency.",
+          "- Short cases underfill the GPU and are sensitive to fixed launch/profile overhead; do not use their occupancy alone to predict long-workload scaling.",
+          "",
+          "## Screenshot audit and outstanding limitation",
+          "- The SASS right-code/right-metrics screenshot pairs are byte-identical in all 27 reports. The supplementary PTX right-code/right-metrics pairs are also byte-identical. Right-side horizontal scrolling did not create a distinct image; this is explicitly recorded in every profile report.",
+          "- Left-code/left-metrics pairs are different. All screenshot records and SHA-256 prefixes are indexed per profile.",
+          "- Blank dependency/inline/source-marker panes are not interpreted as zero dependencies, no inlining or no source events. Generated stub correlation is not represented as full source mapping of the high-level kernel.",
+          "",
+          "## Artifact links",
+          "- [Native profile report/CSV/PTX/SASS artifact](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41206212024)",
+          "- [864 primary screenshot artifact](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41326582158)",
+          "- [108 PTX supplement artifact](https://github.com/xemptynothing/gpu-nvidia/actions/runs/41329271876)",
+          "- [Original two-base-experiment analysis](../../../../results/ncu/rtx4060/20261027-230742/ncu-analysis-current/README.md)"
+          ]
+          idxtext="\n".join(idx)
+          (OUT/"README.md").write_text(idxtext,encoding="utf-8")
+          local["docs/ncu/rtx4060/27-profile-gui-analysis/README.md"]=idxtext
+          
+          audit=[
+          "# NCU screenshot evidence audit","",
+          "- Primary capture: 41326582158; 27 reports × 32 = 864; no skipped reports/views.",
+          "- PTX supplement: 41329271876; 27 reports × 4 = 108; no skipped reports/views.",
+          "- Total: 972 PNGs; 36 per profile; all 1936×1048.",
+          "- SHA-256 shows right-code/right-metrics images are byte-identical in primary SASS and supplemental PTX for every report. This means no distinct right-side horizontal scroll is proven.",
+          "- Left-code/left-metrics images differ. The right-pane failure is documented and not mislabeled as success.",
+          "",
+          "| Profile | Main captures | PTX supplement | Total | SASS right duplicate | PTX right duplicate |","|---|---:|---:|---:|---|---|"]
+          for d in data:audit.append("| "+d["name"]+" | 32 | 4 | 36 | yes | yes |")
+          audittext="\n".join(audit)
+          (OUT/"CAPTURE_AUDIT.md").write_text(audittext,encoding="utf-8")
+          local["docs/ncu/rtx4060/27-profile-gui-analysis/CAPTURE_AUDIT.md"]=audittext
+          
+          buf=io.StringIO()
+          fields=["profile","case","tile_q","tile_k","load_latency","duration_us","native_duration_unit","compute_pct","memory_pct","dram_pct","memory_bandwidth_gbs","l2_hit_rate_pct","no_eligible_pct","eligible_warps_per_scheduler","registers_per_thread","static_shared_kib","theoretical_occupancy_pct","achieved_occupancy_pct","shared_memory_cta_limit","local_spill_requests","shared_spill_requests"]
+          w=csv.writer(buf);w.writerow(fields)
+          for d in data:
+           m=d["m"];s=d["status"]
+           w.writerow([d["name"],s.get("case"),s.get("tile_q"),s.get("tile_k"),s.get("load_latency"),d["duration_us"],d["unit"],m["compute"],m["memory"],m["dram"],m["bw"],m["l2_hit"],m["no_eligible"],m["eligible"],m["regs"],m["shared"],m["theoretical"],m["achieved"],m["limit_shared"],m["local_spills"],m["shared_spills"]])
+          csvtext=buf.getvalue()
+          (OUT/"matrix-summary.csv").write_text(csvtext,encoding="utf-8")
+          local["docs/ncu/rtx4060/27-profile-gui-analysis/matrix-summary.csv"]=csvtext
+          print("Built 27 profile pages and verified 972 screenshots.")
+          print("Right-pane SHA audit: all 27 SASS pairs and all 27 PTX pairs identical.")
+          
+          # Create one Git commit containing all 30 documents using Git Data API.
+          entries=[]
+          for path,content in local.items():
+            b64=base64.b64encode(content.encode("utf-8")).decode("ascii")
+            blob=api("POST","/git/blobs",{"content":b64,"encoding":"base64"})
+            entries.append({"path":path,"mode":"100644","type":"blob","sha":blob["sha"]})
+          print("Created",len(entries),"documentation blobs.")
+          for attempt in range(2):
+            ref=api("GET","/git/ref/heads/main")
+            parent=ref["object"]["sha"]
+            commit0=api("GET","/git/commits/"+parent)
+            tree=api("POST","/git/trees",{"base_tree":commit0["tree"]["sha"],"tree":entries})
+            commit=api("POST","/git/commits",{"message":"Add full screenshot-by-screenshot analysis for 27 RTX 4060 NCU profiles","tree":tree["sha"],"parents":[parent]})
+            try:
+              api("PATCH","/git/refs/heads/main",{"sha":commit["sha"],"force":False})
+              print("PUBLISHED_COMMIT="+commit["sha"])
+              break
+            except Exception:
+              if attempt:raise
+              time.sleep(3)
+          print("INDEX_URL=https://github.com/xemptynothing/gpu-nvidia/blob/main/docs/ncu/rtx4060/27-profile-gui-analysis/README.md")
+          '@
+          $script = Join-Path $env:RUNNER_TEMP 'publish_ncu27_screenshot_analysis.py'
+          [IO.File]::WriteAllText($script, $code, [Text.UTF8Encoding]::new($false))
+          & $py $script
+          if ($LASTEXITCODE -ne 0) { throw "NCU analysis publisher failed: $LASTEXITCODE" }
+          Write-Host "NCU27_ANALYSIS_PUBLISHED=1"

@@ -1,0 +1,479 @@
+# Final validation rerun for the report/checklist handoff on 2026-10-19; behavior unchanged.
+name: RTX 4060 native Windows cuTile validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cutile-rtx4060-docker.yml"
+      - "src/**"
+      - "tests/**"
+      - "benchmarks/**"
+      - "scripts/**"
+      - "run_attention.py"
+      - "requirements-dev.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cutile-validation:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, windows, x64, local]
+    timeout-minutes: 180
+    steps:
+      - name: Checkout exact source commit into the isolated Actions workspace
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+          fetch-depth: 1
+          clean: true
+          persist-credentials: false
+
+      - name: Verify checked-out source commit and required native GPU files
+        id: source_verify
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Workspace = Join-Path $env:GITHUB_WORKSPACE ".actions-workspace\$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $Head = & git -C $Workspace rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $Head -ne $env:GITHUB_SHA) {
+            throw "Exact Actions source mismatch: expected $env:GITHUB_SHA, found $Head"
+          }
+          foreach ($Required in @('src/cutile_attention.py','tests/test_gpu_correctness.py','benchmarks/profile_fused.py','run_attention.py','scripts/mentor_demo.ps1')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $Workspace $Required))) {
+              throw "Checked-out source is missing required file: $Required"
+            }
+          }
+          "SOURCE_COMMIT=$Head" | Write-Host
+          "SOURCE_ROOT=$Workspace" | Write-Host
+
+      - name: Install project dependencies only into the project-local venv
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE '..\..\..\..')).Path
+          $TempRoot = Join-Path $ProjectRoot '.tmp'
+          $PipCache = Join-Path $ProjectRoot '.cache\pip'
+          $CupyCache = Join-Path $ProjectRoot '.cache\cupy'
+          $CudaCache = Join-Path $ProjectRoot '.cache\cuda'
+          New-Item -ItemType Directory -Force -Path $TempRoot,$PipCache,$CupyCache,$CudaCache | Out-Null
+          $env:TEMP = $TempRoot
+          $env:TMP = $TempRoot
+          $env:PIP_CACHE_DIR = $PipCache
+          $env:CUPY_CACHE_DIR = $CupyCache
+          $env:CUDA_CACHE_PATH = $CudaCache
+
+          # Persist project-local cache/temp paths to later workflow steps.
+          $EnvLines = @(
+            "TEMP=$TempRoot",
+            "TMP=$TempRoot",
+            "PIP_CACHE_DIR=$PipCache",
+            "CUPY_CACHE_DIR=$CupyCache",
+            "CUDA_CACHE_PATH=$CudaCache"
+          )
+          $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+          $EnvContent = [string]::Join([Environment]::NewLine, $EnvLines) + [Environment]::NewLine
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, $EnvContent, $Utf8NoBom)
+
+          $NvidiaSmi = Get-Command nvidia-smi.exe -ErrorAction SilentlyContinue
+          if (-not $NvidiaSmi) { $NvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue }
+          if (-not $NvidiaSmi) { throw 'nvidia-smi is unavailable; stopping without installing tools.' }
+          $GpuInventory = & $NvidiaSmi.Source --query-gpu=name,driver_version,compute_cap,memory.total --format=csv,noheader
+          if ($LASTEXITCODE -ne 0) { throw 'GPU inventory failed.' }
+          $GpuInventory | Tee-Object -FilePath cutile-environment.log
+          "WORKFLOW_SHA=$env:GITHUB_SHA" | Tee-Object -FilePath cutile-environment.log -Append
+          $ObservedGitHead = & git -C $PWD rev-parse HEAD 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            "CHECKOUT_GIT_HEAD=$ObservedGitHead" | Tee-Object -FilePath cutile-environment.log -Append
+          } else {
+            "CHECKOUT_GIT_HEAD=<unavailable>" | Tee-Object -FilePath cutile-environment.log -Append
+          }
+          if (-not ($GpuInventory -match 'RTX 4060')) { throw "Expected the local RTX 4060 runner; found: $GpuInventory" }
+
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          if (-not (Test-Path $Py)) { throw "Expected project-local venv missing: $Py" }
+          "PROJECT_ROOT=$ProjectRoot" | Tee-Object -FilePath cutile-environment.log -Append
+          "PYTHON_EXE=$Py" | Tee-Object -FilePath cutile-environment.log -Append
+          "TEMP=$env:TEMP" | Tee-Object -FilePath cutile-environment.log -Append
+          "PIP_CACHE_DIR=$env:PIP_CACHE_DIR" | Tee-Object -FilePath cutile-environment.log -Append
+          "CUPY_CACHE_DIR=$env:CUPY_CACHE_DIR" | Tee-Object -FilePath cutile-environment.log -Append
+          "CUDA_CACHE_PATH=$env:CUDA_CACHE_PATH" | Tee-Object -FilePath cutile-environment.log -Append
+          & $Py --version 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Project venv Python failed.' }
+
+          # Only the already-approved project Python dependencies are installed.
+          # pip cache and temporary download/extraction files stay under ProjectRoot.
+          $PreviousErrorPreference = $ErrorActionPreference
+          $ErrorActionPreference = 'Continue'
+          & $Py -m pip install --disable-pip-version-check --cache-dir $PipCache -r requirements-dev.txt *> cutile-install.log
+          $RequirementsExit = $LASTEXITCODE
+          Get-Content cutile-install.log | Tee-Object -FilePath cutile-environment.log -Append
+          if ($RequirementsExit -ne 0) {
+            $ErrorActionPreference = $PreviousErrorPreference
+            throw "Installing requirements-dev.txt into project venv failed (exit $RequirementsExit)."
+          }
+
+          # Pin the versions that were previously reported working with the genuine
+          # Windows cuTile smoke; no system-wide install and no tool/dataset downloads.
+          & $Py -m pip install --disable-pip-version-check --cache-dir $PipCache 'cupy-cuda13x[ctk]==14.2.0' 'cuda-tile[tileiras]==1.6.0' *> cutile-gpu-install.log
+          $GpuInstallExit = $LASTEXITCODE
+          Get-Content cutile-gpu-install.log | Tee-Object -FilePath cutile-environment.log -Append
+          $ErrorActionPreference = $PreviousErrorPreference
+          if ($GpuInstallExit -ne 0) { throw "Installing CuPy/cuTile into project venv failed (exit $GpuInstallExit)." }
+
+          & $Py -c "import numpy, cupy, cuda.tile, pytest; import importlib.metadata as m; print('numpy='+numpy.__version__); print('cupy='+cupy.__version__); print('cuda-tile='+m.version('cuda-tile')); print('pytest='+pytest.__version__)" 2>&1 | Tee-Object -FilePath cutile-environment.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Required GPU package import check failed.' }
+          & $Py -m pip freeze *> cutile-pip-freeze.txt
+          if ($LASTEXITCODE -ne 0) { throw 'pip freeze failed.' }
+          Get-Content cutile-pip-freeze.txt | Tee-Object -FilePath cutile-environment.log -Append
+
+      - name: Compile and launch genuine cuTile smoke kernel
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Py = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          if (-not $Py) { throw 'Python path record is missing.' }
+          $Py = $Py.Substring('PYTHON_EXE='.Length)
+          & $Py scripts/cutile_smoke.py 2>&1 | Tee-Object -FilePath cutile-smoke.log
+          if ($LASTEXITCODE -ne 0) { throw 'Genuine cuTile smoke test failed.' }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'OUTPUT_CHECK=PASS' -Quiet)) { throw 'Smoke output check did not pass.' }
+          if (-not (Select-String -Path cutile-smoke.log -SimpleMatch 'CUTILE_RUNTIME_CHECK=PASS' -Quiet)) { throw 'cuTile smoke gate did not pass.' }
+
+      - name: Run required actual cuTile attention correctness matrix
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          "REQUIRE_CUTILE=$env:REQUIRE_CUTILE" | Tee-Object -FilePath cutile-pytest.log
+          & $Py -m pytest -q -ra tests/test_gpu_correctness.py tests/test_gpu_edge_cases.py 2>&1 | Tee-Object -FilePath cutile-pytest.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Required actual cuTile attention correctness matrix failed.' }
+
+      - name: Run optional cuTile GQA/MQA and packed-varlen correctness gates
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          REQUIRE_CUTILE: "1"
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          "REQUIRE_CUTILE=$env:REQUIRE_CUTILE" | Tee-Object -FilePath cutile-optional-objectives.log
+          & $Py -m pytest -q tests/test_gpu_optional_attention_objectives.py 2>&1 | Tee-Object -FilePath cutile-optional-objectives.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Optional GQA/MQA/packed-varlen GPU correctness gates failed.' }
+
+      - name: Record numerical error metrics for every mandatory case and tile
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py scripts/cutile_accuracy_report.py --output results/cutile-accuracy.json 2>&1 | Tee-Object -FilePath cutile-accuracy.log
+          if ($LASTEXITCODE -ne 0) { throw 'Independent-reference numerical error report failed.' }
+
+      - name: Exercise CLI and verify output against independent NumPy oracle
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          & $Py scripts/generate_inputs.py --output cutile-cli-input.npz --seq 64 --head-dim 32 --seed 20261018
+          if ($LASTEXITCODE -ne 0) { throw 'Deterministic CLI input generation failed.' }
+          & $Py run_attention.py --input cutile-cli-input.npz --output cutile-cli-output.npy --backend cutile --tile-q 64 --tile-k 64 2>&1 | Tee-Object -FilePath cutile-cli.log
+          if ($LASTEXITCODE -ne 0) { throw 'CLI inference failed.' }
+          & $Py scripts/verify_cli_output.py --input cutile-cli-input.npz --output cutile-cli-output.npy 2>&1 | Tee-Object -FilePath cutile-cli-reference.log
+          if ($LASTEXITCODE -ne 0) { throw 'CLI output mismatches the independent NumPy reference.' }
+
+      - name: Run three controlled benchmark sessions with alternating tile order
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+
+          # Reverse/rotate tile order between sessions to reduce systematic order bias.
+          $TileOrders = @(
+            ,@('32x64','64x64','64x128','128x64','128x128')
+            ,@('128x128','128x64','64x128','64x64','32x64')
+            ,@('64x64','32x64','128x64','64x128','128x128')
+          )
+          $Session = 1
+          foreach ($TileOrder in $TileOrders) {
+            $Output = "results/cutile-benchmark-session$Session.json"
+            $Log = "cutile-benchmark-session$Session.log"
+            $BenchmarkArgs = @('benchmarks/benchmark_attention.py','--output',$Output,'--warmup','10','--iterations','30','--tiles') + @($TileOrder)
+            "SESSION=$Session TILE_ORDER=$($TileOrder -join ',')" | Tee-Object -FilePath $Log
+            & $Py @BenchmarkArgs 2>&1 | Tee-Object -FilePath $Log -Append
+            if ($LASTEXITCODE -ne 0) { throw "Controlled benchmark session $Session failed." }
+            $Session++
+          }
+
+          & $Py scripts/summarize_benchmark_repeats.py --inputs results/cutile-benchmark-session1.json results/cutile-benchmark-session2.json results/cutile-benchmark-session3.json --json-output results/cutile-benchmark-summary.json --csv-output results/cutile-benchmark-summary.csv 2>&1 | Tee-Object -FilePath cutile-benchmark-summary.log
+          if ($LASTEXITCODE -ne 0) { throw 'Benchmark repeat aggregation failed.' }
+
+
+      - name: Compare against CUDA PyTorch SDPA framework reference
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py -c "import torch; print('TORCH='+torch.__version__); print('TORCH_CUDA='+str(torch.version.cuda)); print('CUDA_AVAILABLE='+str(torch.cuda.is_available()))" 2>&1 | Tee-Object -FilePath cutile-torch-sdpa.log
+          if ($LASTEXITCODE -ne 0) { throw 'PyTorch CUDA framework reference is not importable in the project venv.' }
+          & $Py scripts/benchmark_torch_sdpa.py --output results/cutile-vs-pytorch-sdpa.json --warmup 10 --iterations 30 --repeats-per-sample 5 2>&1 | Tee-Object -FilePath cutile-torch-sdpa.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'PyTorch SDPA accuracy/backend/timing comparison failed; inspect cutile-torch-sdpa.log.' }
+          if (-not (Test-Path results/cutile-vs-pytorch-sdpa.json)) { throw 'PyTorch SDPA report JSON was not produced.' }
+
+      - name: Measure long-specialization first-call time with isolated fresh caches
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py benchmarks/benchmark_clean_jit.py --output results/cutile-clean-jit.json --warmup 10 --iterations 30 --repeats-per-sample 5 --cases long_d128:64x64 longer_batched_d128:64x128 2>&1 | Tee-Object -FilePath cutile-clean-jit.log
+          if ($LASTEXITCODE -ne 0) { throw 'Fresh-cache JIT measurement failed.' }
+
+      - name: Profile-guided optional load-latency-hint experiment
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+          & $Py benchmarks/benchmark_load_latency_hints.py --output results/cutile-load-latency-hints.json --warmup 10 --iterations 30 --repeats-per-sample 5 --sessions 3 --minimum-gain-pct 1.0 2>&1 | Tee-Object -FilePath cutile-load-latency-hints.log
+          if ($LASTEXITCODE -ne 0) {
+            'LOAD_LATENCY_EXPERIMENT=FAIL; keep compiler-inferred default pending investigation.' | Tee-Object -FilePath cutile-load-latency-hints.log -Append
+            throw 'Optional load-latency-hint experiment failed; core correctness/benchmark evidence is retained separately.'
+          }
+          'LOAD_LATENCY_EXPERIMENT=PASS' | Tee-Object -FilePath cutile-load-latency-hints.log -Append
+
+      - name: Locate Nsight Compute and capture two genuine cuTile kernels
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE '..\..\..\..')).Path
+          $NcuPath = $null
+
+          # Prefer PATH, then inspect the standard NVIDIA installation folders,
+          # and finally the explicitly approved project-local locations.
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          if ($NcuCommand) { $NcuPath = $NcuCommand.Source }
+          if (-not $NcuPath) {
+            $SearchRoots = @()
+            if ($env:ProgramFiles) { $SearchRoots += (Join-Path $env:ProgramFiles 'NVIDIA Corporation') }
+            if (${env:ProgramFiles(x86)}) { $SearchRoots += (Join-Path ${env:ProgramFiles(x86)} 'NVIDIA Corporation') }
+            if ($env:LOCALAPPDATA) { $SearchRoots += (Join-Path $env:LOCALAPPDATA 'NVIDIA Corporation') }
+            foreach ($SearchRoot in $SearchRoots) {
+              if (-not (Test-Path $SearchRoot)) { continue }
+              $InstallDirs = Get-ChildItem -Path $SearchRoot -Directory -Filter 'Nsight Compute*' -ErrorAction SilentlyContinue
+              foreach ($InstallDir in $InstallDirs) {
+                $Found = Get-ChildItem -Path $InstallDir.FullName -Filter 'ncu.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($Found) { $NcuPath = $Found.FullName; break }
+              }
+              if ($NcuPath) { break }
+            }
+          }
+          if (-not $NcuPath) {
+            $NcuCandidates = @(
+              (Join-Path $ProjectRoot 'ncu.exe'),
+              (Join-Path $ProjectRoot '.tools\ncu.exe')
+            )
+            $NcuPath = $NcuCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $NcuPath) {
+            'NCU_NOT_FOUND: checked PATH, standard NVIDIA Nsight Compute install folders, project root, and project .tools.' | Tee-Object -FilePath cutile-profile-status.log
+            exit 0
+          }
+
+          "NCU_PATH=$NcuPath" | Tee-Object -FilePath cutile-profile-status.log
+          & $NcuPath --version 2>&1 | Tee-Object -FilePath cutile-profile-status.log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'Nsight Compute CLI was found but --version failed.' }
+          $PyRecord = Get-Content cutile-environment.log | Where-Object { $_ -like 'PYTHON_EXE=*' } | Select-Object -First 1
+          $Py = $PyRecord.Substring('PYTHON_EXE='.Length)
+          New-Item -ItemType Directory -Force -Path results | Out-Null
+
+          # profile_fused.py performs one cold launch + five warmups + one
+          # steady-state launch; collect just that final launch.
+          & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results/cutile-profile-medium $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-medium.log
+          $MediumExit = $LASTEXITCODE
+          if ($MediumExit -ne 0) { "MEDIUM_PROFILE_EXIT=$MediumExit" | Tee-Object -FilePath cutile-profile-status.log -Append }
+
+          & $NcuPath --set basic --launch-skip 6 --launch-count 1 --force-overwrite -o results/cutile-profile-long-batched $Py benchmarks/profile_fused.py --case longer_batched_d128 --tile-q 64 --tile-k 128 --warmup 5 2>&1 | Tee-Object -FilePath cutile-profile-long-batched.log
+          $LongExit = $LASTEXITCODE
+          if ($LongExit -ne 0) { "LONG_BATCHED_PROFILE_EXIT=$LongExit" | Tee-Object -FilePath cutile-profile-status.log -Append }
+
+          if ($MediumExit -ne 0 -or $LongExit -ne 0) {
+            throw "Nsight Compute failed (medium=$MediumExit, long/batched=$LongExit). Inspect profile logs for counter-permission errors."
+          }
+          "PROFILE_REPORTS_CREATED=$((Test-Path results/cutile-profile-medium.ncu-repz) -and (Test-Path results/cutile-profile-long-batched.ncu-repz))" | Tee-Object -FilePath cutile-profile-status.log -Append
+          Get-ChildItem results/cutile-profile-*.ncu-rep* -File -ErrorAction SilentlyContinue | ForEach-Object { "PROFILE_FILE=$($_.Name) SIZE=$($_.Length)" } | Tee-Object -FilePath cutile-profile-status.log -Append
+
+
+      - name: Matched Nsight Compute comparison for LOAD_LATENCY 0 versus 10
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProjectRoot = (Resolve-Path (Join-Path $env:GITHUB_WORKSPACE '..\..\..\..')).Path
+          $Py = Join-Path $ProjectRoot '.venv-cutile-windows\Scripts\python.exe'
+          $NcuPath = $null
+          $NcuCommand = Get-Command ncu.exe -ErrorAction SilentlyContinue
+          if ($NcuCommand) { $NcuPath = $NcuCommand.Source }
+          if (-not $NcuPath) {
+            foreach ($Root in @("$env:ProgramFiles\NVIDIA Corporation","$env:LOCALAPPDATA\NVIDIA Corporation")) {
+              if (Test-Path $Root) {
+                $Found = Get-ChildItem $Root -Filter ncu.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($Found) { $NcuPath = $Found.FullName; break }
+              }
+            }
+          }
+          if (-not $NcuPath) { throw 'Nsight Compute CLI not found.' }
+          $Out = 'results/cutile-matched-ncu'
+          New-Item -ItemType Directory -Force -Path $Out | Out-Null
+          "SOURCE_SHA=$env:GITHUB_SHA" | Set-Content "$Out/environment.txt"
+          "NCU_PATH=$NcuPath" | Add-Content "$Out/environment.txt"
+          & $NcuPath --version 2>&1 | Tee-Object -FilePath "$Out/environment.txt" -Append
+          foreach ($Hint in @(0,10)) {
+            $Name = if ($Hint -eq 0) { 'default' } else { 'latency10' }
+            $Base = Join-Path $Out "medium-d128-64x64-$Name"
+            "PROFILE=$Name LOAD_LATENCY=$Hint" | Tee-Object -FilePath "$Out/$Name.log"
+            & $NcuPath --set basic --section SchedulerStats --section WarpStateStats --section MemoryWorkloadAnalysis --launch-skip 6 --launch-count 1 --force-overwrite -o $Base $Py benchmarks/profile_fused.py --case medium_d128 --tile-q 64 --tile-k 64 --warmup 5 --load-latency $Hint 2>&1 | Tee-Object -FilePath "$Out/$Name.log" -Append
+            if ($LASTEXITCODE -ne 0) { throw "NCU capture failed for $Name." }
+            $Report = "$Base.ncu-repz"
+            if (-not (Test-Path $Report)) { throw "Expected profile missing: $Report" }
+            & $NcuPath --import $Report --page details --csv 2>&1 | Out-File -Encoding utf8 "$Base-details.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Details export failed for $Name." }
+            & $NcuPath --import $Report --page raw --csv 2>&1 | Out-File -Encoding utf8 "$Base-raw.csv"
+            if ($LASTEXITCODE -ne 0) { throw "Raw export failed for $Name." }
+          }
+          'MATCHED_NCU_PROFILES=2' | Tee-Object -FilePath "$Out/status.txt"
+
+      - name: Publish native run metrics and logs through GitHub REST API
+        if: always() && steps.source_verify.outcome == 'success'
+        continue-on-error: true
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        working-directory: .actions-workspace/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $Stage = Join-Path $env:RUNNER_TEMP ("cutile-evidence-" + $env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $Stage | Out-Null
+
+          $Files = @()
+          $Files += @(Get-ChildItem -LiteralPath . -File -Filter 'cutile-*.log' -ErrorAction SilentlyContinue)
+          $Files += @(Get-ChildItem -LiteralPath . -File -Filter 'cutile-*.txt' -ErrorAction SilentlyContinue)
+          if (Test-Path -LiteralPath 'results') {
+            $Files += @(Get-ChildItem -LiteralPath 'results' -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in @('.json','.csv','.log','.txt') })
+          }
+          $Files = @($Files | Sort-Object FullName -Unique)
+          $FileIndex = @()
+          foreach ($file in $Files) {
+            $relative = $file.FullName.Substring((Get-Location).Path.TrimEnd('\').Length + 1)
+            $destination = Join-Path $Stage $relative
+            $parent = Split-Path -Parent $destination
+            New-Item -ItemType Directory -Force -Path $parent | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $destination -Force
+            $FileIndex += [pscustomobject]@{
+              path = $relative.Replace('\','/')
+              bytes = $file.Length
+              sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          }
+          $manifest = [pscustomobject]@{
+            run_id = $env:GITHUB_RUN_ID
+            source_commit = $env:GITHUB_SHA
+            gpu_target = 'NVIDIA GeForce RTX 4060 / compute capability 8.9'
+            captured_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+            file_count = $FileIndex.Count
+            files = $FileIndex
+          }
+          $manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $Stage 'evidence-manifest.json')
+
+          $Headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+            'User-Agent' = 'gpu-nvidia-evidence-publisher'
+          }
+          function Invoke-GitHubApi {
+            param([string]$Method,[string]$Path,[object]$Body=$null)
+            $Uri = "https://api.github.com/repos/xemptynothing/gpu-nvidia$Path"
+            for ($Attempt = 1; $Attempt -le 6; $Attempt++) {
+              try {
+                if ($null -eq $Body) {
+                  return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -TimeoutSec 180
+                }
+                $Json = $Body | ConvertTo-Json -Depth 60 -Compress
+                return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $Headers -Body $Json -ContentType 'application/json; charset=utf-8' -TimeoutSec 180
+              } catch {
+                $Status = 0
+                try { $Status = [int]$_.Exception.Response.StatusCode } catch {}
+                if ($Status -in @(401,403,404,422) -or $Attempt -eq 6) { throw }
+                Write-Warning "GitHub REST $Method $Path attempt $Attempt failed: $($_.Exception.Message)"
+                Start-Sleep -Seconds ([Math]::Min(20, 2 * $Attempt))
+              }
+            }
+          }
+
+          $Entries = @()
+          foreach ($file in Get-ChildItem -LiteralPath $Stage -File -Recurse) {
+            if ($file.Length -ge 90000000) { throw "Refusing to publish a single evidence file >=90 MB: $($file.FullName)" }
+            $relative = $file.FullName.Substring($Stage.TrimEnd('\').Length + 1).Replace('\','/')
+            $content = [System.IO.File]::ReadAllText($file.FullName,[System.Text.Encoding]::UTF8)
+            $blob = Invoke-GitHubApi -Method POST -Path '/git/blobs' -Body @{ content=$content; encoding='utf-8' }
+            $Entries += @{ path="results/rtx4060-validation/$env:GITHUB_RUN_ID/$relative"; mode='100644'; type='blob'; sha=$blob.sha }
+          }
+          if ($Entries.Count -eq 0) { throw 'No native validation evidence files were found to publish.' }
+
+          $Committed = $false
+          for ($CommitAttempt = 1; $CommitAttempt -le 4; $CommitAttempt++) {
+            $ref = Invoke-GitHubApi -Method GET -Path '/git/ref/heads/main'
+            $parent = $ref.object.sha
+            $parentCommit = Invoke-GitHubApi -Method GET -Path "/git/commits/$parent"
+            $tree = Invoke-GitHubApi -Method POST -Path '/git/trees' -Body @{ base_tree=$parentCommit.tree.sha; tree=$Entries }
+            $commit = Invoke-GitHubApi -Method POST -Path '/git/commits' -Body @{
+              message="Add RTX 4060 validation evidence from run $env:GITHUB_RUN_ID"
+              tree=$tree.sha
+              parents=@($parent)
+            }
+            try {
+              $null = Invoke-GitHubApi -Method PATCH -Path '/git/refs/heads/main' -Body @{ sha=$commit.sha; force=$false }
+              $Committed = $true
+              "EVIDENCE_COMMIT=$($commit.sha) FILES=$($Entries.Count)" | Write-Host
+              break
+            } catch {
+              if ($CommitAttempt -eq 4) { throw }
+              Write-Warning "Evidence ref update raced with another main push; retrying from latest main."
+              Start-Sleep -Seconds (2 * $CommitAttempt)
+            }
+          }
+          if (-not $Committed) { throw 'Evidence commit was not published.' }

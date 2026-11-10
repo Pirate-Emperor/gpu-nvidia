@@ -1,0 +1,9 @@
+BEST long_d128                tile=64x64 median=0.268288 ms across 3 sessions speedup=16.45x range=0.3%
+BEST longer_batched_d128      tile=64x128 median=0.917914 ms across 3 sessions speedup=18.66x range=0.1%
+BEST medium_d128              tile=64x64 median=0.055603 ms across 3 sessions speedup=6.79x range=13.3%
+BEST medium_d64               tile=64x64 median=0.017920 ms across 3 sessions speedup=16.16x range=0.6%
+BEST short_d32                tile=32x64 median=0.017510 ms across 3 sessions speedup=17.85x range=73.1%
+BEST short_d64                tile=32x64 median=0.017715 ms across 3 sessions speedup=18.36x range=10.4%
+BEST short_multihead_d64      tile=64x128 median=0.016794 ms across 3 sessions speedup=17.51x range=7.9%
+SUMMARY_JSON=results\cutile-benchmark-summary.json
+SUMMARY_CSV=results\cutile-benchmark-summary.csv

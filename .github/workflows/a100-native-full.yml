@@ -1,0 +1,75 @@
+name: A100 full non-cuTile suite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/reference.py"
+      - "src/online_reference.py"
+      - "src/contract.py"
+      - "src/baseline.py"
+      - "src/naive_cuda_attention.py"
+      - "src/custom_cuda_attention.py"
+      - "src/warp_cuda_attention.py"
+      - "src/shared_tile_cuda_attention.py"
+      - "src/variants/**"
+      - "tests/**"
+      - ".github/workflows/a100-native-full.yml"
+      - "requirements-dev.txt"
+      - "pyproject.toml"
+      - "scripts/setup_native_env.sh"
+
+concurrency:
+  group: a100-native-full-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  non-cutile:
+    runs-on: [self-hosted, linux, x64, gpu, a100]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify A100 and CUDA
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi --query-gpu=index,name,driver_version,compute_cap,memory.total --format=csv
+          nvcc --version
+
+      - name: Prepare persistent native environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/setup_native_env.sh
+
+      - name: Run all tests that do not require cuTile
+        shell: bash
+        env:
+          REQUIRE_A100: "1"
+        run: |
+          set -euo pipefail
+          export CUPY_CACHE_DIR="${CUPY_CACHE_DIR:-$HOME/.cache/gpu-nvidia/cupy}"
+          mkdir -p "$CUPY_CACHE_DIR"
+          ${NATIVE_VENV}/bin/python -m pytest -q \
+            tests/test_cases.py \
+            tests/test_generator.py \
+            tests/test_io.py \
+            tests/test_launch_contract.py \
+            tests/test_online_reference.py \
+            tests/test_project_structure.py \
+            tests/test_cutile_config.py \
+            tests/test_reference_contract.py \
+            tests/test_reference_causal.py \
+            tests/test_reference_edge_cases.py \
+            tests/test_reference_exhaustive.py \
+            tests/test_reference_metamorphic.py \
+            tests/test_gpu_baselines.py \
+            tests/test_gpu_custom_cuda.py \
+            tests/test_gpu_custom_cuda_variants.py \
+            tests/test_gpu_device_matrix.py \
+            tests/test_gpu_kernel_versions.py \
+            tests/test_gpu_kernel_v3.py \
+            tests/test_tooling_compile.py \
+            tests/test_gpu_shared_tile_exhaustive.py

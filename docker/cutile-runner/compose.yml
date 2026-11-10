@@ -1,0 +1,26 @@
+services:
+  runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gpu-nvidia-cutile-runner:local
+    gpus: all
+    init: true
+    restart: "no"
+    environment:
+      RUNNER_REPO: https://github.com/xemptynothing/gpu-nvidia
+      RUNNER_TOKEN: ${RUNNER_TOKEN-}
+      RUNNER_NAME: ${RUNNER_NAME:-cutile-rtx4060-runner}
+      RUNNER_LABELS: gpu,cutile-rtx4060
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    mem_limit: 6g
+    shm_size: 1g
+    stop_grace_period: 30s
+    # No host bind mounts, Docker socket, privileged mode, ports, or persisted workspace.
+    # Empty/default interpolation lets "docker compose down" work without keeping
+    # registration credentials in the PowerShell environment; entrypoint.sh rejects
+    # an empty token when someone attempts to start the service without a token.
